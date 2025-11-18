@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Configurator3D, {
   TableShape,
   TabletopConfig
@@ -16,6 +16,9 @@ const defaultConfig: TabletopConfig = {
   quantity: 1
 };
 
+// Supported board thickness increments for the slider.
+const thicknessOptions = [12, 16, 18, 25, 33];
+
 const ConfiguratorPage: React.FC = () => {
   const [config, setConfig] = useState<TabletopConfig>(defaultConfig);
   const { price, loading, error } = usePricing(config);
@@ -32,6 +35,25 @@ const ConfiguratorPage: React.FC = () => {
     price != null
       ? price.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })
       : '—';
+
+  // Clamp the corner radius whenever the width slider reduces the available space.
+  useEffect(() => {
+    if (config.shape !== 'rounded-rect') return;
+    const maxCornerRadius = Math.floor(config.widthMm / 2);
+    if (config.edgeRadiusMm > maxCornerRadius) {
+      setConfig(prev => ({
+        ...prev,
+        edgeRadiusMm: Math.max(50, maxCornerRadius)
+      }));
+    }
+  }, [config.shape, config.widthMm, config.edgeRadiusMm]);
+
+  const maxCornerRadius = useMemo(() => Math.floor(config.widthMm / 2), [config.widthMm]);
+  // Translate the saved thickness back to the slider position.
+  const thicknessIndex = useMemo(
+    () => Math.max(thicknessOptions.indexOf(config.thicknessMm), 0),
+    [config.thicknessMm]
+  );
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
@@ -83,57 +105,86 @@ const ConfiguratorPage: React.FC = () => {
           </div>
 
           <label className="flex flex-col gap-1">
-            <span>Length (mm)</span>
+            <div className="flex items-center justify-between text-[0.75rem] font-medium">
+              <span>Length (mm)</span>
+              <span className="text-slate-400">{config.lengthMm} mm</span>
+            </div>
             <input
-              type="number"
-              min={600}
-              max={4000}
+              type="range"
+              min={500}
+              max={3600}
+              step={10}
               value={config.lengthMm}
               onChange={e => updateField('lengthMm', Number(e.target.value))}
-              className="rounded border border-slate-700 bg-slate-950 px-2 py-1"
+              className="accent-emerald-400"
             />
+            <p className="text-[0.7rem] text-slate-400">
+              Slide between 500&nbsp;mm and 3600&nbsp;mm to match your room or base footprint.
+            </p>
           </label>
 
           <label className="flex flex-col gap-1">
-            <span>Width (mm)</span>
+            <div className="flex items-center justify-between text-[0.75rem] font-medium">
+              <span>Width (mm)</span>
+              <span className="text-slate-400">{config.widthMm} mm</span>
+            </div>
             <input
-              type="number"
-              min={400}
+              type="range"
+              min={300}
               max={1800}
+              step={10}
               value={config.widthMm}
               onChange={e => updateField('widthMm', Number(e.target.value))}
-              className="rounded border border-slate-700 bg-slate-950 px-2 py-1"
+              className="accent-emerald-400"
             />
+            <p className="text-[0.7rem] text-slate-400">
+              Choose a width from 300&nbsp;mm to 1800&nbsp;mm—ideal for narrow desks or
+              generous conference tables.
+            </p>
           </label>
 
           {config.shape === 'rounded-rect' && (
             <label className="flex flex-col gap-1">
-              <span>Corner radius (mm)</span>
+              <div className="flex items-center justify-between text-[0.75rem] font-medium">
+                <span>Corner radius (mm)</span>
+                <span className="text-slate-400">{config.edgeRadiusMm} mm</span>
+              </div>
               <input
-                type="number"
-                min={20}
-                max={400}
+                type="range"
+                min={50}
+                max={maxCornerRadius}
+                step={5}
                 value={config.edgeRadiusMm}
-                onChange={e =>
-                  updateField('edgeRadiusMm', Number(e.target.value))
-                }
-                className="rounded border border-slate-700 bg-slate-950 px-2 py-1"
+                onChange={e => updateField('edgeRadiusMm', Number(e.target.value))}
+                className="accent-emerald-400"
               />
+              <p className="text-[0.7rem] text-slate-400">
+                Pick between a gentle 50&nbsp;mm curve and up to half of the table width for a
+                bold rounded corner.
+              </p>
             </label>
           )}
 
           <label className="flex flex-col gap-1">
-            <span>Thickness (mm)</span>
+            <div className="flex items-center justify-between text-[0.75rem] font-medium">
+              <span>Thickness (mm)</span>
+              <span className="text-slate-400">{config.thicknessMm} mm</span>
+            </div>
             <input
-              type="number"
-              min={18}
-              max={50}
-              value={config.thicknessMm}
-              onChange={e =>
-                updateField('thicknessMm', Number(e.target.value))
-              }
-              className="rounded border border-slate-700 bg-slate-950 px-2 py-1"
+              type="range"
+              min={0}
+              max={thicknessOptions.length - 1}
+              step={1}
+              value={thicknessIndex}
+              onChange={e => {
+                const nextIndex = Number(e.target.value);
+                updateField('thicknessMm', thicknessOptions[nextIndex]);
+              }}
+              className="accent-emerald-400"
             />
+            <p className="text-[0.7rem] text-slate-400">
+              Snap to common board sizes: 12, 16, 18, 25 or 33&nbsp;mm thicknesses.
+            </p>
           </label>
 
           <label className="flex flex-col gap-1">
@@ -146,6 +197,10 @@ const ConfiguratorPage: React.FC = () => {
               onChange={e => updateField('quantity', Number(e.target.value))}
               className="rounded border border-slate-700 bg-slate-950 px-2 py-1"
             />
+            <p className="text-[0.7rem] text-slate-400">
+              Tell us how many identical tops you require (between 1 and 50) so pricing stays
+              accurate.
+            </p>
           </label>
         </div>
 
