@@ -2,9 +2,17 @@
   "functions": {
     "source": "functions"
   },
-  "hosting": {
-    "predeploy": ["npm run build"],
-    "public": "dist",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
-  }
+  "hosting": [
+    {
+      "target": "curvetops-configurator-bbeb7",
+      "site": "curvetops-configurator-bbeb7",
+      "predeploy": ["npm run build"],
+      "public": "dist",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ]
+    }
+  ]
 }

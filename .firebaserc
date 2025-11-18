@@ -2,6 +2,14 @@
   "projects": {
     "default": "curvetops-configurator"
   },
-  "targets": {},
+  "targets": {
+    "curvetops-configurator": {
+      "hosting": {
+        "curvetops-configurator-bbeb7": [
+          "curvetops-configurator-bbeb7"
+        ]
+      }
+    }
+  },
   "etags": {}
 }
