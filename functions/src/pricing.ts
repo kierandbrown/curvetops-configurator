@@ -1,11 +1,12 @@
 import * as functions from 'firebase-functions';
 
 interface TabletopConfig {
-  shape: 'rect' | 'rounded-rect' | 'ellipse';
+  shape: 'rect' | 'rounded-rect' | 'ellipse' | 'super-ellipse';
   lengthMm: number;
   widthMm: number;
   thicknessMm: number;
   edgeRadiusMm: number;
+  superEllipseExponent: number;
   material: 'laminate' | 'timber' | 'linoleum';
   finish: 'matte' | 'satin';
   quantity: number;

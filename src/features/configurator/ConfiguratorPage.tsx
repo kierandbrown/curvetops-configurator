@@ -11,6 +11,7 @@ const defaultConfig: TabletopConfig = {
   widthMm: 900,
   thicknessMm: 25,
   edgeRadiusMm: 150,
+  superEllipseExponent: 2.5,
   material: 'laminate',
   finish: 'matte',
   quantity: 1
@@ -102,6 +103,16 @@ const ConfiguratorPage: React.FC = () => {
             >
               Ellipse
             </button>
+            <button
+              onClick={() => handleShapeChange('super-ellipse')}
+              className={`rounded border px-2 py-1 ${
+                config.shape === 'super-ellipse'
+                  ? 'border-emerald-400 bg-emerald-500/10'
+                  : 'border-slate-700'
+              }`}
+            >
+              Super ellipse
+            </button>
           </div>
 
           <label className="flex flex-col gap-1">
@@ -161,6 +172,32 @@ const ConfiguratorPage: React.FC = () => {
               <p className="text-[0.7rem] text-slate-400">
                 Pick between a gentle 50&nbsp;mm curve and up to half of the table width for a
                 bold rounded corner.
+              </p>
+            </label>
+          )}
+
+          {config.shape === 'super-ellipse' && (
+            <label className="flex flex-col gap-1">
+              {/* Allow designers to blend between a pure ellipse and a squarer super ellipse. */}
+              <div className="flex items-center justify-between text-[0.75rem] font-medium">
+                <span>Softness exponent</span>
+                <span className="text-slate-400">
+                  n = {config.superEllipseExponent.toFixed(1)}
+                </span>
+              </div>
+              <input
+                type="range"
+                min={1.5}
+                max={6}
+                step={0.1}
+                value={config.superEllipseExponent}
+                onChange={e => updateField('superEllipseExponent', Number(e.target.value))}
+                className="accent-emerald-400"
+              />
+              <p className="text-[0.7rem] text-slate-400">
+                Increase the exponent to morph the curve from a soft ellipse (n≈2) to a
+                squarer super-ellipse that keeps wider straights before sweeping into the
+                ends.
               </p>
             </label>
           )}
