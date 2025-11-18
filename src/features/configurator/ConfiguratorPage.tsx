@@ -22,6 +22,79 @@ const defaultConfig: TabletopConfig = {
 // Supported board thickness increments for the slider.
 const thicknessOptions = [12, 16, 18, 25, 33];
 
+// Visual previews for each tabletop shape help replace the plain text buttons and
+// keep the UI consistent with the request for image-based selectors.
+const shapeOptions: { shape: TableShape; label: string; icon: JSX.Element }[] = [
+  {
+    shape: 'rect',
+    label: 'Rectangle',
+    icon: (
+      <div
+        aria-hidden
+        className="h-10 w-16 rounded-sm border-2 border-emerald-300/50 bg-emerald-400/20"
+      />
+    )
+  },
+  {
+    shape: 'rounded-rect',
+    label: 'Rounded corners',
+    icon: (
+      <div
+        aria-hidden
+        className="h-10 w-16 rounded-2xl border-2 border-emerald-300/50 bg-emerald-400/20"
+      />
+    )
+  },
+  {
+    shape: 'ellipse',
+    label: 'Ellipse',
+    icon: (
+      <div
+        aria-hidden
+        className="h-10 w-16 rounded-full border-2 border-emerald-300/50 bg-emerald-400/20"
+      />
+    )
+  },
+  {
+    shape: 'super-ellipse',
+    label: 'Super ellipse',
+    icon: (
+      <svg
+        aria-hidden
+        viewBox="0 0 100 60"
+        className="h-10 w-16 text-emerald-300"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={4}
+      >
+        <path d="M20 10 C10 10 10 50 20 50 H80 C90 50 90 10 80 10 Z" className="fill-emerald-400/20" />
+      </svg>
+    )
+  },
+  {
+    shape: 'custom',
+    label: 'Custom DXF/DWG',
+    icon: (
+      <div aria-hidden className="flex h-10 w-16 items-center justify-center rounded border-2 border-emerald-300/50">
+        <svg
+          viewBox="0 0 48 48"
+          className="h-6 w-6 text-emerald-300"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            d="M8 24h8l4-8 8 16 4-8h8"
+            className="stroke-emerald-300"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
+    )
+  }
+];
+
 const ConfiguratorPage: React.FC = () => {
   const [config, setConfig] = useState<TabletopConfig>(defaultConfig);
   // Custom shape metadata drives the DXF preview + the locked dimensions.
@@ -96,57 +169,26 @@ const ConfiguratorPage: React.FC = () => {
       <section className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900 p-4">
         <h2 className="text-sm font-semibold text-slate-200">Parameters</h2>
         <div className="grid gap-3 text-xs text-slate-200">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <button
-              onClick={() => handleShapeChange('rect')}
-              className={`rounded border px-2 py-1 ${
-                config.shape === 'rect'
-                  ? 'border-emerald-400 bg-emerald-500/10'
-                  : 'border-slate-700'
-              }`}
-            >
-              Rectangle
-            </button>
-            <button
-              onClick={() => handleShapeChange('rounded-rect')}
-              className={`rounded border px-2 py-1 ${
-                config.shape === 'rounded-rect'
-                  ? 'border-emerald-400 bg-emerald-500/10'
-                  : 'border-slate-700'
-              }`}
-            >
-              Rounded corners
-            </button>
-            <button
-              onClick={() => handleShapeChange('ellipse')}
-              className={`rounded border px-2 py-1 ${
-                config.shape === 'ellipse'
-                  ? 'border-emerald-400 bg-emerald-500/10'
-                  : 'border-slate-700'
-              }`}
-            >
-              Ellipse
-            </button>
-            <button
-              onClick={() => handleShapeChange('super-ellipse')}
-              className={`rounded border px-2 py-1 ${
-                config.shape === 'super-ellipse'
-                  ? 'border-emerald-400 bg-emerald-500/10'
-                  : 'border-slate-700'
-              }`}
-            >
-              Super ellipse
-            </button>
-            <button
-              onClick={() => handleShapeChange('custom')}
-              className={`rounded border px-2 py-1 ${
-                config.shape === 'custom'
-                  ? 'border-emerald-400 bg-emerald-500/10'
-                  : 'border-slate-700'
-              }`}
-            >
-              Custom DXF/DWG
-            </button>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {shapeOptions.map(option => (
+              <button
+                key={option.shape}
+                onClick={() => handleShapeChange(option.shape)}
+                className={`group relative flex h-20 items-center justify-center rounded-xl border bg-slate-950/70 transition ${
+                  config.shape === option.shape
+                    ? 'border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.2)]'
+                    : 'border-slate-700 hover:border-emerald-300/80'
+                }`}
+              >
+                {/* Icon previews make it easier to understand each table type at a glance. */}
+                {option.icon}
+                {/* Screen reader label + hover label */}
+                <span className="sr-only">{option.label}</span>
+                <span className="pointer-events-none absolute -bottom-7 rounded bg-slate-900 px-2 py-0.5 text-[0.65rem] text-slate-100 opacity-0 transition group-hover:opacity-100">
+                  {option.label}
+                </span>
+              </button>
+            ))}
           </div>
 
           {config.shape === 'custom' && (
