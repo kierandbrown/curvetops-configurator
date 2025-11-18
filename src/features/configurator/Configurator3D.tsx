@@ -250,106 +250,201 @@ const IconRuler = () => (
   </svg>
 );
 
-interface DimensionOverlayProps {
+interface LinkedDimensionOverlayProps {
   config: TabletopConfig;
   activeView: ViewPreset;
   visible: boolean;
 }
 
-// Render a small glyph so the overlay hints at the direction of each dimension line.
-const DimensionGlyph: React.FC<{ orientation: 'horizontal' | 'vertical' }> = ({ orientation }) => {
-  const isHorizontal = orientation === 'horizontal';
-  return (
-    <svg
-      viewBox={isHorizontal ? '0 0 120 24' : '0 0 24 120'}
-      className={`text-emerald-200 ${isHorizontal ? 'h-6 w-24' : 'h-24 w-6'}`}
-      aria-hidden="true"
-    >
-      <defs>
-        <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto" markerUnits="strokeWidth">
-          <path d="M0,0 L0,6 L6,3 z" fill="currentColor" />
-        </marker>
-      </defs>
-      {isHorizontal ? (
-        <g>
-          <line x1="10" y1="12" x2="110" y2="12" stroke="currentColor" strokeWidth="2" markerStart="url(#arrow)" markerEnd="url(#arrow)" />
-          <line x1="60" y1="5" x2="60" y2="19" stroke="currentColor" strokeWidth="1" strokeDasharray="4 4" />
-        </g>
-      ) : (
-        <g>
-          <line x1="12" y1="10" x2="12" y2="110" stroke="currentColor" strokeWidth="2" markerStart="url(#arrow)" markerEnd="url(#arrow)" />
-          <line x1="5" y1="60" x2="19" y2="60" stroke="currentColor" strokeWidth="1" strokeDasharray="4 4" />
-        </g>
-      )}
-    </svg>
-  );
-};
+interface DimensionLineLayout {
+  key: string;
+  orientation: 'horizontal' | 'vertical';
+  value: string;
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+  label: { x: number; y: number };
+  connectors?: { x1: number; y1: number; x2: number; y2: number }[];
+}
 
-// Overlay that communicates the current view's overall dimensions in a compact card.
-const DimensionOverlay: React.FC<DimensionOverlayProps> = ({ config, activeView, visible }) => {
-  if (!visible || !['top', 'front', 'side'].includes(activeView)) {
+interface DimensionViewLayout {
+  shape: { x: number; y: number; width: number; height: number; rx?: number; ry?: number };
+  lines: DimensionLineLayout[];
+}
+
+// Draw lightweight measurement lines that hug the model instead of a block of explanatory text.
+const LinkedDimensionOverlay: React.FC<LinkedDimensionOverlayProps> = ({ config, activeView, visible }) => {
+  if (!visible || activeView === '3d') {
     return null;
   }
 
   const { lengthMm, widthMm, thicknessMm } = config;
 
-  // Map each orthographic preset to the dimensions that matter for that view.
-  // Keeping this derived data inside the component means the text reacts instantly
-  // whenever the sliders in the configurator change.
-  const viewDimensions = {
+  // Describe how each orthographic view should render its reference rectangle and measurement lines.
+  // Using normalized coordinates (0-100) inside the viewBox keeps the math simple and ensures the overlay
+  // scales with the canvas size.
+  const viewLayouts: Record<'top' | 'front' | 'side', DimensionViewLayout> = {
     top: {
-      title: 'Plan (Top) Dimensions',
+      shape: { x: 30, y: 32, width: 40, height: 25, rx: 6, ry: 6 },
       lines: [
-        { label: 'Overall Length', value: `${lengthMm} mm`, orientation: 'horizontal' as const },
-        { label: 'Overall Width', value: `${widthMm} mm`, orientation: 'vertical' as const }
+        {
+          key: 'length',
+          orientation: 'horizontal',
+          value: `${lengthMm} mm`,
+          start: { x: 20, y: 25 },
+          end: { x: 80, y: 25 },
+          label: { x: 50, y: 21 },
+          connectors: [
+            { x1: 30, y1: 32, x2: 30, y2: 26.5 },
+            { x1: 70, y1: 32, x2: 70, y2: 26.5 }
+          ]
+        },
+        {
+          key: 'width',
+          orientation: 'vertical',
+          value: `${widthMm} mm`,
+          start: { x: 24, y: 32 },
+          end: { x: 24, y: 57 },
+          label: { x: 19, y: 45 },
+          connectors: [
+            { x1: 30, y1: 32, x2: 24.8, y2: 32 },
+            { x1: 30, y1: 57, x2: 24.8, y2: 57 }
+          ]
+        }
       ]
     },
     front: {
-      title: 'Front Elevation Dimensions',
+      shape: { x: 25, y: 47, width: 50, height: 9, rx: 2, ry: 2 },
       lines: [
-        { label: 'Overall Length', value: `${lengthMm} mm`, orientation: 'horizontal' as const },
-        { label: 'Thickness', value: `${thicknessMm} mm`, orientation: 'vertical' as const }
+        {
+          key: 'length',
+          orientation: 'horizontal',
+          value: `${lengthMm} mm`,
+          start: { x: 17, y: 42 },
+          end: { x: 83, y: 42 },
+          label: { x: 50, y: 38 },
+          connectors: [
+            { x1: 25, y1: 47, x2: 25, y2: 43 },
+            { x1: 75, y1: 47, x2: 75, y2: 43 }
+          ]
+        },
+        {
+          key: 'thickness-front',
+          orientation: 'vertical',
+          value: `${thicknessMm} mm`,
+          start: { x: 78, y: 47 },
+          end: { x: 78, y: 60 },
+          label: { x: 84, y: 54 },
+          connectors: [
+            { x1: 78, y1: 47, x2: 75, y2: 47 },
+            { x1: 78, y1: 56, x2: 75, y2: 56 }
+          ]
+        }
       ]
     },
     side: {
-      title: 'Side Elevation Dimensions',
+      shape: { x: 30, y: 47, width: 40, height: 9, rx: 2, ry: 2 },
       lines: [
-        { label: 'Overall Width', value: `${widthMm} mm`, orientation: 'horizontal' as const },
-        { label: 'Thickness', value: `${thicknessMm} mm`, orientation: 'vertical' as const }
+        {
+          key: 'width-side',
+          orientation: 'horizontal',
+          value: `${widthMm} mm`,
+          start: { x: 22, y: 42 },
+          end: { x: 78, y: 42 },
+          label: { x: 50, y: 38 },
+          connectors: [
+            { x1: 30, y1: 47, x2: 30, y2: 43 },
+            { x1: 70, y1: 47, x2: 70, y2: 43 }
+          ]
+        },
+        {
+          key: 'thickness-side',
+          orientation: 'vertical',
+          value: `${thicknessMm} mm`,
+          start: { x: 73, y: 47 },
+          end: { x: 73, y: 60 },
+          label: { x: 79, y: 54 },
+          connectors: [
+            { x1: 73, y1: 47, x2: 70, y2: 47 },
+            { x1: 73, y1: 56, x2: 70, y2: 56 }
+          ]
+        }
       ]
     }
-  } as const;
+  };
 
-  const content = viewDimensions[activeView];
+  const layout = viewLayouts[activeView as 'top' | 'front' | 'side'];
 
   return (
-    // Pin the overlay to the top edge of the viewport so it never feels like a modal obscuring
-    // the 3D scene. Pointer events remain disabled so the canvas underneath stays interactive.
-    <div className="pointer-events-none absolute left-0 right-0 top-0 flex justify-center px-3 pt-3 sm:px-6">
-      <div className="w-full max-w-3xl rounded-2xl border border-white/10 bg-slate-950/80 p-4 shadow-2xl backdrop-blur">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200">{content.title}</p>
-            <p className="mt-1 text-sm text-slate-200">
-              These values mirror the live sliders below so the plan stays anchored to the top edge instead of obscuring the preview.
-            </p>
-          </div>
-          <p className="text-xs text-slate-400">
-            Adjust any dimension to instantly refresh these readouts.
-          </p>
-        </div>
-        <ul className="mt-4 grid gap-3 sm:grid-cols-2">
-          {content.lines.map(line => (
-            <li key={line.label} className="flex items-center gap-3 rounded-xl bg-white/5 p-3">
-              <DimensionGlyph orientation={line.orientation} />
-              <div>
-                <p className="text-[0.7rem] uppercase tracking-wider text-slate-400">{line.label}</p>
-                <p className="text-base font-semibold text-white">{line.value}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
+    <div className="pointer-events-none absolute inset-0">
+      <svg viewBox="0 0 100 100" className="h-full w-full text-emerald-200" aria-hidden="true">
+        <defs>
+          <marker
+            id="dimension-arrow"
+            markerWidth="6"
+            markerHeight="6"
+            refX="5"
+            refY="3"
+            orient="auto"
+            markerUnits="strokeWidth"
+          >
+            <path d="M0,0 L0,6 L6,3 z" fill="currentColor" />
+          </marker>
+        </defs>
+        <rect
+          x={layout.shape.x}
+          y={layout.shape.y}
+          width={layout.shape.width}
+          height={layout.shape.height}
+          rx={layout.shape.rx ?? 0}
+          ry={layout.shape.ry ?? 0}
+          fill="none"
+          stroke="currentColor"
+          strokeOpacity={0.3}
+          strokeWidth={1.2}
+        />
+        {layout.lines.map(line => (
+          <g key={line.key}>
+            {line.connectors?.map((connector, index) => (
+              <line
+                key={`${line.key}-connector-${index}`}
+                x1={connector.x1}
+                y1={connector.y1}
+                x2={connector.x2}
+                y2={connector.y2}
+                stroke="currentColor"
+                strokeWidth={0.8}
+                strokeOpacity={0.6}
+                strokeDasharray="4 2"
+              />
+            ))}
+            <line
+              x1={line.start.x}
+              y1={line.start.y}
+              x2={line.end.x}
+              y2={line.end.y}
+              stroke="currentColor"
+              strokeWidth={1.2}
+              markerStart="url(#dimension-arrow)"
+              markerEnd="url(#dimension-arrow)"
+            />
+            <text
+              x={line.label.x}
+              y={line.label.y}
+              fill="currentColor"
+              fontSize={4.2}
+              fontWeight={600}
+              textAnchor="middle"
+              transform={
+                line.orientation === 'vertical'
+                  ? `rotate(-90 ${line.label.x} ${line.label.y})`
+                  : undefined
+              }
+            >
+              {line.value}
+            </text>
+          </g>
+        ))}
+      </svg>
     </div>
   );
 };
@@ -436,7 +531,7 @@ const Configurator3D: React.FC<{ config: TabletopConfig }> = ({ config }) => {
         <CameraViewUpdater preset={activeView} controlsRef={controlsRef} viewTargets={viewTargets} />
       </Canvas>
 
-      <DimensionOverlay config={config} activeView={activeView} visible={showDimensions} />
+      <LinkedDimensionOverlay config={config} activeView={activeView} visible={showDimensions} />
 
       <div className="pointer-events-none absolute inset-0 flex justify-end p-3">
         <div className="pointer-events-auto flex flex-col gap-2 rounded-xl border border-white/10 bg-slate-900/80 p-2 shadow-xl backdrop-blur">
