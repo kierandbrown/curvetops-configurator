@@ -293,6 +293,9 @@ const DimensionOverlay: React.FC<DimensionOverlayProps> = ({ config, activeView,
 
   const { lengthMm, widthMm, thicknessMm } = config;
 
+  // Map each orthographic preset to the dimensions that matter for that view.
+  // Keeping this derived data inside the component means the text reacts instantly
+  // whenever the sliders in the configurator change.
   const viewDimensions = {
     top: {
       title: 'Plan (Top) Dimensions',
@@ -320,15 +323,24 @@ const DimensionOverlay: React.FC<DimensionOverlayProps> = ({ config, activeView,
   const content = viewDimensions[activeView];
 
   return (
-    <div className="pointer-events-none absolute inset-0 flex items-start justify-center p-4 sm:items-center">
-      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-slate-950/80 p-4 shadow-2xl backdrop-blur">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200">{content.title}</p>
-        <p className="mt-1 text-sm text-slate-200">
-          These values reflect the total span of the tabletop in the current view so you can quickly verify clearances.
-        </p>
-        <ul className="mt-4 space-y-3">
+    // Pin the overlay to the top edge of the viewport so it never feels like a modal obscuring
+    // the 3D scene. Pointer events remain disabled so the canvas underneath stays interactive.
+    <div className="pointer-events-none absolute left-0 right-0 top-0 flex justify-center px-3 pt-3 sm:px-6">
+      <div className="w-full max-w-3xl rounded-2xl border border-white/10 bg-slate-950/80 p-4 shadow-2xl backdrop-blur">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200">{content.title}</p>
+            <p className="mt-1 text-sm text-slate-200">
+              These values mirror the live sliders below so the plan stays anchored to the top edge instead of obscuring the preview.
+            </p>
+          </div>
+          <p className="text-xs text-slate-400">
+            Adjust any dimension to instantly refresh these readouts.
+          </p>
+        </div>
+        <ul className="mt-4 grid gap-3 sm:grid-cols-2">
           {content.lines.map(line => (
-            <li key={line.label} className="flex items-center gap-3">
+            <li key={line.label} className="flex items-center gap-3 rounded-xl bg-white/5 p-3">
               <DimensionGlyph orientation={line.orientation} />
               <div>
                 <p className="text-[0.7rem] uppercase tracking-wider text-slate-400">{line.label}</p>
