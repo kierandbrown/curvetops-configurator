@@ -166,6 +166,105 @@ const IconIso = () => (
   </svg>
 );
 
+const IconRuler = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" width={20} height={20} className="text-slate-200">
+    <rect x={3} y={5} width={18} height={14} rx={2} ry={2} fill="none" stroke="currentColor" strokeWidth={1.5} />
+    <path d="M7 5V8M11 5V9M15 5V8M7 19V16M11 19V15M15 19V16" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" />
+  </svg>
+);
+
+interface DimensionOverlayProps {
+  config: TabletopConfig;
+  activeView: ViewPreset;
+  visible: boolean;
+}
+
+// Render a small glyph so the overlay hints at the direction of each dimension line.
+const DimensionGlyph: React.FC<{ orientation: 'horizontal' | 'vertical' }> = ({ orientation }) => {
+  const isHorizontal = orientation === 'horizontal';
+  return (
+    <svg
+      viewBox={isHorizontal ? '0 0 120 24' : '0 0 24 120'}
+      className={`text-emerald-200 ${isHorizontal ? 'h-6 w-24' : 'h-24 w-6'}`}
+      aria-hidden="true"
+    >
+      <defs>
+        <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto" markerUnits="strokeWidth">
+          <path d="M0,0 L0,6 L6,3 z" fill="currentColor" />
+        </marker>
+      </defs>
+      {isHorizontal ? (
+        <g>
+          <line x1="10" y1="12" x2="110" y2="12" stroke="currentColor" strokeWidth="2" markerStart="url(#arrow)" markerEnd="url(#arrow)" />
+          <line x1="60" y1="5" x2="60" y2="19" stroke="currentColor" strokeWidth="1" strokeDasharray="4 4" />
+        </g>
+      ) : (
+        <g>
+          <line x1="12" y1="10" x2="12" y2="110" stroke="currentColor" strokeWidth="2" markerStart="url(#arrow)" markerEnd="url(#arrow)" />
+          <line x1="5" y1="60" x2="19" y2="60" stroke="currentColor" strokeWidth="1" strokeDasharray="4 4" />
+        </g>
+      )}
+    </svg>
+  );
+};
+
+// Overlay that communicates the current view's overall dimensions in a compact card.
+const DimensionOverlay: React.FC<DimensionOverlayProps> = ({ config, activeView, visible }) => {
+  if (!visible || !['top', 'front', 'side'].includes(activeView)) {
+    return null;
+  }
+
+  const { lengthMm, widthMm, thicknessMm } = config;
+
+  const viewDimensions = {
+    top: {
+      title: 'Plan (Top) Dimensions',
+      lines: [
+        { label: 'Overall Length', value: `${lengthMm} mm`, orientation: 'horizontal' as const },
+        { label: 'Overall Width', value: `${widthMm} mm`, orientation: 'vertical' as const }
+      ]
+    },
+    front: {
+      title: 'Front Elevation Dimensions',
+      lines: [
+        { label: 'Overall Length', value: `${lengthMm} mm`, orientation: 'horizontal' as const },
+        { label: 'Thickness', value: `${thicknessMm} mm`, orientation: 'vertical' as const }
+      ]
+    },
+    side: {
+      title: 'Side Elevation Dimensions',
+      lines: [
+        { label: 'Overall Width', value: `${widthMm} mm`, orientation: 'horizontal' as const },
+        { label: 'Thickness', value: `${thicknessMm} mm`, orientation: 'vertical' as const }
+      ]
+    }
+  } as const;
+
+  const content = viewDimensions[activeView];
+
+  return (
+    <div className="pointer-events-none absolute inset-0 flex items-start justify-center p-4 sm:items-center">
+      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-slate-950/80 p-4 shadow-2xl backdrop-blur">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200">{content.title}</p>
+        <p className="mt-1 text-sm text-slate-200">
+          These values reflect the total span of the tabletop in the current view so you can quickly verify clearances.
+        </p>
+        <ul className="mt-4 space-y-3">
+          {content.lines.map(line => (
+            <li key={line.label} className="flex items-center gap-3">
+              <DimensionGlyph orientation={line.orientation} />
+              <div>
+                <p className="text-[0.7rem] uppercase tracking-wider text-slate-400">{line.label}</p>
+                <p className="text-base font-semibold text-white">{line.value}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+};
+
 interface CameraViewUpdaterProps {
   preset: ViewPreset;
   controlsRef: React.MutableRefObject<OrbitControlsImpl | null>;
@@ -197,6 +296,7 @@ const Configurator3D: React.FC<{ config: TabletopConfig }> = ({ config }) => {
   const tabletopThickness = config.thicknessMm * MM_TO_M;
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const [activeView, setActiveView] = useState<ViewPreset>('3d');
+  const [showDimensions, setShowDimensions] = useState(true);
 
   const tableCenter = useMemo<[number, number, number]>(
     () => [0, TABLETOP_STANDING_HEIGHT_M + tabletopThickness / 2, 0],
@@ -247,6 +347,8 @@ const Configurator3D: React.FC<{ config: TabletopConfig }> = ({ config }) => {
         <CameraViewUpdater preset={activeView} controlsRef={controlsRef} viewTargets={viewTargets} />
       </Canvas>
 
+      <DimensionOverlay config={config} activeView={activeView} visible={showDimensions} />
+
       <div className="pointer-events-none absolute inset-0 flex justify-end p-3">
         <div className="pointer-events-auto flex flex-col gap-2 rounded-xl border border-white/10 bg-slate-900/80 p-2 shadow-xl backdrop-blur">
           {viewButtons.map(button => (
@@ -265,6 +367,21 @@ const Configurator3D: React.FC<{ config: TabletopConfig }> = ({ config }) => {
               <span className="sr-only">{button.label} view</span>
             </button>
           ))}
+          <div className="mt-1 border-t border-white/10 pt-1">
+            <button
+              type="button"
+              onClick={() => setShowDimensions(prev => !prev)}
+              className={`flex h-11 w-11 items-center justify-center rounded-lg border text-xs font-medium transition ${
+                showDimensions
+                  ? 'border-emerald-400 bg-emerald-500/10 text-emerald-200'
+                  : 'border-white/15 text-slate-200 hover:border-emerald-300/70'
+              }`}
+              title="Toggle overall dimension overlay"
+            >
+              <IconRuler />
+              <span className="sr-only">Toggle overall dimensions</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
