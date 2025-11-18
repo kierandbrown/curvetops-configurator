@@ -1,5 +1,5 @@
 import { Canvas, useThree } from '@react-three/fiber';
-import { OrbitControls, Environment } from '@react-three/drei';
+import { OrbitControls, Environment, Html, Line } from '@react-three/drei';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter';
@@ -244,357 +244,170 @@ const IconRuler = () => (
   </svg>
 );
 
-interface LinkedDimensionOverlayProps {
+interface DimensionLabelProps {
+  position: [number, number, number];
+  text: string;
+}
+
+const DIMENSION_COLOR = '#fcd34d';
+const DIMENSION_LABEL_CLASS =
+  'pointer-events-none whitespace-nowrap rounded border border-amber-400/30 bg-slate-950/80 px-2 py-0.5 text-[0.65rem] font-semibold text-amber-100 shadow-lg backdrop-blur';
+
+const DimensionLabel: React.FC<DimensionLabelProps> = ({ position, text }) => (
+  <Html position={position} transform center distanceFactor={12}>
+    <div className={DIMENSION_LABEL_CLASS}>{text}</div>
+  </Html>
+);
+
+interface WorldSpaceDimensionsProps {
   config: TabletopConfig;
-  activeView: ViewPreset;
   visible: boolean;
 }
 
-interface DimensionLineLayout {
-  key: string;
-  orientation: 'horizontal' | 'vertical';
-  value: string;
-  start: { x: number; y: number };
-  end: { x: number; y: number };
-  label: { x: number; y: number };
-  connectors?: { x1: number; y1: number; x2: number; y2: number }[];
-}
+// Render true 3D measurement lines so they stay attached to the tabletop even when the user orbits/zooms.
+const WorldSpaceDimensions: React.FC<WorldSpaceDimensionsProps> = ({ config, visible }) => {
+  if (!visible) return null;
 
-interface DimensionViewLayout {
-  shape: { x: number; y: number; width: number; height: number; rx?: number; ry?: number };
-  lines: DimensionLineLayout[];
-}
+  const length = config.lengthMm * MM_TO_M;
+  const width = config.widthMm * MM_TO_M;
+  const thickness = config.thicknessMm * MM_TO_M;
+  const centerY = TABLETOP_STANDING_HEIGHT_M + thickness / 2;
+  const topY = centerY + thickness / 2;
+  const bottomY = centerY - thickness / 2;
 
-type RectPadding = Partial<{ top: number; right: number; bottom: number; left: number }> | number;
+  // Offsets keep the measurement lines readable without floating too far away from the mesh.
+  const edgeOffset = 0.08;
+  const heightOffset = 0.04;
 
-const VIEWBOX_SIZE = 100;
-const DIMENSION_GAP = 6;
-
-const resolvePadding = (padding?: RectPadding) => {
-  if (typeof padding === 'number') {
-    return { top: padding, right: padding, bottom: padding, left: padding };
-  }
-
-  return {
-    top: padding?.top ?? 16,
-    right: padding?.right ?? 16,
-    bottom: padding?.bottom ?? 16,
-    left: padding?.left ?? 16
-  };
-};
-
-const buildReferenceRect = (
-  widthMm: number,
-  heightMm: number,
-  options?: { padding?: RectPadding; alignY?: 'top' | 'center' | 'bottom' }
-) => {
-  const padding = resolvePadding(options?.padding);
-  const widthAvailable = VIEWBOX_SIZE - padding.left - padding.right;
-  const heightAvailable = VIEWBOX_SIZE - padding.top - padding.bottom;
-  const safeWidth = Math.max(widthMm, 1);
-  const safeHeight = Math.max(heightMm, 1);
-  const scale = Math.min(widthAvailable / safeWidth, heightAvailable / safeHeight);
-  const width = safeWidth * scale;
-  const height = safeHeight * scale;
-  const x = padding.left + (widthAvailable - width) / 2;
-
-  let y = padding.top + (heightAvailable - height) / 2;
-  if (options?.alignY === 'top') {
-    y = padding.top;
-  } else if (options?.alignY === 'bottom') {
-    y = VIEWBOX_SIZE - padding.bottom - height;
-  }
-
-  return { x, y, width, height };
-};
-
-// Draw lightweight measurement lines that hug the model instead of a block of explanatory text.
-const LinkedDimensionOverlay: React.FC<LinkedDimensionOverlayProps> = ({ config, activeView, visible }) => {
-  if (!visible || activeView === '3d') {
-    return null;
-  }
-
-  const { lengthMm, widthMm, thicknessMm } = config;
-
-  // Normalize each view to the same 0-100 coordinate system so the SVG can scale with
-  // the canvas size. The helper above scales each rectangle proportionally so the
-  // measurement arrows always touch the true extents of the tabletop no matter the size.
-  const topRect = buildReferenceRect(lengthMm, widthMm, {
-    padding: { top: 20, right: 22, bottom: 20, left: 22 }
-  });
-  const frontRect = buildReferenceRect(lengthMm, thicknessMm, {
-    padding: { top: 40, right: 20, bottom: 18, left: 20 },
-    alignY: 'bottom'
-  });
-  const sideRect = buildReferenceRect(widthMm, thicknessMm, {
-    padding: { top: 40, right: 20, bottom: 18, left: 20 },
-    alignY: 'bottom'
-  });
-  const frontHeight = Math.max(frontRect.height, 1.2);
-  const sideHeight = Math.max(sideRect.height, 1.2);
-
-  // Describe how each orthographic view should render its reference rectangle and measurement lines.
-  // Using normalized coordinates (0-100) inside the viewBox keeps the math simple and ensures the overlay
-  // scales with the canvas size.
-  const viewLayouts: Record<'top' | 'front' | 'side', DimensionViewLayout> = {
-    top: {
-      shape: {
-        x: topRect.x,
-        y: topRect.y,
-        width: topRect.width,
-        height: topRect.height,
-        rx: Math.min(8, topRect.height / 2),
-        ry: Math.min(8, topRect.height / 2)
-      },
-      lines: [
-        {
-          key: 'length',
-          orientation: 'horizontal',
-          value: `${lengthMm} mm`,
-          start: { x: topRect.x, y: topRect.y - DIMENSION_GAP },
-          end: { x: topRect.x + topRect.width, y: topRect.y - DIMENSION_GAP },
-          label: {
-            x: topRect.x + topRect.width / 2,
-            y: topRect.y - DIMENSION_GAP - 4
-          },
-          connectors: [
-            { x1: topRect.x, y1: topRect.y, x2: topRect.x, y2: topRect.y - DIMENSION_GAP },
-            {
-              x1: topRect.x + topRect.width,
-              y1: topRect.y,
-              x2: topRect.x + topRect.width,
-              y2: topRect.y - DIMENSION_GAP
-            }
-          ]
-        },
-        {
-          key: 'width',
-          orientation: 'vertical',
-          value: `${widthMm} mm`,
-          start: { x: topRect.x - DIMENSION_GAP, y: topRect.y },
-          end: { x: topRect.x - DIMENSION_GAP, y: topRect.y + topRect.height },
-          label: {
-            x: topRect.x - DIMENSION_GAP - 5,
-            y: topRect.y + topRect.height / 2
-          },
-          connectors: [
-            { x1: topRect.x, y1: topRect.y, x2: topRect.x - DIMENSION_GAP, y2: topRect.y },
-            {
-              x1: topRect.x,
-              y1: topRect.y + topRect.height,
-              x2: topRect.x - DIMENSION_GAP,
-              y2: topRect.y + topRect.height
-            }
-          ]
-        }
-      ]
-    },
-    front: {
-      shape: {
-        x: frontRect.x,
-        y: frontRect.y,
-        width: frontRect.width,
-        height: frontHeight,
-        rx: 2,
-        ry: 2
-      },
-      lines: [
-        {
-          key: 'length',
-          orientation: 'horizontal',
-          value: `${lengthMm} mm`,
-          start: { x: frontRect.x, y: frontRect.y - DIMENSION_GAP },
-          end: { x: frontRect.x + frontRect.width, y: frontRect.y - DIMENSION_GAP },
-          label: {
-            x: frontRect.x + frontRect.width / 2,
-            y: frontRect.y - DIMENSION_GAP - 4
-          },
-          connectors: [
-            { x1: frontRect.x, y1: frontRect.y, x2: frontRect.x, y2: frontRect.y - DIMENSION_GAP },
-            {
-              x1: frontRect.x + frontRect.width,
-              y1: frontRect.y,
-              x2: frontRect.x + frontRect.width,
-              y2: frontRect.y - DIMENSION_GAP
-            }
-          ]
-        },
-        {
-          key: 'thickness-front',
-          orientation: 'vertical',
-          value: `${thicknessMm} mm`,
-          start: {
-            x: frontRect.x + frontRect.width + DIMENSION_GAP,
-            y: frontRect.y
-          },
-          end: {
-            x: frontRect.x + frontRect.width + DIMENSION_GAP,
-            y: frontRect.y + frontHeight
-          },
-          label: {
-            x: frontRect.x + frontRect.width + DIMENSION_GAP + 5,
-            y: frontRect.y + frontHeight / 2
-          },
-          connectors: [
-            {
-              x1: frontRect.x + frontRect.width,
-              y1: frontRect.y,
-              x2: frontRect.x + frontRect.width + DIMENSION_GAP,
-              y2: frontRect.y
-            },
-            {
-              x1: frontRect.x + frontRect.width,
-              y1: frontRect.y + frontHeight,
-              x2: frontRect.x + frontRect.width + DIMENSION_GAP,
-              y2: frontRect.y + frontHeight
-            }
-          ]
-        }
-      ]
-    },
-    side: {
-      shape: {
-        x: sideRect.x,
-        y: sideRect.y,
-        width: sideRect.width,
-        height: sideHeight,
-        rx: 2,
-        ry: 2
-      },
-      lines: [
-        {
-          key: 'width-side',
-          orientation: 'horizontal',
-          value: `${widthMm} mm`,
-          start: { x: sideRect.x, y: sideRect.y - DIMENSION_GAP },
-          end: { x: sideRect.x + sideRect.width, y: sideRect.y - DIMENSION_GAP },
-          label: {
-            x: sideRect.x + sideRect.width / 2,
-            y: sideRect.y - DIMENSION_GAP - 4
-          },
-          connectors: [
-            { x1: sideRect.x, y1: sideRect.y, x2: sideRect.x, y2: sideRect.y - DIMENSION_GAP },
-            {
-              x1: sideRect.x + sideRect.width,
-              y1: sideRect.y,
-              x2: sideRect.x + sideRect.width,
-              y2: sideRect.y - DIMENSION_GAP
-            }
-          ]
-        },
-        {
-          key: 'thickness-side',
-          orientation: 'vertical',
-          value: `${thicknessMm} mm`,
-          start: {
-            x: sideRect.x + sideRect.width + DIMENSION_GAP,
-            y: sideRect.y
-          },
-          end: {
-            x: sideRect.x + sideRect.width + DIMENSION_GAP,
-            y: sideRect.y + sideHeight
-          },
-          label: {
-            x: sideRect.x + sideRect.width + DIMENSION_GAP + 5,
-            y: sideRect.y + sideHeight / 2
-          },
-          connectors: [
-            {
-              x1: sideRect.x + sideRect.width,
-              y1: sideRect.y,
-              x2: sideRect.x + sideRect.width + DIMENSION_GAP,
-              y2: sideRect.y
-            },
-            {
-              x1: sideRect.x + sideRect.width,
-              y1: sideRect.y + sideHeight,
-              x2: sideRect.x + sideRect.width + DIMENSION_GAP,
-              y2: sideRect.y + sideHeight
-            }
-          ]
-        }
-      ]
-    }
-  };
-
-  const layout = viewLayouts[activeView as 'top' | 'front' | 'side'];
+  const lengthLineY = topY + heightOffset;
+  const lengthLineZ = width / 2 + edgeOffset;
+  const widthLineY = topY + heightOffset;
+  const widthLineX = length / 2 + edgeOffset;
+  const thicknessLineX = length / 2 + edgeOffset;
+  const thicknessLineZ = width / 2 + edgeOffset * 0.7;
 
   return (
-    <div className="pointer-events-none absolute inset-0">
-      <svg
-        viewBox={`0 0 ${VIEWBOX_SIZE} ${VIEWBOX_SIZE}`}
-        className="h-full w-full text-emerald-200"
-        aria-hidden="true"
-      >
-        <defs>
-          <marker
-            id="dimension-arrow"
-            markerWidth="6"
-            markerHeight="6"
-            refX="5"
-            refY="3"
-            orient="auto"
-            markerUnits="strokeWidth"
-          >
-            <path d="M0,0 L0,6 L6,3 z" fill="currentColor" />
-          </marker>
-        </defs>
-        <rect
-          x={layout.shape.x}
-          y={layout.shape.y}
-          width={layout.shape.width}
-          height={layout.shape.height}
-          rx={layout.shape.rx ?? 0}
-          ry={layout.shape.ry ?? 0}
-          fill="none"
-          stroke="currentColor"
-          strokeOpacity={0.3}
-          strokeWidth={1.2}
+    <group>
+      {/* Length measurement */}
+      <group>
+        <Line
+          points={[
+            [-length / 2, lengthLineY, lengthLineZ],
+            [length / 2, lengthLineY, lengthLineZ]
+          ]}
+          color={DIMENSION_COLOR}
+          lineWidth={1.5}
         />
-        {layout.lines.map(line => (
-          <g key={line.key}>
-            {line.connectors?.map((connector, index) => (
-              <line
-                key={`${line.key}-connector-${index}`}
-                x1={connector.x1}
-                y1={connector.y1}
-                x2={connector.x2}
-                y2={connector.y2}
-                stroke="currentColor"
-                strokeWidth={0.8}
-                strokeOpacity={0.6}
-                strokeDasharray="4 2"
-              />
-            ))}
-            <line
-              x1={line.start.x}
-              y1={line.start.y}
-              x2={line.end.x}
-              y2={line.end.y}
-              stroke="currentColor"
-              strokeWidth={1.2}
-              markerStart="url(#dimension-arrow)"
-              markerEnd="url(#dimension-arrow)"
-            />
-            <text
-              x={line.label.x}
-              y={line.label.y}
-              fill="currentColor"
-              fontSize={4.2}
-              fontWeight={600}
-              textAnchor="middle"
-              transform={
-                line.orientation === 'vertical'
-                  ? `rotate(-90 ${line.label.x} ${line.label.y})`
-                  : undefined
-              }
-            >
-              {line.value}
-            </text>
-          </g>
-        ))}
-      </svg>
-    </div>
+        {/* Connectors from the tabletop edge to the dimension line. */}
+        <Line
+          points={[
+            [-length / 2, topY, width / 2],
+            [-length / 2, lengthLineY, width / 2]
+          ]}
+          color="#94a3b8"
+          lineWidth={1}
+        />
+        <Line
+          points={[
+            [-length / 2, lengthLineY, width / 2],
+            [-length / 2, lengthLineY, lengthLineZ]
+          ]}
+          color="#94a3b8"
+          lineWidth={1}
+        />
+        <Line
+          points={[
+            [length / 2, topY, width / 2],
+            [length / 2, lengthLineY, width / 2]
+          ]}
+          color="#94a3b8"
+          lineWidth={1}
+        />
+        <Line
+          points={[
+            [length / 2, lengthLineY, width / 2],
+            [length / 2, lengthLineY, lengthLineZ]
+          ]}
+          color="#94a3b8"
+          lineWidth={1}
+        />
+        <DimensionLabel position={[0, lengthLineY + 0.01, lengthLineZ]} text={`${config.lengthMm} mm`} />
+      </group>
+
+      {/* Width measurement */}
+      <group>
+        <Line
+          points={[
+            [widthLineX, widthLineY, -width / 2],
+            [widthLineX, widthLineY, width / 2]
+          ]}
+          color={DIMENSION_COLOR}
+          lineWidth={1.5}
+        />
+        <Line
+          points={[
+            [length / 2, topY, -width / 2],
+            [length / 2, widthLineY, -width / 2]
+          ]}
+          color="#94a3b8"
+          lineWidth={1}
+        />
+        <Line
+          points={[
+            [length / 2, widthLineY, -width / 2],
+            [widthLineX, widthLineY, -width / 2]
+          ]}
+          color="#94a3b8"
+          lineWidth={1}
+        />
+        <Line
+          points={[
+            [length / 2, topY, width / 2],
+            [length / 2, widthLineY, width / 2]
+          ]}
+          color="#94a3b8"
+          lineWidth={1}
+        />
+        <Line
+          points={[
+            [length / 2, widthLineY, width / 2],
+            [widthLineX, widthLineY, width / 2]
+          ]}
+          color="#94a3b8"
+          lineWidth={1}
+        />
+        <DimensionLabel position={[widthLineX, widthLineY + 0.01, 0]} text={`${config.widthMm} mm`} />
+      </group>
+
+      {/* Thickness measurement */}
+      <group>
+        <Line
+          points={[
+            [thicknessLineX, bottomY, thicknessLineZ],
+            [thicknessLineX, topY, thicknessLineZ]
+          ]}
+          color={DIMENSION_COLOR}
+          lineWidth={1.5}
+        />
+        <Line
+          points={[
+            [length / 2, bottomY, width / 2],
+            [thicknessLineX, bottomY, thicknessLineZ]
+          ]}
+          color="#94a3b8"
+          lineWidth={1}
+        />
+        <Line
+          points={[
+            [length / 2, topY, width / 2],
+            [thicknessLineX, topY, thicknessLineZ]
+          ]}
+          color="#94a3b8"
+          lineWidth={1}
+        />
+        <DimensionLabel position={[thicknessLineX + 0.01, centerY, thicknessLineZ]} text={`${config.thicknessMm} mm`} />
+      </group>
+    </group>
   );
 };
 
@@ -778,6 +591,7 @@ const Configurator3D: React.FC<{ config: TabletopConfig; customOutline?: ParsedC
           {/* Rotate the tabletop so it lays horizontally in the viewport. */}
           <TabletopMesh config={config} customOutline={customOutline} />
         </group>
+        <WorldSpaceDimensions config={config} visible={showDimensions} />
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
           <planeGeometry args={[5, 5]} />
           <meshStandardMaterial color="#020617" />
@@ -786,8 +600,6 @@ const Configurator3D: React.FC<{ config: TabletopConfig; customOutline?: ParsedC
         <Environment preset="warehouse" />
         <CameraViewUpdater preset={activeView} controlsRef={controlsRef} viewTargets={viewTargets} />
       </Canvas>
-
-      <LinkedDimensionOverlay config={config} activeView={activeView} visible={showDimensions} />
 
       {/* Toolbar overlays keep export + view controls reachable without blocking the canvas. */}
       <div className="pointer-events-none absolute inset-0 flex flex-col gap-2 p-3 sm:flex-row sm:justify-end">
