@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 
 import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
+import { OutlinePoint, ParsedCustomOutline } from './customShapeTypes';
 
 
 export type TableShape = 'rect' | 'rounded-rect' | 'ellipse' | 'super-ellipse' | 'custom';
@@ -52,7 +53,7 @@ const buildCustomGeometry = (
     return null;
   }
 
-  outerPath.forEach((point, index) => {
+  outerPath.forEach((point: OutlinePoint, index: number) => {
     const { x, y } = toMeters(point);
     if (index === 0) {
       shape2d.moveTo(x, y);
@@ -62,10 +63,10 @@ const buildCustomGeometry = (
   });
   shape2d.closePath();
 
-  outline.paths.slice(1).forEach(path => {
+  outline.paths.slice(1).forEach((path: OutlinePoint[]) => {
     if (!path.length) return;
     const hole = new THREE.Path();
-    path.forEach((point, index) => {
+    path.forEach((point: OutlinePoint, index: number) => {
       const { x, y } = toMeters(point);
       if (index === 0) {
         hole.moveTo(x, y);
@@ -271,6 +272,49 @@ interface DimensionViewLayout {
   lines: DimensionLineLayout[];
 }
 
+type RectPadding = Partial<{ top: number; right: number; bottom: number; left: number }> | number;
+
+const VIEWBOX_SIZE = 100;
+const DIMENSION_GAP = 6;
+
+const resolvePadding = (padding?: RectPadding) => {
+  if (typeof padding === 'number') {
+    return { top: padding, right: padding, bottom: padding, left: padding };
+  }
+
+  return {
+    top: padding?.top ?? 16,
+    right: padding?.right ?? 16,
+    bottom: padding?.bottom ?? 16,
+    left: padding?.left ?? 16
+  };
+};
+
+const buildReferenceRect = (
+  widthMm: number,
+  heightMm: number,
+  options?: { padding?: RectPadding; alignY?: 'top' | 'center' | 'bottom' }
+) => {
+  const padding = resolvePadding(options?.padding);
+  const widthAvailable = VIEWBOX_SIZE - padding.left - padding.right;
+  const heightAvailable = VIEWBOX_SIZE - padding.top - padding.bottom;
+  const safeWidth = Math.max(widthMm, 1);
+  const safeHeight = Math.max(heightMm, 1);
+  const scale = Math.min(widthAvailable / safeWidth, heightAvailable / safeHeight);
+  const width = safeWidth * scale;
+  const height = safeHeight * scale;
+  const x = padding.left + (widthAvailable - width) / 2;
+
+  let y = padding.top + (heightAvailable - height) / 2;
+  if (options?.alignY === 'top') {
+    y = padding.top;
+  } else if (options?.alignY === 'bottom') {
+    y = VIEWBOX_SIZE - padding.bottom - height;
+  }
+
+  return { x, y, width, height };
+};
+
 // Draw lightweight measurement lines that hug the model instead of a block of explanatory text.
 const LinkedDimensionOverlay: React.FC<LinkedDimensionOverlayProps> = ({ config, activeView, visible }) => {
   if (!visible || activeView === '3d') {
@@ -279,93 +323,201 @@ const LinkedDimensionOverlay: React.FC<LinkedDimensionOverlayProps> = ({ config,
 
   const { lengthMm, widthMm, thicknessMm } = config;
 
+  // Normalize each view to the same 0-100 coordinate system so the SVG can scale with
+  // the canvas size. The helper above scales each rectangle proportionally so the
+  // measurement arrows always touch the true extents of the tabletop no matter the size.
+  const topRect = buildReferenceRect(lengthMm, widthMm, {
+    padding: { top: 20, right: 22, bottom: 20, left: 22 }
+  });
+  const frontRect = buildReferenceRect(lengthMm, thicknessMm, {
+    padding: { top: 40, right: 20, bottom: 18, left: 20 },
+    alignY: 'bottom'
+  });
+  const sideRect = buildReferenceRect(widthMm, thicknessMm, {
+    padding: { top: 40, right: 20, bottom: 18, left: 20 },
+    alignY: 'bottom'
+  });
+  const frontHeight = Math.max(frontRect.height, 1.2);
+  const sideHeight = Math.max(sideRect.height, 1.2);
+
   // Describe how each orthographic view should render its reference rectangle and measurement lines.
   // Using normalized coordinates (0-100) inside the viewBox keeps the math simple and ensures the overlay
   // scales with the canvas size.
   const viewLayouts: Record<'top' | 'front' | 'side', DimensionViewLayout> = {
     top: {
-      shape: { x: 30, y: 32, width: 40, height: 25, rx: 6, ry: 6 },
+      shape: {
+        x: topRect.x,
+        y: topRect.y,
+        width: topRect.width,
+        height: topRect.height,
+        rx: Math.min(8, topRect.height / 2),
+        ry: Math.min(8, topRect.height / 2)
+      },
       lines: [
         {
           key: 'length',
           orientation: 'horizontal',
           value: `${lengthMm} mm`,
-          start: { x: 20, y: 25 },
-          end: { x: 80, y: 25 },
-          label: { x: 50, y: 21 },
+          start: { x: topRect.x, y: topRect.y - DIMENSION_GAP },
+          end: { x: topRect.x + topRect.width, y: topRect.y - DIMENSION_GAP },
+          label: {
+            x: topRect.x + topRect.width / 2,
+            y: topRect.y - DIMENSION_GAP - 4
+          },
           connectors: [
-            { x1: 30, y1: 32, x2: 30, y2: 26.5 },
-            { x1: 70, y1: 32, x2: 70, y2: 26.5 }
+            { x1: topRect.x, y1: topRect.y, x2: topRect.x, y2: topRect.y - DIMENSION_GAP },
+            {
+              x1: topRect.x + topRect.width,
+              y1: topRect.y,
+              x2: topRect.x + topRect.width,
+              y2: topRect.y - DIMENSION_GAP
+            }
           ]
         },
         {
           key: 'width',
           orientation: 'vertical',
           value: `${widthMm} mm`,
-          start: { x: 24, y: 32 },
-          end: { x: 24, y: 57 },
-          label: { x: 19, y: 45 },
+          start: { x: topRect.x - DIMENSION_GAP, y: topRect.y },
+          end: { x: topRect.x - DIMENSION_GAP, y: topRect.y + topRect.height },
+          label: {
+            x: topRect.x - DIMENSION_GAP - 5,
+            y: topRect.y + topRect.height / 2
+          },
           connectors: [
-            { x1: 30, y1: 32, x2: 24.8, y2: 32 },
-            { x1: 30, y1: 57, x2: 24.8, y2: 57 }
+            { x1: topRect.x, y1: topRect.y, x2: topRect.x - DIMENSION_GAP, y2: topRect.y },
+            {
+              x1: topRect.x,
+              y1: topRect.y + topRect.height,
+              x2: topRect.x - DIMENSION_GAP,
+              y2: topRect.y + topRect.height
+            }
           ]
         }
       ]
     },
     front: {
-      shape: { x: 25, y: 47, width: 50, height: 9, rx: 2, ry: 2 },
+      shape: {
+        x: frontRect.x,
+        y: frontRect.y,
+        width: frontRect.width,
+        height: frontHeight,
+        rx: 2,
+        ry: 2
+      },
       lines: [
         {
           key: 'length',
           orientation: 'horizontal',
           value: `${lengthMm} mm`,
-          start: { x: 17, y: 42 },
-          end: { x: 83, y: 42 },
-          label: { x: 50, y: 38 },
+          start: { x: frontRect.x, y: frontRect.y - DIMENSION_GAP },
+          end: { x: frontRect.x + frontRect.width, y: frontRect.y - DIMENSION_GAP },
+          label: {
+            x: frontRect.x + frontRect.width / 2,
+            y: frontRect.y - DIMENSION_GAP - 4
+          },
           connectors: [
-            { x1: 25, y1: 47, x2: 25, y2: 43 },
-            { x1: 75, y1: 47, x2: 75, y2: 43 }
+            { x1: frontRect.x, y1: frontRect.y, x2: frontRect.x, y2: frontRect.y - DIMENSION_GAP },
+            {
+              x1: frontRect.x + frontRect.width,
+              y1: frontRect.y,
+              x2: frontRect.x + frontRect.width,
+              y2: frontRect.y - DIMENSION_GAP
+            }
           ]
         },
         {
           key: 'thickness-front',
           orientation: 'vertical',
           value: `${thicknessMm} mm`,
-          start: { x: 78, y: 47 },
-          end: { x: 78, y: 60 },
-          label: { x: 84, y: 54 },
+          start: {
+            x: frontRect.x + frontRect.width + DIMENSION_GAP,
+            y: frontRect.y
+          },
+          end: {
+            x: frontRect.x + frontRect.width + DIMENSION_GAP,
+            y: frontRect.y + frontHeight
+          },
+          label: {
+            x: frontRect.x + frontRect.width + DIMENSION_GAP + 5,
+            y: frontRect.y + frontHeight / 2
+          },
           connectors: [
-            { x1: 78, y1: 47, x2: 75, y2: 47 },
-            { x1: 78, y1: 56, x2: 75, y2: 56 }
+            {
+              x1: frontRect.x + frontRect.width,
+              y1: frontRect.y,
+              x2: frontRect.x + frontRect.width + DIMENSION_GAP,
+              y2: frontRect.y
+            },
+            {
+              x1: frontRect.x + frontRect.width,
+              y1: frontRect.y + frontHeight,
+              x2: frontRect.x + frontRect.width + DIMENSION_GAP,
+              y2: frontRect.y + frontHeight
+            }
           ]
         }
       ]
     },
     side: {
-      shape: { x: 30, y: 47, width: 40, height: 9, rx: 2, ry: 2 },
+      shape: {
+        x: sideRect.x,
+        y: sideRect.y,
+        width: sideRect.width,
+        height: sideHeight,
+        rx: 2,
+        ry: 2
+      },
       lines: [
         {
           key: 'width-side',
           orientation: 'horizontal',
           value: `${widthMm} mm`,
-          start: { x: 22, y: 42 },
-          end: { x: 78, y: 42 },
-          label: { x: 50, y: 38 },
+          start: { x: sideRect.x, y: sideRect.y - DIMENSION_GAP },
+          end: { x: sideRect.x + sideRect.width, y: sideRect.y - DIMENSION_GAP },
+          label: {
+            x: sideRect.x + sideRect.width / 2,
+            y: sideRect.y - DIMENSION_GAP - 4
+          },
           connectors: [
-            { x1: 30, y1: 47, x2: 30, y2: 43 },
-            { x1: 70, y1: 47, x2: 70, y2: 43 }
+            { x1: sideRect.x, y1: sideRect.y, x2: sideRect.x, y2: sideRect.y - DIMENSION_GAP },
+            {
+              x1: sideRect.x + sideRect.width,
+              y1: sideRect.y,
+              x2: sideRect.x + sideRect.width,
+              y2: sideRect.y - DIMENSION_GAP
+            }
           ]
         },
         {
           key: 'thickness-side',
           orientation: 'vertical',
           value: `${thicknessMm} mm`,
-          start: { x: 73, y: 47 },
-          end: { x: 73, y: 60 },
-          label: { x: 79, y: 54 },
+          start: {
+            x: sideRect.x + sideRect.width + DIMENSION_GAP,
+            y: sideRect.y
+          },
+          end: {
+            x: sideRect.x + sideRect.width + DIMENSION_GAP,
+            y: sideRect.y + sideHeight
+          },
+          label: {
+            x: sideRect.x + sideRect.width + DIMENSION_GAP + 5,
+            y: sideRect.y + sideHeight / 2
+          },
           connectors: [
-            { x1: 73, y1: 47, x2: 70, y2: 47 },
-            { x1: 73, y1: 56, x2: 70, y2: 56 }
+            {
+              x1: sideRect.x + sideRect.width,
+              y1: sideRect.y,
+              x2: sideRect.x + sideRect.width + DIMENSION_GAP,
+              y2: sideRect.y
+            },
+            {
+              x1: sideRect.x + sideRect.width,
+              y1: sideRect.y + sideHeight,
+              x2: sideRect.x + sideRect.width + DIMENSION_GAP,
+              y2: sideRect.y + sideHeight
+            }
           ]
         }
       ]
@@ -376,7 +528,11 @@ const LinkedDimensionOverlay: React.FC<LinkedDimensionOverlayProps> = ({ config,
 
   return (
     <div className="pointer-events-none absolute inset-0">
-      <svg viewBox="0 0 100 100" className="h-full w-full text-emerald-200" aria-hidden="true">
+      <svg
+        viewBox={`0 0 ${VIEWBOX_SIZE} ${VIEWBOX_SIZE}`}
+        className="h-full w-full text-emerald-200"
+        aria-hidden="true"
+      >
         <defs>
           <marker
             id="dimension-arrow"
@@ -473,7 +629,10 @@ const CameraViewUpdater: React.FC<CameraViewUpdaterProps> = ({ preset, controlsR
   return null;
 };
 
-const Configurator3D: React.FC<{ config: TabletopConfig }> = ({ config }) => {
+const Configurator3D: React.FC<{ config: TabletopConfig; customOutline?: ParsedCustomOutline | null }> = ({
+  config,
+  customOutline
+}) => {
   // Convert the tabletop thickness to meters so we can offset the mesh when
   // we rotate it. Without the offset, half the tabletop would sink below the
   // origin once we lay it flat.
@@ -520,7 +679,7 @@ const Configurator3D: React.FC<{ config: TabletopConfig }> = ({ config }) => {
         />
         <group rotation={[-Math.PI / 2, 0, 0]} position={[0, TABLETOP_STANDING_HEIGHT_M + tabletopThickness / 2, 0]}>
           {/* Rotate the tabletop so it lays horizontally in the viewport. */}
-          <TabletopMesh config={config} />
+          <TabletopMesh config={config} customOutline={customOutline} />
         </group>
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
           <planeGeometry args={[5, 5]} />
