@@ -1,7 +1,8 @@
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
 export type TableShape = 'rect' | 'rounded-rect' | 'ellipse' | 'super-ellipse';
 
@@ -127,45 +128,146 @@ const TabletopMesh: React.FC<Props> = ({ config }) => {
   );
 };
 
+type ViewPreset = 'top' | 'front' | 'side' | '3d';
+
+// Simple SVG helpers so each view button has a recognizable icon.
+const IconTop = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" width={20} height={20} className="text-slate-200">
+    <rect x={5} y={5} width={14} height={14} rx={2} ry={2} fill="none" stroke="currentColor" strokeWidth={1.5} />
+    <rect x={8} y={8} width={8} height={8} fill="none" stroke="currentColor" strokeWidth={1.5} />
+  </svg>
+);
+
+const IconFront = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" width={20} height={20} className="text-slate-200">
+    <rect x={4} y={7} width={16} height={10} rx={1.5} ry={1.5} fill="none" stroke="currentColor" strokeWidth={1.5} />
+    <line x1={4} y1={14} x2={20} y2={14} stroke="currentColor" strokeWidth={1.5} />
+  </svg>
+);
+
+const IconSide = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" width={20} height={20} className="text-slate-200">
+    <rect x={7} y={6} width={10} height={12} rx={2} ry={2} fill="none" stroke="currentColor" strokeWidth={1.5} />
+    <line x1={12} y1={6} x2={12} y2={18} stroke="currentColor" strokeWidth={1.5} />
+  </svg>
+);
+
+const IconIso = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" width={20} height={20} className="text-slate-200">
+    <path
+      d="M7 9L12 6L17 9V15L12 18L7 15Z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinejoin="round"
+    />
+    <path d="M7 9L12 12L17 9" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
+    <path d="M12 12V18" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
+  </svg>
+);
+
+interface CameraViewUpdaterProps {
+  preset: ViewPreset;
+  controlsRef: React.MutableRefObject<OrbitControlsImpl | null>;
+  viewTargets: Record<ViewPreset, { position: [number, number, number]; target: [number, number, number] }>;
+}
+
+// Bridge React state to the underlying three.js camera so each preset is applied immediately.
+const CameraViewUpdater: React.FC<CameraViewUpdaterProps> = ({ preset, controlsRef, viewTargets }) => {
+  const { camera } = useThree();
+
+  useEffect(() => {
+    const config = viewTargets[preset];
+    camera.position.set(...config.position);
+    camera.lookAt(...config.target);
+    camera.updateProjectionMatrix();
+    if (controlsRef.current) {
+      controlsRef.current.target.set(...config.target);
+      controlsRef.current.update();
+    }
+  }, [preset, camera, viewTargets, controlsRef]);
+
+  return null;
+};
+
 const Configurator3D: React.FC<{ config: TabletopConfig }> = ({ config }) => {
   // Convert the tabletop thickness to meters so we can offset the mesh when
   // we rotate it. Without the offset, half the tabletop would sink below the
   // origin once we lay it flat.
   const tabletopThickness = config.thicknessMm * MM_TO_M;
+  const controlsRef = useRef<OrbitControlsImpl | null>(null);
+  const [activeView, setActiveView] = useState<ViewPreset>('3d');
+
+  const tableCenter = useMemo<[number, number, number]>(
+    () => [0, TABLETOP_STANDING_HEIGHT_M + tabletopThickness / 2, 0],
+    [tabletopThickness]
+  );
+
+  // Describe the camera position and target for each preset. Using useMemo avoids re-allocating
+  // the objects on every render and keeps the camera updates predictable.
+  const viewTargets = useMemo(
+    () => ({
+      '3d': { position: [1.5, 1.3, 1.5] as [number, number, number], target: tableCenter },
+      top: { position: [0, tableCenter[1] + 2.5, 0.0001] as [number, number, number], target: tableCenter },
+      front: { position: [0, tableCenter[1], 2.6] as [number, number, number], target: tableCenter },
+      side: { position: [2.6, tableCenter[1], 0] as [number, number, number], target: tableCenter }
+    }),
+    [tableCenter]
+  );
+
+  const viewButtons: { key: ViewPreset; label: string; icon: JSX.Element; help: string }[] = [
+    { key: 'top', label: 'Top', icon: <IconTop />, help: 'Look straight down to check the plan view.' },
+    { key: 'front', label: 'Front', icon: <IconFront />, help: 'Review thickness and edge profile from the front.' },
+    { key: 'side', label: 'Side', icon: <IconSide />, help: 'Inspect proportions from the side elevation.' },
+    { key: '3d', label: '3D', icon: <IconIso />, help: 'Return to an isometric orbit view.' }
+  ];
 
   return (
-    <Canvas
-      camera={{ position: [1.5, 1.3, 1.5], fov: 40 }}
-      shadows
-      dpr={[1, 2]}
-    >
-      <color attach="background" args={['#020617']} />
-      <ambientLight intensity={0.5} />
-      <directionalLight
-        position={[4, 6, 3]}
-        intensity={1.2}
-        castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
-      />
-      <group
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, TABLETOP_STANDING_HEIGHT_M + tabletopThickness / 2, 0]}
-      >
-        {/* Rotate the tabletop so it lays horizontally in the viewport. */}
-        <TabletopMesh config={config} />
-      </group>
-      <mesh
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, -0.02, 0]}
-        receiveShadow
-      >
-        <planeGeometry args={[5, 5]} />
-        <meshStandardMaterial color="#020617" />
-      </mesh>
-      <OrbitControls enablePan enableRotate enableZoom />
-      <Environment preset="warehouse" />
-    </Canvas>
+    <div className="relative h-full w-full">
+      <Canvas camera={{ position: [1.5, 1.3, 1.5], fov: 40 }} shadows dpr={[1, 2]}>
+        <color attach="background" args={['#020617']} />
+        <ambientLight intensity={0.5} />
+        <directionalLight
+          position={[4, 6, 3]}
+          intensity={1.2}
+          castShadow
+          shadow-mapSize-width={1024}
+          shadow-mapSize-height={1024}
+        />
+        <group rotation={[-Math.PI / 2, 0, 0]} position={[0, TABLETOP_STANDING_HEIGHT_M + tabletopThickness / 2, 0]}>
+          {/* Rotate the tabletop so it lays horizontally in the viewport. */}
+          <TabletopMesh config={config} />
+        </group>
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
+          <planeGeometry args={[5, 5]} />
+          <meshStandardMaterial color="#020617" />
+        </mesh>
+        <OrbitControls ref={controlsRef} enablePan enableRotate enableZoom />
+        <Environment preset="warehouse" />
+        <CameraViewUpdater preset={activeView} controlsRef={controlsRef} viewTargets={viewTargets} />
+      </Canvas>
+
+      <div className="pointer-events-none absolute inset-0 flex justify-end p-3">
+        <div className="pointer-events-auto flex flex-col gap-2 rounded-xl border border-white/10 bg-slate-900/80 p-2 shadow-xl backdrop-blur">
+          {viewButtons.map(button => (
+            <button
+              key={button.key}
+              type="button"
+              onClick={() => setActiveView(button.key)}
+              className={`flex h-11 w-11 items-center justify-center rounded-lg border text-xs font-medium text-slate-200 transition ${
+                activeView === button.key
+                  ? 'border-emerald-400 bg-emerald-500/10 text-emerald-200'
+                  : 'border-white/15 hover:border-emerald-300/70'
+              }`}
+              title={`${button.label} view – ${button.help}`}
+            >
+              {button.icon}
+              <span className="sr-only">{button.label} view</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 };
 
