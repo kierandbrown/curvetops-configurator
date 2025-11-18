@@ -2,8 +2,9 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
 import { useMemo } from 'react';
 import * as THREE from 'three';
+import { ParsedCustomOutline } from './customShapeTypes';
 
-export type TableShape = 'rect' | 'rounded-rect' | 'ellipse' | 'super-ellipse';
+export type TableShape = 'rect' | 'rounded-rect' | 'ellipse' | 'super-ellipse' | 'custom';
 
 export interface TabletopConfig {
   shape: TableShape;
@@ -19,16 +20,83 @@ export interface TabletopConfig {
 
 interface Props {
   config: TabletopConfig;
+  customOutline?: ParsedCustomOutline | null;
 }
 
 const MM_TO_M = 0.001;
 // Keep the tabletop hovering at 720mm (0.72m) to resemble a real table height.
 const TABLETOP_STANDING_HEIGHT_M = 0.72;
 
-const TabletopMesh: React.FC<Props> = ({ config }) => {
+// Build an extruded mesh from the uploaded DXF outline so it can share the same
+// lighting + material pipeline as the procedural shapes.
+const buildCustomGeometry = (
+  outline: ParsedCustomOutline,
+  thicknessMm: number
+): THREE.ExtrudeGeometry | null => {
+  if (!outline.bounds || !outline.paths.length) {
+    return null;
+  }
+
+  const centerX = (outline.bounds.minX + outline.bounds.maxX) / 2;
+  const centerY = (outline.bounds.minY + outline.bounds.maxY) / 2;
+  const shape2d = new THREE.Shape();
+  const toMeters = (point: { x: number; y: number }) => ({
+    x: (point.x - centerX) * MM_TO_M,
+    y: (point.y - centerY) * MM_TO_M
+  });
+
+  const outerPath = outline.paths[0];
+  if (!outerPath?.length) {
+    return null;
+  }
+
+  outerPath.forEach((point, index) => {
+    const { x, y } = toMeters(point);
+    if (index === 0) {
+      shape2d.moveTo(x, y);
+    } else {
+      shape2d.lineTo(x, y);
+    }
+  });
+  shape2d.closePath();
+
+  outline.paths.slice(1).forEach(path => {
+    if (!path.length) return;
+    const hole = new THREE.Path();
+    path.forEach((point, index) => {
+      const { x, y } = toMeters(point);
+      if (index === 0) {
+        hole.moveTo(x, y);
+      } else {
+        hole.lineTo(x, y);
+      }
+    });
+    hole.closePath();
+    shape2d.holes.push(hole);
+  });
+
+  const extrudeSettings: THREE.ExtrudeGeometryOptions = {
+    depth: thicknessMm * MM_TO_M,
+    bevelEnabled: true,
+    bevelThickness: 0.003,
+    bevelSize: 0.003,
+    bevelSegments: 2
+  };
+
+  return new THREE.ExtrudeGeometry(shape2d, extrudeSettings);
+};
+
+const TabletopMesh: React.FC<Props> = ({ config, customOutline }) => {
   const { shape, lengthMm, widthMm, thicknessMm, edgeRadiusMm, superEllipseExponent } = config;
 
   const geometry = useMemo(() => {
+    if (shape === 'custom' && customOutline?.paths.length && customOutline.bounds) {
+      const customGeometry = buildCustomGeometry(customOutline, thicknessMm);
+      if (customGeometry) {
+        return customGeometry;
+      }
+    }
+
     const length = lengthMm * MM_TO_M;
     const width = widthMm * MM_TO_M;
     const thickness = thicknessMm * MM_TO_M;
@@ -107,7 +175,15 @@ const TabletopMesh: React.FC<Props> = ({ config }) => {
     };
 
     return new THREE.ExtrudeGeometry(shape2d, extrudeSettings);
-  }, [shape, lengthMm, widthMm, thicknessMm, edgeRadiusMm, superEllipseExponent]);
+  }, [
+    shape,
+    lengthMm,
+    widthMm,
+    thicknessMm,
+    edgeRadiusMm,
+    superEllipseExponent,
+    customOutline
+  ]);
 
   const materialColor =
     config.material === 'linoleum'
@@ -127,7 +203,10 @@ const TabletopMesh: React.FC<Props> = ({ config }) => {
   );
 };
 
-const Configurator3D: React.FC<{ config: TabletopConfig }> = ({ config }) => {
+const Configurator3D: React.FC<{ config: TabletopConfig; customOutline?: ParsedCustomOutline | null }> = ({
+  config,
+  customOutline
+}) => {
   // Convert the tabletop thickness to meters so we can offset the mesh when
   // we rotate it. Without the offset, half the tabletop would sink below the
   // origin once we lay it flat.
@@ -153,7 +232,7 @@ const Configurator3D: React.FC<{ config: TabletopConfig }> = ({ config }) => {
         position={[0, TABLETOP_STANDING_HEIGHT_M + tabletopThickness / 2, 0]}
       >
         {/* Rotate the tabletop so it lays horizontally in the viewport. */}
-        <TabletopMesh config={config} />
+        <TabletopMesh config={config} customOutline={customOutline} />
       </group>
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
