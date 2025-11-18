@@ -5,7 +5,6 @@
   "hosting": [
     {
       "target": "curvetops-configurator-bbeb7",
-      "site": "curvetops-configurator-bbeb7",
       "predeploy": ["npm run build"],
       "public": "dist",
       "ignore": [
