@@ -1,10 +1,13 @@
 import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter';
+import { STLExporter } from 'three/examples/jsm/exporters/STLExporter';
+import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter';
 
 import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
-import { OutlinePoint, ParsedCustomOutline } from './customShapeTypes';
+import { ParsedCustomOutline } from './customShapeTypes';
 
 
 export type TableShape = 'rect' | 'rounded-rect' | 'ellipse' | 'super-ellipse' | 'custom';
@@ -29,6 +32,11 @@ interface Props {
 const MM_TO_M = 0.001;
 // Keep the tabletop hovering at 720mm (0.72m) to resemble a real table height.
 const TABLETOP_STANDING_HEIGHT_M = 0.72;
+
+interface TabletopGeometryOptions {
+  config: TabletopConfig;
+  customOutline?: ParsedCustomOutline | null;
+}
 
 // Build an extruded mesh from the uploaded DXF outline so it can share the same
 // lighting + material pipeline as the procedural shapes.
@@ -89,104 +97,89 @@ const buildCustomGeometry = (
   return new THREE.ExtrudeGeometry(shape2d, extrudeSettings);
 };
 
-const TabletopMesh: React.FC<Props> = ({ config, customOutline }) => {
+const createTabletopGeometry = ({ config, customOutline }: TabletopGeometryOptions) => {
   const { shape, lengthMm, widthMm, thicknessMm, edgeRadiusMm, superEllipseExponent } = config;
 
-  const geometry = useMemo(() => {
-    if (shape === 'custom' && customOutline?.paths.length && customOutline.bounds) {
-      const customGeometry = buildCustomGeometry(customOutline, thicknessMm);
-      if (customGeometry) {
-        return customGeometry;
+  if (shape === 'custom' && customOutline?.paths.length && customOutline.bounds) {
+    const customGeometry = buildCustomGeometry(customOutline, thicknessMm);
+    if (customGeometry) {
+      return customGeometry;
+    }
+  }
+
+  const length = lengthMm * MM_TO_M;
+  const width = widthMm * MM_TO_M;
+  const thickness = thicknessMm * MM_TO_M;
+
+  const shape2d = new THREE.Shape();
+
+  if (shape === 'ellipse') {
+    const xRadius = length / 2;
+    const yRadius = width / 2;
+    const segments = 64;
+    const ellipseCurve = new THREE.EllipseCurve(0, 0, xRadius, yRadius, 0, Math.PI * 2);
+    const points = ellipseCurve.getPoints(segments);
+    shape2d.moveTo(points[0].x, points[0].y);
+    points.forEach(p => shape2d.lineTo(p.x, p.y));
+  } else if (shape === 'super-ellipse') {
+    const a = length / 2;
+    const b = width / 2;
+    const segments = 128;
+    // Clamp the exponent so the geometry can't become unstable.
+    const exponent = THREE.MathUtils.clamp(superEllipseExponent, 1.5, 8);
+    for (let i = 0; i <= segments; i++) {
+      const theta = (i / segments) * Math.PI * 2;
+      const cos = Math.cos(theta);
+      const sin = Math.sin(theta);
+      const x = a * Math.sign(cos) * Math.pow(Math.abs(cos), 2 / exponent);
+      const y = b * Math.sign(sin) * Math.pow(Math.abs(sin), 2 / exponent);
+      if (i === 0) {
+        shape2d.moveTo(x, y);
+      } else {
+        shape2d.lineTo(x, y);
       }
     }
+  } else if (shape === 'rounded-rect') {
+    const hw = width / 2;
+    const hl = length / 2;
+    const r = Math.min(edgeRadiusMm * MM_TO_M, hw, hl);
+    const x = -hl;
+    const y = -hw;
+    shape2d.moveTo(x + r, y);
+    shape2d.lineTo(x + length - r, y);
+    shape2d.quadraticCurveTo(x + length, y, x + length, y + r);
+    shape2d.lineTo(x + length, y + width - r);
+    shape2d.quadraticCurveTo(x + length, y + width, x + length - r, y + width);
+    shape2d.lineTo(x + r, y + width);
+    shape2d.quadraticCurveTo(x, y + width, x, y + width - r);
+    shape2d.lineTo(x, y + r);
+    shape2d.quadraticCurveTo(x, y, x + r, y);
+  } else {
+    const hw = width / 2;
+    const hl = length / 2;
+    shape2d.moveTo(-hl, -hw);
+    shape2d.lineTo(hl, -hw);
+    shape2d.lineTo(hl, hw);
+    shape2d.lineTo(-hl, hw);
+    shape2d.lineTo(-hl, -hw);
+  }
 
-    const length = lengthMm * MM_TO_M;
-    const width = widthMm * MM_TO_M;
-    const thickness = thicknessMm * MM_TO_M;
+  const extrudeSettings: THREE.ExtrudeGeometryOptions = {
+    depth: thickness,
+    bevelEnabled: true,
+    bevelThickness: 0.003,
+    bevelSize: 0.003,
+    bevelSegments: 2
+  };
 
-    const shape2d = new THREE.Shape();
+  return new THREE.ExtrudeGeometry(shape2d, extrudeSettings);
+};
 
-    if (shape === 'ellipse') {
-      const xRadius = length / 2;
-      const yRadius = width / 2;
-      const segments = 64;
-      const ellipseCurve = new THREE.EllipseCurve(
-        0,
-        0,
-        xRadius,
-        yRadius,
-        0,
-        Math.PI * 2
-      );
-      const points = ellipseCurve.getPoints(segments);
-      shape2d.moveTo(points[0].x, points[0].y);
-      points.forEach(p => shape2d.lineTo(p.x, p.y));
-    } else if (shape === 'super-ellipse') {
-      const a = length / 2;
-      const b = width / 2;
-      const segments = 128;
-      // Clamp the exponent so the geometry can't become unstable.
-      const exponent = THREE.MathUtils.clamp(superEllipseExponent, 1.5, 8);
-      for (let i = 0; i <= segments; i++) {
-        const theta = (i / segments) * Math.PI * 2;
-        const cos = Math.cos(theta);
-        const sin = Math.sin(theta);
-        const x = a * Math.sign(cos) * Math.pow(Math.abs(cos), 2 / exponent);
-        const y = b * Math.sign(sin) * Math.pow(Math.abs(sin), 2 / exponent);
-        if (i === 0) {
-          shape2d.moveTo(x, y);
-        } else {
-          shape2d.lineTo(x, y);
-        }
-      }
-    } else if (shape === 'rounded-rect') {
-      const hw = width / 2;
-      const hl = length / 2;
-      const r = Math.min(edgeRadiusMm * MM_TO_M, hw, hl);
-      const x = -hl;
-      const y = -hw;
-      shape2d.moveTo(x + r, y);
-      shape2d.lineTo(x + length - r, y);
-      shape2d.quadraticCurveTo(x + length, y, x + length, y + r);
-      shape2d.lineTo(x + length, y + width - r);
-      shape2d.quadraticCurveTo(
-        x + length,
-        y + width,
-        x + length - r,
-        y + width
-      );
-      shape2d.lineTo(x + r, y + width);
-      shape2d.quadraticCurveTo(x, y + width, x, y + width - r);
-      shape2d.lineTo(x, y + r);
-      shape2d.quadraticCurveTo(x, y, x + r, y);
-    } else {
-      const hw = width / 2;
-      const hl = length / 2;
-      shape2d.moveTo(-hl, -hw);
-      shape2d.lineTo(hl, -hw);
-      shape2d.lineTo(hl, hw);
-      shape2d.lineTo(-hl, hw);
-      shape2d.lineTo(-hl, -hw);
-    }
-
-    const extrudeSettings: THREE.ExtrudeGeometryOptions = {
-      depth: thickness,
-      bevelEnabled: true,
-      bevelThickness: 0.003,
-      bevelSize: 0.003,
-      bevelSegments: 2
-    };
-
-    return new THREE.ExtrudeGeometry(shape2d, extrudeSettings);
-  }, [
-    shape,
-    lengthMm,
-    widthMm,
-    thicknessMm,
-    edgeRadiusMm,
-    superEllipseExponent,
-    customOutline
-  ]);
+const TabletopMesh: React.FC<TabletopGeometryOptions> = ({ config, customOutline }) => {
+  const geometry = useMemo(
+    () => createTabletopGeometry({ config, customOutline }),
+    [config, customOutline]
+  );
 
   const materialColor =
     config.material === 'linoleum'
@@ -629,6 +622,14 @@ const CameraViewUpdater: React.FC<CameraViewUpdaterProps> = ({ preset, controlsR
   return null;
 };
 
+type ExportFormat = 'glb' | 'stl' | 'obj';
+
+const formatLabels: Record<ExportFormat, string> = {
+  glb: 'GLB (glTF)',
+  stl: 'STL',
+  obj: 'OBJ'
+};
+
 const Configurator3D: React.FC<{ config: TabletopConfig; customOutline?: ParsedCustomOutline | null }> = ({
   config,
   customOutline
@@ -640,6 +641,11 @@ const Configurator3D: React.FC<{ config: TabletopConfig; customOutline?: ParsedC
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const [activeView, setActiveView] = useState<ViewPreset>('3d');
   const [showDimensions, setShowDimensions] = useState(true);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [exportState, setExportState] = useState<{
+    status: 'idle' | 'working' | 'success' | 'error';
+    message: string;
+  }>({ status: 'idle', message: '' });
 
   const tableCenter = useMemo<[number, number, number]>(
     () => [0, TABLETOP_STANDING_HEIGHT_M + tabletopThickness / 2, 0],
@@ -663,6 +669,95 @@ const Configurator3D: React.FC<{ config: TabletopConfig; customOutline?: ParsedC
     { key: 'front', label: 'Front', icon: <IconFront />, help: 'Review thickness and edge profile from the front.' },
     { key: 'side', label: 'Side', icon: <IconSide />, help: 'Inspect proportions from the side elevation.' },
     { key: '3d', label: '3D', icon: <IconIso />, help: 'Return to an isometric orbit view.' }
+  ];
+
+  // Helper used by every exporter to trigger a browser download without adding dependencies.
+  const saveBlob = (blob: Blob, fileName: string) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExport = useCallback(
+    (format: ExportFormat) => {
+      try {
+        // Surface immediate feedback so buyers know the request is being processed.
+        setExportState({ status: 'working', message: `Preparing ${formatLabels[format]} download…` });
+        const geometry = createTabletopGeometry({ config, customOutline });
+        const materialColor =
+          config.material === 'linoleum'
+            ? '#3f5c5c'
+            : config.material === 'timber'
+            ? '#b3825a'
+            : '#d0d4da';
+        const mesh = new THREE.Mesh(
+          geometry,
+          new THREE.MeshStandardMaterial({
+            color: materialColor,
+            metalness: 0.1,
+            roughness: config.finish === 'matte' ? 0.9 : 0.6
+          })
+        );
+        mesh.updateMatrixWorld(true);
+
+        const safeShapeName = config.shape.replace(/[^a-z0-9-]/gi, '-');
+        const fileBase = `curvetops-${safeShapeName}-${config.lengthMm}x${config.widthMm}`;
+
+        if (format === 'glb') {
+          // GLB is the smallest all-in-one option so we default to a binary export.
+          const exporter = new GLTFExporter();
+          exporter.parse(
+            mesh,
+            result => {
+              const output = result as ArrayBuffer;
+              saveBlob(new Blob([output], { type: 'model/gltf-binary' }), `${fileBase}.glb`);
+              setExportState({ status: 'success', message: 'GLB downloaded for use in BIM/CAD apps.' });
+            },
+            { binary: true }
+          );
+        } else if (format === 'stl') {
+          // STL remains the lingua franca for CAM + 3D printing.
+          const exporter = new STLExporter();
+          const data = exporter.parse(mesh);
+          saveBlob(new Blob([data], { type: 'model/stl' }), `${fileBase}.stl`);
+          setExportState({ status: 'success', message: 'STL exported for quick 3D print checks.' });
+        } else {
+          // OBJ is included for backwards compatibility with older modeling suites.
+          const exporter = new OBJExporter();
+          const data = exporter.parse(mesh);
+          saveBlob(new Blob([data], { type: 'text/plain' }), `${fileBase}.obj`);
+          setExportState({ status: 'success', message: 'OBJ exported for legacy modeling tools.' });
+        }
+
+        geometry.dispose();
+      } catch (error) {
+        console.error('Export failed', error);
+        setExportState({ status: 'error', message: 'Unable to export model. Please try again.' });
+      } finally {
+        setExportMenuOpen(false);
+      }
+    },
+    [config, customOutline]
+  );
+
+  const exportOptions: { format: ExportFormat; description: string }[] = [
+    {
+      format: 'glb',
+      description: 'Compact glTF binary ready for AR viewers.'
+    },
+    {
+      format: 'stl',
+      description: 'Neutral solid for machining + 3D prints.'
+    },
+    {
+      format: 'obj',
+      description: 'Legacy mesh that imports everywhere.'
+    }
   ];
 
   return (
@@ -692,8 +787,60 @@ const Configurator3D: React.FC<{ config: TabletopConfig; customOutline?: ParsedC
 
       <LinkedDimensionOverlay config={config} activeView={activeView} visible={showDimensions} />
 
-      <div className="pointer-events-none absolute inset-0 flex justify-end p-3">
-        <div className="pointer-events-auto flex flex-col gap-2 rounded-xl border border-white/10 bg-slate-900/80 p-2 shadow-xl backdrop-blur">
+      {/* Toolbar overlays keep export + view controls reachable without blocking the canvas. */}
+      <div className="pointer-events-none absolute inset-0 flex flex-col gap-2 p-3 sm:flex-row sm:justify-between">
+        <div className="pointer-events-auto max-w-sm rounded-xl border border-white/10 bg-slate-900/80 p-3 shadow-xl backdrop-blur">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200">Export model</p>
+          <p className="mt-1 text-[0.75rem] text-slate-300">
+            Download this tabletop as a 3D file so estimators or CNC operators can inspect the live configuration.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setExportMenuOpen(prev => !prev)}
+              className="flex-1 rounded-lg border border-emerald-400 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-400/20"
+            >
+              {exportMenuOpen ? 'Hide formats' : 'Choose format'}
+            </button>
+            <span className="flex-1 text-[0.7rem] text-slate-400">
+              GLB, STL and OBJ exports keep dimension and bevel data intact.
+            </span>
+          </div>
+          {exportMenuOpen && (
+            <ul className="mt-3 space-y-2 rounded-lg border border-white/10 bg-slate-950/90 p-2">
+              {exportOptions.map(option => (
+                <li key={option.format}>
+                  <button
+                    type="button"
+                    onClick={() => handleExport(option.format)}
+                    className="w-full rounded-md px-3 py-2 text-left text-sm text-slate-100 hover:bg-white/10"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold">{formatLabels[option.format]}</span>
+                      <span className="text-[0.65rem] text-slate-400">Tap to export</span>
+                    </div>
+                    <p className="text-[0.7rem] text-slate-400">{option.description}</p>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {exportState.message && (
+            <p
+              className={`mt-2 text-[0.75rem] ${
+                exportState.status === 'error'
+                  ? 'text-rose-300'
+                  : exportState.status === 'working'
+                  ? 'text-amber-200'
+                  : 'text-emerald-200'
+              }`}
+            >
+              {exportState.message}
+            </p>
+          )}
+        </div>
+
+        <div className="pointer-events-auto flex flex-col gap-2 rounded-xl border border-white/10 bg-slate-900/80 p-2 shadow-xl backdrop-blur sm:ml-auto">
           {viewButtons.map(button => (
             <button
               key={button.key}
