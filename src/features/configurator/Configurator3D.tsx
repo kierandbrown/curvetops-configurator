@@ -21,6 +21,8 @@ interface Props {
 }
 
 const MM_TO_M = 0.001;
+// Keep the tabletop hovering at 720mm (0.72m) to resemble a real table height.
+const TABLETOP_STANDING_HEIGHT_M = 0.72;
 
 const TabletopMesh: React.FC<Props> = ({ config }) => {
   const { shape, lengthMm, widthMm, thicknessMm, edgeRadiusMm } = config;
@@ -129,7 +131,7 @@ const Configurator3D: React.FC<{ config: TabletopConfig }> = ({ config }) => {
       />
       <group
         rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, tabletopThickness / 2, 0]}
+        position={[0, TABLETOP_STANDING_HEIGHT_M + tabletopThickness / 2, 0]}
       >
         {/* Rotate the tabletop so it lays horizontally in the viewport. */}
         <TabletopMesh config={config} />
