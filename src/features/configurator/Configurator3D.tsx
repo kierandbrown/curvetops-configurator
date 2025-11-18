@@ -3,7 +3,7 @@ import { OrbitControls, Environment } from '@react-three/drei';
 import { useMemo } from 'react';
 import * as THREE from 'three';
 
-export type TableShape = 'rect' | 'rounded-rect' | 'ellipse';
+export type TableShape = 'rect' | 'rounded-rect' | 'ellipse' | 'super-ellipse';
 
 export interface TabletopConfig {
   shape: TableShape;
@@ -11,6 +11,7 @@ export interface TabletopConfig {
   widthMm: number;
   thicknessMm: number;
   edgeRadiusMm: number;
+  superEllipseExponent: number;
   material: 'laminate' | 'timber' | 'linoleum';
   finish: 'matte' | 'satin';
   quantity: number;
@@ -25,7 +26,7 @@ const MM_TO_M = 0.001;
 const TABLETOP_STANDING_HEIGHT_M = 0.72;
 
 const TabletopMesh: React.FC<Props> = ({ config }) => {
-  const { shape, lengthMm, widthMm, thicknessMm, edgeRadiusMm } = config;
+  const { shape, lengthMm, widthMm, thicknessMm, edgeRadiusMm, superEllipseExponent } = config;
 
   const geometry = useMemo(() => {
     const length = lengthMm * MM_TO_M;
@@ -49,6 +50,24 @@ const TabletopMesh: React.FC<Props> = ({ config }) => {
       const points = ellipseCurve.getPoints(segments);
       shape2d.moveTo(points[0].x, points[0].y);
       points.forEach(p => shape2d.lineTo(p.x, p.y));
+    } else if (shape === 'super-ellipse') {
+      const a = length / 2;
+      const b = width / 2;
+      const segments = 128;
+      // Clamp the exponent so the geometry can't become unstable.
+      const exponent = THREE.MathUtils.clamp(superEllipseExponent, 1.5, 8);
+      for (let i = 0; i <= segments; i++) {
+        const theta = (i / segments) * Math.PI * 2;
+        const cos = Math.cos(theta);
+        const sin = Math.sin(theta);
+        const x = a * Math.sign(cos) * Math.pow(Math.abs(cos), 2 / exponent);
+        const y = b * Math.sign(sin) * Math.pow(Math.abs(sin), 2 / exponent);
+        if (i === 0) {
+          shape2d.moveTo(x, y);
+        } else {
+          shape2d.lineTo(x, y);
+        }
+      }
     } else if (shape === 'rounded-rect') {
       const hw = width / 2;
       const hl = length / 2;
@@ -88,7 +107,7 @@ const TabletopMesh: React.FC<Props> = ({ config }) => {
     };
 
     return new THREE.ExtrudeGeometry(shape2d, extrudeSettings);
-  }, [shape, lengthMm, widthMm, thicknessMm, edgeRadiusMm]);
+  }, [shape, lengthMm, widthMm, thicknessMm, edgeRadiusMm, superEllipseExponent]);
 
   const materialColor =
     config.material === 'linoleum'
