@@ -265,8 +265,7 @@ const ConfiguratorPage: React.FC = () => {
                 className="accent-emerald-400"
               />
               <p className="text-[0.7rem] text-slate-400">
-                Pick between a gentle 50&nbsp;mm curve and up to half of the table width for a
-                bold rounded corner.
+                Minimum 50&nbsp;mm up to half the table width.
               </p>
             </label>
           )}
