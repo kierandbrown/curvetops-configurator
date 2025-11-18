@@ -2,22 +2,20 @@
   "functions": {
     "source": "functions"
   },
-  "hosting": [
-    {
-      "target": "curvetops-configurator-bbeb7",
-      "predeploy": ["npm run build"],
-      "public": "dist",
-      "ignore": [
-        "firebase.json",
-        "**/.*",
-        "**/node_modules/**"
-      ],
-      "rewrites": [
-        {
-          "source": "**",
-          "destination": "/index.html"
-        }
-      ]
-    }
-  ]
+  "hosting": {
+    "site": "curvetops-configurator-bbeb7",
+    "predeploy": ["npm run build"],
+    "public": "dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
 }
