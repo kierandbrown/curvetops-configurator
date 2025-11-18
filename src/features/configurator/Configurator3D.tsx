@@ -487,6 +487,8 @@ const Configurator3D: React.FC<{ config: TabletopConfig; customOutline?: ParsedC
   const [activeView, setActiveView] = useState<ViewPreset>('3d');
   const [showDimensions, setShowDimensions] = useState(true);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  // Controls whether the export modal overlay is visible so the control can be reused on desktop + mobile.
+  const [showExportModal, setShowExportModal] = useState(false);
   const [exportState, setExportState] = useState<{
     status: 'idle' | 'working' | 'success' | 'error';
     message: string;
@@ -633,59 +635,8 @@ const Configurator3D: React.FC<{ config: TabletopConfig; customOutline?: ParsedC
       <LinkedDimensionOverlay config={config} activeView={activeView} visible={showDimensions} />
 
       {/* Toolbar overlays keep export + view controls reachable without blocking the canvas. */}
-      <div className="pointer-events-none absolute inset-0 flex flex-col gap-2 p-3 sm:flex-row sm:justify-between">
-        <div className="pointer-events-auto max-w-sm rounded-xl border border-white/10 bg-slate-900/80 p-3 shadow-xl backdrop-blur">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200">Export model</p>
-          <p className="mt-1 text-[0.75rem] text-slate-300">
-            Download this tabletop as a 3D file so estimators or CNC operators can inspect the live configuration.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setExportMenuOpen(prev => !prev)}
-              className="flex-1 rounded-lg border border-emerald-400 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-400/20"
-            >
-              {exportMenuOpen ? 'Hide formats' : 'Choose format'}
-            </button>
-            <span className="flex-1 text-[0.7rem] text-slate-400">
-              GLB, STL and OBJ exports keep dimension and bevel data intact.
-            </span>
-          </div>
-          {exportMenuOpen && (
-            <ul className="mt-3 space-y-2 rounded-lg border border-white/10 bg-slate-950/90 p-2">
-              {exportOptions.map(option => (
-                <li key={option.format}>
-                  <button
-                    type="button"
-                    onClick={() => handleExport(option.format)}
-                    className="w-full rounded-md px-3 py-2 text-left text-sm text-slate-100 hover:bg-white/10"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold">{formatLabels[option.format]}</span>
-                      <span className="text-[0.65rem] text-slate-400">Tap to export</span>
-                    </div>
-                    <p className="text-[0.7rem] text-slate-400">{option.description}</p>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {exportState.message && (
-            <p
-              className={`mt-2 text-[0.75rem] ${
-                exportState.status === 'error'
-                  ? 'text-rose-300'
-                  : exportState.status === 'working'
-                  ? 'text-amber-200'
-                  : 'text-emerald-200'
-              }`}
-            >
-              {exportState.message}
-            </p>
-          )}
-        </div>
-
-        <div className="pointer-events-auto flex flex-col gap-2 rounded-xl border border-white/10 bg-slate-900/80 p-2 shadow-xl backdrop-blur sm:ml-auto">
+      <div className="pointer-events-none absolute inset-0 flex flex-col gap-2 p-3 sm:flex-row sm:justify-end">
+        <div className="pointer-events-auto flex flex-col gap-2 rounded-xl border border-white/10 bg-slate-900/80 p-2 shadow-xl backdrop-blur">
           {viewButtons.map(button => (
             <button
               key={button.key}
@@ -716,9 +667,105 @@ const Configurator3D: React.FC<{ config: TabletopConfig; customOutline?: ParsedC
               <IconRuler />
               <span className="sr-only">Toggle overall dimensions</span>
             </button>
+            {/* Export button sits directly below the dimension toggle per UX request. */}
+            <button
+              type="button"
+              onClick={() => setShowExportModal(true)}
+              className="mt-2 flex w-full items-center justify-center rounded-lg border border-emerald-400 bg-emerald-500/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-emerald-200 transition hover:bg-emerald-400/20"
+            >
+              Export model
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Lightweight modal overlay keeps the existing export helper content but only surfaces it when needed. */}
+      {showExportModal && (
+        <div
+          className="absolute inset-0 z-10 flex items-center justify-center bg-slate-950/80 px-4 py-8"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Export tabletop model"
+          onClick={() => {
+            setShowExportModal(false);
+            setExportMenuOpen(false);
+          }}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-900/95 p-5 shadow-2xl backdrop-blur"
+            onClick={event => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200">Export model</p>
+                <p className="mt-1 text-[0.8rem] text-slate-200">
+                  Choose a CAD-friendly format so estimators, CNC programmers or 3D printers can review this configuration with
+                  dimensions and bevels intact.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowExportModal(false);
+                  setExportMenuOpen(false);
+                }}
+                className="rounded-full border border-white/15 p-2 text-slate-300 transition hover:border-emerald-400 hover:text-emerald-200"
+                aria-label="Close export modal"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Select format</p>
+              <button
+                type="button"
+                onClick={() => setExportMenuOpen(prev => !prev)}
+                className="w-full rounded-lg border border-emerald-400 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-400/20"
+              >
+                {exportMenuOpen ? 'Hide available formats' : 'Show available formats'}
+              </button>
+              <p className="text-[0.75rem] text-slate-400">
+                Tip: GLB is the most compact all-in-one file, STL is ideal for neutral manufacturing, and OBJ keeps compatibility with legacy modeling suites.
+              </p>
+            </div>
+
+            {exportMenuOpen && (
+              <ul className="mt-3 space-y-2 rounded-lg border border-white/10 bg-slate-950/90 p-2">
+                {exportOptions.map(option => (
+                  <li key={option.format}>
+                    <button
+                      type="button"
+                      onClick={() => handleExport(option.format)}
+                      className="w-full rounded-md px-3 py-2 text-left text-sm text-slate-100 hover:bg-white/10"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold">{formatLabels[option.format]}</span>
+                        <span className="text-[0.65rem] text-slate-400">Tap to export</span>
+                      </div>
+                      <p className="text-[0.7rem] text-slate-400">{option.description}</p>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {exportState.message && (
+              <p
+                className={`mt-3 text-[0.8rem] ${
+                  exportState.status === 'error'
+                    ? 'text-rose-300'
+                    : exportState.status === 'working'
+                    ? 'text-amber-200'
+                    : 'text-emerald-200'
+                }`}
+              >
+                {exportState.message}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
