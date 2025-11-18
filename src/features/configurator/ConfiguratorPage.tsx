@@ -4,6 +4,8 @@ import Configurator3D, {
   TabletopConfig
 } from './Configurator3D';
 import { usePricing } from './usePricing';
+import CustomShapeUpload from './CustomShapeUpload';
+import { CustomShapeDetails } from './customShapeTypes';
 
 const defaultConfig: TabletopConfig = {
   shape: 'rounded-rect',
@@ -22,6 +24,8 @@ const thicknessOptions = [12, 16, 18, 25, 33];
 
 const ConfiguratorPage: React.FC = () => {
   const [config, setConfig] = useState<TabletopConfig>(defaultConfig);
+  // Custom shape metadata drives the DXF preview + the locked dimensions.
+  const [customShape, setCustomShape] = useState<CustomShapeDetails | null>(null);
   const { price, loading, error } = usePricing(config);
 
   const updateField = (field: keyof TabletopConfig, value: number | string) => {
@@ -30,6 +34,19 @@ const ConfiguratorPage: React.FC = () => {
 
   const handleShapeChange = (shape: TableShape) => {
     setConfig(prev => ({ ...prev, shape }));
+  };
+
+  // Whenever we parse a DXF we push the detected bounding box into the sliders so
+  // pricing still has sensible numbers to work with.
+  const handleCustomDimensions = (
+    dimensions: { lengthMm: number; widthMm: number } | null
+  ) => {
+    if (!dimensions) return;
+    setConfig(prev => ({
+      ...prev,
+      lengthMm: Math.round(dimensions.lengthMm),
+      widthMm: Math.round(dimensions.widthMm)
+    }));
   };
 
   const formattedPrice =
@@ -56,6 +73,8 @@ const ConfiguratorPage: React.FC = () => {
     [config.thicknessMm]
   );
 
+  const dimensionLocked = config.shape === 'custom';
+
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
       <section className="space-y-4">
@@ -64,15 +83,20 @@ const ConfiguratorPage: React.FC = () => {
           Adjust dimensions, shape and material to match your project. The 3D
           preview updates in real time.
         </p>
-        <div className="h-[420px] overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
-          <Configurator3D config={config} />
+        <div className="relative h-[420px] overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
+          <Configurator3D config={config} customOutline={customShape?.outline ?? null} />
+          {config.shape === 'custom' && !customShape?.outline && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/70 px-6 text-center text-sm text-slate-200">
+              Upload a DXF file to see the custom outline in the preview window.
+            </div>
+          )}
         </div>
       </section>
 
       <section className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900 p-4">
         <h2 className="text-sm font-semibold text-slate-200">Parameters</h2>
         <div className="grid gap-3 text-xs text-slate-200">
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <button
               onClick={() => handleShapeChange('rect')}
               className={`rounded border px-2 py-1 ${
@@ -113,7 +137,25 @@ const ConfiguratorPage: React.FC = () => {
             >
               Super ellipse
             </button>
+            <button
+              onClick={() => handleShapeChange('custom')}
+              className={`rounded border px-2 py-1 ${
+                config.shape === 'custom'
+                  ? 'border-emerald-400 bg-emerald-500/10'
+                  : 'border-slate-700'
+              }`}
+            >
+              Custom DXF/DWG
+            </button>
           </div>
+
+          {config.shape === 'custom' && (
+            <CustomShapeUpload
+              value={customShape}
+              onChange={details => setCustomShape(details)}
+              onDimensions={handleCustomDimensions}
+            />
+          )}
 
           <label className="flex flex-col gap-1">
             <div className="flex items-center justify-between text-[0.75rem] font-medium">
@@ -127,11 +169,17 @@ const ConfiguratorPage: React.FC = () => {
               step={10}
               value={config.lengthMm}
               onChange={e => updateField('lengthMm', Number(e.target.value))}
-              className="accent-emerald-400"
+              className={`accent-emerald-400 ${dimensionLocked ? 'cursor-not-allowed opacity-50' : ''}`}
+              disabled={dimensionLocked}
             />
             <p className="text-[0.7rem] text-slate-400">
               Slide between 500&nbsp;mm and 3600&nbsp;mm to match your room or base footprint.
             </p>
+            {dimensionLocked && (
+              <p className="text-[0.7rem] text-amber-300">
+                Length follows the bounding box of the uploaded DXF. Update your CAD file to adjust.
+              </p>
+            )}
           </label>
 
           <label className="flex flex-col gap-1">
@@ -146,12 +194,18 @@ const ConfiguratorPage: React.FC = () => {
               step={10}
               value={config.widthMm}
               onChange={e => updateField('widthMm', Number(e.target.value))}
-              className="accent-emerald-400"
+              className={`accent-emerald-400 ${dimensionLocked ? 'cursor-not-allowed opacity-50' : ''}`}
+              disabled={dimensionLocked}
             />
             <p className="text-[0.7rem] text-slate-400">
               Choose a width from 300&nbsp;mm to 1800&nbsp;mm—ideal for narrow desks or
               generous conference tables.
             </p>
+            {dimensionLocked && (
+              <p className="text-[0.7rem] text-amber-300">
+                Width is locked to your DXF outline so the preview and pricing stay accurate.
+              </p>
+            )}
           </label>
 
           {config.shape === 'rounded-rect' && (
