@@ -107,6 +107,11 @@ const TabletopMesh: React.FC<Props> = ({ config }) => {
 };
 
 const Configurator3D: React.FC<{ config: TabletopConfig }> = ({ config }) => {
+  // Convert the tabletop thickness to meters so we can offset the mesh when
+  // we rotate it. Without the offset, half the tabletop would sink below the
+  // origin once we lay it flat.
+  const tabletopThickness = config.thicknessMm * MM_TO_M;
+
   return (
     <Canvas
       camera={{ position: [1.5, 1.3, 1.5], fov: 40 }}
@@ -122,7 +127,11 @@ const Configurator3D: React.FC<{ config: TabletopConfig }> = ({ config }) => {
         shadow-mapSize-width={1024}
         shadow-mapSize-height={1024}
       />
-      <group position={[0, 0, 0]}>
+      <group
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, tabletopThickness / 2, 0]}
+      >
+        {/* Rotate the tabletop so it lays horizontally in the viewport. */}
         <TabletopMesh config={config} />
       </group>
       <mesh
