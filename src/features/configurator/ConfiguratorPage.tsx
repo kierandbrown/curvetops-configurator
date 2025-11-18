@@ -215,7 +215,7 @@ const ConfiguratorPage: React.FC = () => {
               disabled={dimensionLocked}
             />
             <p className="text-[0.7rem] text-slate-400">
-              Slide between 500&nbsp;mm and 3600&nbsp;mm to match your room or base footprint.
+              Slide between 500&nbsp;mm and 3600&nbsp;mm.
             </p>
             {dimensionLocked && (
               <p className="text-[0.7rem] text-amber-300">
@@ -240,8 +240,7 @@ const ConfiguratorPage: React.FC = () => {
               disabled={dimensionLocked}
             />
             <p className="text-[0.7rem] text-slate-400">
-              Choose a width from 300&nbsp;mm to 1800&nbsp;mm—ideal for narrow desks or
-              generous conference tables.
+              Choose a width from 300&nbsp;mm to 1800&nbsp;mm.
             </p>
             {dimensionLocked && (
               <p className="text-[0.7rem] text-amber-300">
