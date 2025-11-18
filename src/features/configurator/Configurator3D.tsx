@@ -247,26 +247,30 @@ const IconRuler = () => (
 interface DimensionLabelProps {
   position: [number, number, number];
   text: string;
+  rotation?: [number, number, number];
 }
 
 const DIMENSION_COLOR = '#fcd34d';
 const DIMENSION_LABEL_CLASS =
   'pointer-events-none whitespace-nowrap rounded border border-amber-400/30 bg-slate-950/80 px-2 py-0.5 text-[0.65rem] font-semibold text-amber-100 shadow-lg backdrop-blur';
 
-const DimensionLabel: React.FC<DimensionLabelProps> = ({ position, text }) => (
-  <Html position={position} transform center distanceFactor={12}>
-    <div className={DIMENSION_LABEL_CLASS}>{text}</div>
-  </Html>
+const DimensionLabel: React.FC<DimensionLabelProps> = ({ position, text, rotation }) => (
+  <group position={position} rotation={rotation ?? [0, 0, 0]}>
+    <Html transform center distanceFactor={12}>
+      <div className={DIMENSION_LABEL_CLASS}>{text}</div>
+    </Html>
+  </group>
 );
 
 interface WorldSpaceDimensionsProps {
   config: TabletopConfig;
   visible: boolean;
+  view: ViewPreset;
 }
 
 // Render true 3D measurement lines so they stay attached to the tabletop even when the user orbits/zooms.
-const WorldSpaceDimensions: React.FC<WorldSpaceDimensionsProps> = ({ config, visible }) => {
-  if (!visible) return null;
+const WorldSpaceDimensions: React.FC<WorldSpaceDimensionsProps> = ({ config, visible, view }) => {
+  if (!visible || view === '3d') return null;
 
   const length = config.lengthMm * MM_TO_M;
   const width = config.widthMm * MM_TO_M;
@@ -286,127 +290,157 @@ const WorldSpaceDimensions: React.FC<WorldSpaceDimensionsProps> = ({ config, vis
   const thicknessLineX = length / 2 + edgeOffset;
   const thicknessLineZ = width / 2 + edgeOffset * 0.7;
 
+  const showLength = view === 'top' || view === 'front';
+  const showWidth = view === 'top' || view === 'side';
+  const showThickness = view !== 'top';
+
+  const labelRotations: Record<Exclude<ViewPreset, '3d'>, [number, number, number]> = {
+    top: [-Math.PI / 2, 0, 0],
+    front: [0, 0, 0],
+    side: [0, Math.PI / 2, 0]
+  };
+
+  const labelRotation = labelRotations[view as Exclude<ViewPreset, '3d'>];
+
   return (
     <group>
       {/* Length measurement */}
-      <group>
-        <Line
-          points={[
-            [-length / 2, lengthLineY, lengthLineZ],
-            [length / 2, lengthLineY, lengthLineZ]
-          ]}
-          color={DIMENSION_COLOR}
-          lineWidth={1.5}
-        />
-        {/* Connectors from the tabletop edge to the dimension line. */}
-        <Line
-          points={[
-            [-length / 2, topY, width / 2],
-            [-length / 2, lengthLineY, width / 2]
-          ]}
-          color="#94a3b8"
-          lineWidth={1}
-        />
-        <Line
-          points={[
-            [-length / 2, lengthLineY, width / 2],
-            [-length / 2, lengthLineY, lengthLineZ]
-          ]}
-          color="#94a3b8"
-          lineWidth={1}
-        />
-        <Line
-          points={[
-            [length / 2, topY, width / 2],
-            [length / 2, lengthLineY, width / 2]
-          ]}
-          color="#94a3b8"
-          lineWidth={1}
-        />
-        <Line
-          points={[
-            [length / 2, lengthLineY, width / 2],
-            [length / 2, lengthLineY, lengthLineZ]
-          ]}
-          color="#94a3b8"
-          lineWidth={1}
-        />
-        <DimensionLabel position={[0, lengthLineY + 0.01, lengthLineZ]} text={`${config.lengthMm} mm`} />
-      </group>
+      {showLength && (
+        <group>
+          <Line
+            points={[
+              [-length / 2, lengthLineY, lengthLineZ],
+              [length / 2, lengthLineY, lengthLineZ]
+            ]}
+            color={DIMENSION_COLOR}
+            lineWidth={1.5}
+          />
+          {/* Connectors from the tabletop edge to the dimension line. */}
+          <Line
+            points={[
+              [-length / 2, topY, width / 2],
+              [-length / 2, lengthLineY, width / 2]
+            ]}
+            color="#94a3b8"
+            lineWidth={1}
+          />
+          <Line
+            points={[
+              [-length / 2, lengthLineY, width / 2],
+              [-length / 2, lengthLineY, lengthLineZ]
+            ]}
+            color="#94a3b8"
+            lineWidth={1}
+          />
+          <Line
+            points={[
+              [length / 2, topY, width / 2],
+              [length / 2, lengthLineY, width / 2]
+            ]}
+            color="#94a3b8"
+            lineWidth={1}
+          />
+          <Line
+            points={[
+              [length / 2, lengthLineY, width / 2],
+              [length / 2, lengthLineY, lengthLineZ]
+            ]}
+            color="#94a3b8"
+            lineWidth={1}
+          />
+          <DimensionLabel
+            position={[0, lengthLineY + 0.01, lengthLineZ]}
+            text={`${config.lengthMm} mm`}
+            rotation={labelRotation}
+          />
+        </group>
+      )}
 
       {/* Width measurement */}
-      <group>
-        <Line
-          points={[
-            [widthLineX, widthLineY, -width / 2],
-            [widthLineX, widthLineY, width / 2]
-          ]}
-          color={DIMENSION_COLOR}
-          lineWidth={1.5}
-        />
-        <Line
-          points={[
-            [length / 2, topY, -width / 2],
-            [length / 2, widthLineY, -width / 2]
-          ]}
-          color="#94a3b8"
-          lineWidth={1}
-        />
-        <Line
-          points={[
-            [length / 2, widthLineY, -width / 2],
-            [widthLineX, widthLineY, -width / 2]
-          ]}
-          color="#94a3b8"
-          lineWidth={1}
-        />
-        <Line
-          points={[
-            [length / 2, topY, width / 2],
-            [length / 2, widthLineY, width / 2]
-          ]}
-          color="#94a3b8"
-          lineWidth={1}
-        />
-        <Line
-          points={[
-            [length / 2, widthLineY, width / 2],
-            [widthLineX, widthLineY, width / 2]
-          ]}
-          color="#94a3b8"
-          lineWidth={1}
-        />
-        <DimensionLabel position={[widthLineX, widthLineY + 0.01, 0]} text={`${config.widthMm} mm`} />
-      </group>
+      {showWidth && (
+        <group>
+          <Line
+            points={[
+              [widthLineX, widthLineY, -width / 2],
+              [widthLineX, widthLineY, width / 2]
+            ]}
+            color={DIMENSION_COLOR}
+            lineWidth={1.5}
+          />
+          <Line
+            points={[
+              [length / 2, topY, -width / 2],
+              [length / 2, widthLineY, -width / 2]
+            ]}
+            color="#94a3b8"
+            lineWidth={1}
+          />
+          <Line
+            points={[
+              [length / 2, widthLineY, -width / 2],
+              [widthLineX, widthLineY, -width / 2]
+            ]}
+            color="#94a3b8"
+            lineWidth={1}
+          />
+          <Line
+            points={[
+              [length / 2, topY, width / 2],
+              [length / 2, widthLineY, width / 2]
+            ]}
+            color="#94a3b8"
+            lineWidth={1}
+          />
+          <Line
+            points={[
+              [length / 2, widthLineY, width / 2],
+              [widthLineX, widthLineY, width / 2]
+            ]}
+            color="#94a3b8"
+            lineWidth={1}
+          />
+          <DimensionLabel
+            position={[widthLineX, widthLineY + 0.01, 0]}
+            text={`${config.widthMm} mm`}
+            rotation={labelRotation}
+          />
+        </group>
+      )}
 
       {/* Thickness measurement */}
-      <group>
-        <Line
-          points={[
-            [thicknessLineX, bottomY, thicknessLineZ],
-            [thicknessLineX, topY, thicknessLineZ]
-          ]}
-          color={DIMENSION_COLOR}
-          lineWidth={1.5}
-        />
-        <Line
-          points={[
-            [length / 2, bottomY, width / 2],
-            [thicknessLineX, bottomY, thicknessLineZ]
-          ]}
-          color="#94a3b8"
-          lineWidth={1}
-        />
-        <Line
-          points={[
-            [length / 2, topY, width / 2],
-            [thicknessLineX, topY, thicknessLineZ]
-          ]}
-          color="#94a3b8"
-          lineWidth={1}
-        />
-        <DimensionLabel position={[thicknessLineX + 0.01, centerY, thicknessLineZ]} text={`${config.thicknessMm} mm`} />
-      </group>
+      {showThickness && (
+        <group>
+          <Line
+            points={[
+              [thicknessLineX, bottomY, thicknessLineZ],
+              [thicknessLineX, topY, thicknessLineZ]
+            ]}
+            color={DIMENSION_COLOR}
+            lineWidth={1.5}
+          />
+          <Line
+            points={[
+              [length / 2, bottomY, width / 2],
+              [thicknessLineX, bottomY, thicknessLineZ]
+            ]}
+            color="#94a3b8"
+            lineWidth={1}
+          />
+          <Line
+            points={[
+              [length / 2, topY, width / 2],
+              [thicknessLineX, topY, thicknessLineZ]
+            ]}
+            color="#94a3b8"
+            lineWidth={1}
+          />
+          <DimensionLabel
+            position={[thicknessLineX + 0.01, centerY, thicknessLineZ]}
+            text={`${config.thicknessMm} mm`}
+            rotation={labelRotation}
+          />
+        </group>
+      )}
     </group>
   );
 };
@@ -454,6 +488,10 @@ const Configurator3D: React.FC<{ config: TabletopConfig; customOutline?: ParsedC
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const [activeView, setActiveView] = useState<ViewPreset>('3d');
   const [showDimensions, setShowDimensions] = useState(true);
+  const is3DView = activeView === '3d';
+  const dimensionsVisible = showDimensions && !is3DView;
+  const dimensionToggleEnabled = !is3DView;
+  const dimensionToggleActive = dimensionsVisible;
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   // Controls whether the export modal overlay is visible so the control can be reused on desktop + mobile.
   const [showExportModal, setShowExportModal] = useState(false);
@@ -591,12 +629,12 @@ const Configurator3D: React.FC<{ config: TabletopConfig; customOutline?: ParsedC
           {/* Rotate the tabletop so it lays horizontally in the viewport. */}
           <TabletopMesh config={config} customOutline={customOutline} />
         </group>
-        <WorldSpaceDimensions config={config} visible={showDimensions} />
+        <WorldSpaceDimensions config={config} visible={dimensionsVisible} view={activeView} />
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
           <planeGeometry args={[5, 5]} />
           <meshStandardMaterial color="#020617" />
         </mesh>
-        <OrbitControls ref={controlsRef} enablePan enableRotate enableZoom />
+        <OrbitControls ref={controlsRef} enablePan={is3DView} enableRotate={is3DView} enableZoom />
         <Environment preset="warehouse" />
         <CameraViewUpdater preset={activeView} controlsRef={controlsRef} viewTargets={viewTargets} />
       </Canvas>
@@ -623,13 +661,18 @@ const Configurator3D: React.FC<{ config: TabletopConfig; customOutline?: ParsedC
           <div className="mt-1 border-t border-white/10 pt-1">
             <button
               type="button"
-              onClick={() => setShowDimensions(prev => !prev)}
+              onClick={() => dimensionToggleEnabled && setShowDimensions(prev => !prev)}
+              disabled={!dimensionToggleEnabled}
               className={`flex h-11 w-11 items-center justify-center rounded-lg border text-xs font-medium transition ${
-                showDimensions
+                dimensionToggleActive
                   ? 'border-emerald-400 bg-emerald-500/10 text-emerald-200'
                   : 'border-white/15 text-slate-200 hover:border-emerald-300/70'
-              }`}
-              title="Toggle overall dimension overlay"
+              } ${!dimensionToggleEnabled ? 'cursor-not-allowed opacity-50 hover:border-white/15' : ''}`}
+              title={
+                dimensionToggleEnabled
+                  ? 'Toggle overall dimension overlay'
+                  : 'Dimensions are only available in plan, front, or side views'
+              }
             >
               <IconRuler />
               <span className="sr-only">Toggle overall dimensions</span>
