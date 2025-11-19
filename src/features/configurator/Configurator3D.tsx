@@ -673,7 +673,7 @@ const Configurator3D: React.FC<{ config: TabletopConfig; customOutline?: ParsedC
         mesh.updateMatrixWorld(true);
 
         const safeShapeName = config.shape.replace(/[^a-z0-9-]/gi, '-');
-        const fileBase = `curvetops-${safeShapeName}-${config.lengthMm}x${config.widthMm}`;
+        const fileBase = `top-store-${safeShapeName}-${config.lengthMm}x${config.widthMm}`;
 
         if (format === 'glb') {
           // GLB is the smallest all-in-one option so we default to a binary export.
