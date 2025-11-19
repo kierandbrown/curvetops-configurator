@@ -399,7 +399,12 @@ const ConfiguratorPage: React.FC = () => {
         config,
         customShape: customShapeMeta,
         estimatedPrice: price ?? null,
-        searchKeywords: buildCartSearchKeywords(config, selectedMaterial.label, customShape),
+        searchKeywords: buildCartSearchKeywords(
+          config,
+          selectedMaterial.label,
+          customShape,
+          cartItemLabel
+        ),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });

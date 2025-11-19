@@ -8,7 +8,8 @@ export interface CartCustomShapeMeta {
 export const buildCartSearchKeywords = (
   config: TabletopConfig,
   materialLabel: string,
-  customShape: CartCustomShapeMeta | null
+  customShape: CartCustomShapeMeta | null,
+  label?: string
 ): string[] => {
   // Edge profile keywords make it easier to search for "sharknose" or "ABS" jobs later.
   const edgeProfileKeywords: Record<TabletopConfig['edgeProfile'], string[]> = {
@@ -28,6 +29,7 @@ export const buildCartSearchKeywords = (
     config.edgeProfile,
     ...edgeProfileKeywords[config.edgeProfile],
     materialLabel,
+    label ?? '',
     customShape?.fileName ?? '',
     customShape?.notes ?? ''
   ];
