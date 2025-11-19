@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Timestamp, collection, deleteDoc, doc, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '@auth/firebase';
 import { useAuth } from '@auth/AuthContext';
 import Loader from '@/components/ui/Loader';
 import { TabletopConfig } from '../configurator/Configurator3D';
 import { defaultTabletopConfig } from '../configurator/defaultConfig';
+import CartTopPreview from './CartTopPreview';
 
 interface CartItemRecord {
   id: string;
@@ -26,6 +27,7 @@ interface CartFilters {
   shape: string;
   dimensions: string;
   price: string;
+  fileName: string;
 }
 
 const MATERIAL_LABELS: Record<TabletopConfig['material'], string> = {
@@ -39,7 +41,8 @@ const emptyFilters: CartFilters = {
   material: '',
   shape: '',
   dimensions: '',
-  price: ''
+  price: '',
+  fileName: ''
 };
 
 const CartPage = () => {
@@ -97,12 +100,14 @@ const CartPage = () => {
     return sorted.filter(item => {
       const dimLabel = `${item.config.lengthMm}x${item.config.widthMm}`.toLowerCase();
       const priceLabel = item.estimatedPrice != null ? item.estimatedPrice.toString() : '';
+      const customFileTokens = `${item.customShape?.fileName ?? ''} ${item.customShape?.notes ?? ''}`.toLowerCase();
       return (
         item.label.toLowerCase().includes(filters.label.toLowerCase()) &&
         item.config.material.toLowerCase().includes(filters.material.toLowerCase()) &&
         item.config.shape.toLowerCase().includes(filters.shape.toLowerCase()) &&
         dimLabel.includes(filters.dimensions.toLowerCase()) &&
-        priceLabel.includes(filters.price.toLowerCase())
+        priceLabel.includes(filters.price.toLowerCase()) &&
+        customFileTokens.includes(filters.fileName.toLowerCase())
       );
     });
   }, [cartItems, filters]);
@@ -136,30 +141,22 @@ const CartPage = () => {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col gap-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-6 md:flex-row md:items-center md:justify-between">
+      <header className="flex flex-col gap-3 border-b border-slate-800 pb-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs uppercase tracking-widest text-slate-400">Saved Tops</p>
-          <h1 className="text-2xl font-semibold">Cart</h1>
+          <p className="text-xs uppercase tracking-widest text-slate-500">Cart</p>
+          <h1 className="text-2xl font-semibold text-slate-50">Saved tops</h1>
           <p className="text-sm text-slate-400">
-            Every configuration that leaves the 3D configurator lands here. Use the search fields to filter, then tap a name
-            to reopen it in the configurator for edits. New items must be added from the configurator workflow so this page
-            remains a read-only index.
+            Browse every configuration that leaves the 3D configurator and reopen a top for edits by tapping its name below.
           </p>
-          <nav className="mt-4 flex flex-wrap gap-2 text-xs" aria-label="Breadcrumb">
-            <span className="rounded-full bg-slate-800 px-3 py-1 text-slate-200">Home</span>
-            <span className="text-slate-500">/</span>
-            <span className="rounded-full bg-slate-800 px-3 py-1 text-slate-200">Cart</span>
-          </nav>
         </div>
-        <Link
-          to="/configurator"
-          className="h-fit rounded-full bg-blue-500 px-5 py-2 text-center text-sm font-semibold text-white transition hover:bg-blue-400"
-        >
-          Create
-        </Link>
+        <nav className="flex flex-wrap gap-2 text-xs text-slate-500" aria-label="Breadcrumb">
+          <span>Home</span>
+          <span aria-hidden="true">/</span>
+          <span className="text-slate-200">Cart</span>
+        </nav>
       </header>
 
-      <section className="flex min-h-[calc(100vh-280px)] flex-col overflow-hidden rounded-3xl border border-slate-800 bg-slate-950">
+      <section className="flex min-h-[calc(100vh-200px)] flex-col overflow-hidden rounded-3xl border border-slate-800 bg-slate-950">
         <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
           <h2 className="text-sm font-semibold text-slate-200">Cart items</h2>
           {loading && <Loader />}
@@ -168,73 +165,116 @@ const CartPage = () => {
           <table className="min-w-full divide-y divide-slate-800 text-sm">
             <thead className="bg-slate-900/80 text-left text-xs uppercase tracking-wider text-slate-400">
               <tr>
+                <th className="p-4 align-bottom text-slate-300">Preview</th>
                 <th className="p-4 align-bottom">
-                  <div className="flex flex-col gap-2">
-                    <span>Name</span>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[0.65rem] font-semibold tracking-wide text-slate-400">Name</span>
                     <input
+                      id="cart-filter-name"
                       type="text"
                       value={filters.label}
                       onChange={e => handleFilterChange('label', e.target.value)}
                       placeholder="Search names"
+                      aria-describedby="cart-filter-name-help"
                       className="rounded border border-slate-700 bg-slate-900/60 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500"
                     />
+                    <p id="cart-filter-name-help" className="text-[0.65rem] text-slate-500">
+                      Type part of a saved name to quickly reopen a top.
+                    </p>
                   </div>
                 </th>
                 <th className="p-4 align-bottom">
-                  <div className="flex flex-col gap-2">
-                    <span>Material</span>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[0.65rem] font-semibold tracking-wide text-slate-400">Material</span>
                     <input
+                      id="cart-filter-material"
                       type="text"
                       value={filters.material}
                       onChange={e => handleFilterChange('material', e.target.value)}
                       placeholder="Search materials"
+                      aria-describedby="cart-filter-material-help"
                       className="rounded border border-slate-700 bg-slate-900/60 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500"
                     />
+                    <p id="cart-filter-material-help" className="text-[0.65rem] text-slate-500">
+                      Use material tags like laminate, timber or linoleum.
+                    </p>
                   </div>
                 </th>
                 <th className="p-4 align-bottom">
-                  <div className="flex flex-col gap-2">
-                    <span>Shape</span>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[0.65rem] font-semibold tracking-wide text-slate-400">Shape</span>
                     <input
+                      id="cart-filter-shape"
                       type="text"
                       value={filters.shape}
                       onChange={e => handleFilterChange('shape', e.target.value)}
                       placeholder="Search shapes"
+                      aria-describedby="cart-filter-shape-help"
                       className="rounded border border-slate-700 bg-slate-900/60 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500"
                     />
+                    <p id="cart-filter-shape-help" className="text-[0.65rem] text-slate-500">
+                      Filter by the chosen profile such as round or custom.
+                    </p>
                   </div>
                 </th>
                 <th className="p-4 align-bottom">
-                  <div className="flex flex-col gap-2">
-                    <span>Dimensions</span>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[0.65rem] font-semibold tracking-wide text-slate-400">Dimensions</span>
                     <input
+                      id="cart-filter-dimensions"
                       type="text"
                       value={filters.dimensions}
                       onChange={e => handleFilterChange('dimensions', e.target.value)}
                       placeholder="e.g. 2000x900"
+                      aria-describedby="cart-filter-dimensions-help"
                       className="rounded border border-slate-700 bg-slate-900/60 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500"
                     />
+                    <p id="cart-filter-dimensions-help" className="text-[0.65rem] text-slate-500">
+                      Enter length × width in millimetres to narrow the list.
+                    </p>
                   </div>
                 </th>
                 <th className="p-4 align-bottom">
-                  <div className="flex flex-col gap-2">
-                    <span>Est. price</span>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[0.65rem] font-semibold tracking-wide text-slate-400">Est. price</span>
                     <input
+                      id="cart-filter-price"
                       type="text"
                       value={filters.price}
                       onChange={e => handleFilterChange('price', e.target.value)}
                       placeholder="Search $"
+                      aria-describedby="cart-filter-price-help"
                       className="rounded border border-slate-700 bg-slate-900/60 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500"
                     />
+                    <p id="cart-filter-price-help" className="text-[0.65rem] text-slate-500">
+                      Paste a value to match estimated pricing.
+                    </p>
                   </div>
                 </th>
-                <th className="p-4 text-right">Actions</th>
+                <th className="p-4 align-bottom">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[0.65rem] font-semibold tracking-wide text-slate-400">DXF / notes</span>
+                    <input
+                      id="cart-filter-file"
+                      type="text"
+                      value={filters.fileName}
+                      onChange={e => handleFilterChange('fileName', e.target.value)}
+                      placeholder="Search file names"
+                      aria-describedby="cart-filter-file-help"
+                      className="rounded border border-slate-700 bg-slate-900/60 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500"
+                    />
+                    <p id="cart-filter-file-help" className="text-[0.65rem] text-slate-500">
+                      Look up DXF filenames or notes captured during upload.
+                    </p>
+                  </div>
+                </th>
+                <th className="p-4 text-right align-bottom">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-900/70 bg-slate-950">
               {filteredItems.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-6 text-center text-sm text-slate-400">
+                  <td colSpan={8} className="p-6 text-center text-sm text-slate-400">
                     No cart items matched your filters. Clear the search inputs to show everything again.
                   </td>
                 </tr>
@@ -243,6 +283,10 @@ const CartPage = () => {
                 const materialLabel = MATERIAL_LABELS[item.config.material];
                 return (
                   <tr key={item.id} className="hover:bg-slate-900/30">
+                    <td className="p-4 align-middle">
+                      {/* Inline previews provide a quick visual of each top without reopening the 3D scene. */}
+                      <CartTopPreview config={item.config} label={item.label} />
+                    </td>
                     <td className="p-4">
                       <button
                         type="button"
@@ -270,6 +314,18 @@ const CartPage = () => {
                             currency: 'AUD'
                           })
                         : '—'}
+                    </td>
+                    <td className="p-4 text-slate-200">
+                      {item.customShape?.fileName ? (
+                        <>
+                          <p className="font-medium text-slate-100">{item.customShape.fileName}</p>
+                          {item.customShape?.notes && (
+                            <p className="text-xs text-slate-500">{item.customShape.notes}</p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-xs text-slate-500">No DXF uploaded</p>
+                      )}
                     </td>
                     <td className="p-4 text-right">
                       <div className="relative inline-block text-left">
