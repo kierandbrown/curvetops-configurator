@@ -9,7 +9,8 @@ export const buildCartSearchKeywords = (
   config: TabletopConfig,
   materialLabel: string,
   customShape: CartCustomShapeMeta | null,
-  label?: string
+  label?: string,
+  extraTerms: string[] = []
 ): string[] => {
   // Edge profile keywords make it easier to search for "sharknose" or "ABS" jobs later.
   const edgeProfileKeywords: Record<TabletopConfig['edgeProfile'], string[]> = {
@@ -31,7 +32,8 @@ export const buildCartSearchKeywords = (
     materialLabel,
     label ?? '',
     customShape?.fileName ?? '',
-    customShape?.notes ?? ''
+    customShape?.notes ?? '',
+    ...extraTerms
   ];
 
   return Array.from(

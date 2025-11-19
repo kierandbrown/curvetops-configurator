@@ -1,6 +1,6 @@
-import { ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@auth/AuthContext';
 import { db } from '@auth/firebase';
 import Configurator3D, {
@@ -17,19 +17,51 @@ import ViewportMouseGuide from './ViewportMouseGuide';
 const ROUND_DIAMETER_LIMIT_MM = 1800;
 
 // Supported board thickness increments for the slider.
-const thicknessOptions = [12, 16, 18, 25, 33];
+const DEFAULT_THICKNESS_OPTIONS = [12, 16, 18, 25, 33];
+
+interface CatalogueMaterial {
+  id: string;
+  name: string;
+  materialType: string;
+  finish: string;
+  supplierSku: string;
+  hexCode?: string;
+  maxLength: string;
+  maxWidth: string;
+  availableThicknesses: string[];
+}
+
+// Convert stored catalogue measurements (e.g. "3600mm" or "3.6m")
+// into a number of millimetres for enforcing limits.
+const parseMeasurementToMm = (value?: string | null): number | null => {
+  if (!value) return null;
+  const trimmed = value.toString().trim();
+  if (!trimmed) return null;
+  const numericPortion = trimmed.replace(/[^0-9.]/g, '');
+  if (!numericPortion) return null;
+  const parsed = Number(numericPortion);
+  if (Number.isNaN(parsed)) return null;
+
+  // Treat values <= 10 as metres so "3.6" can stand for 3.6m -> 3600mm.
+  if (parsed > 10) {
+    return Math.round(parsed);
+  }
+  return Math.round(parsed * 1000);
+};
+
+const materialTypeToConfigMaterial = (
+  materialType?: string
+): TabletopConfig['material'] => {
+  const normalized = (materialType ?? '').toLowerCase();
+  if (normalized.includes('linoleum')) return 'linoleum';
+  if (normalized.includes('veneer') || normalized.includes('timber')) return 'timber';
+  return 'laminate';
+};
 
 // Simple utility for clamping manual numeric input so values never exceed the
 // existing slider limits.
 const clampNumber = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
-
-const snapToNearestThickness = (value: number) =>
-  thicknessOptions.reduce(
-    (closest, option) =>
-      Math.abs(option - value) < Math.abs(closest - value) ? option : closest,
-    thicknessOptions[0]
-  );
 
 // Edge styles that shop floor teams can filter against in the search UI.
 const edgeProfileOptions: {
@@ -214,33 +246,6 @@ type NumericConfigField =
   | 'superEllipseExponent'
   | 'thicknessMm';
 
-// Surface build presets keep pricing and the 3D appearance in sync with what customers pick.
-const materialOptions: {
-  value: TabletopConfig['material'];
-  label: string;
-  description: string;
-  edgeNote: string;
-}[] = [
-  {
-    value: 'laminate',
-    label: 'High-pressure laminate',
-    description: 'Durable melamine surface that wipes clean quickly. Ideal for education and hospitality.',
-    edgeNote: 'Best when paired with ABS edging.'
-  },
-  {
-    value: 'timber',
-    label: 'Solid timber',
-    description: 'Premium hardwood core for boutique installs. Arrives sealed and ready for final finishing.',
-    edgeNote: 'Allow for natural grain variation.'
-  },
-  {
-    value: 'linoleum',
-    label: 'Furniture linoleum',
-    description: 'Warm, matte desktop linoleum bonded to moisture-resistant particle board.',
-    edgeNote: 'Ships with colour-matched edge banding.'
-  }
-];
-
 const ConfiguratorPage: React.FC = () => {
   const [config, setConfig] = useState<TabletopConfig>(defaultTabletopConfig);
   // Mirror the manual inputs as strings so makers can type freely before we
@@ -266,6 +271,10 @@ const ConfiguratorPage: React.FC = () => {
     | { type: 'error'; message: string }
     | null
   >(null);
+  const [catalogueMaterials, setCatalogueMaterials] = useState<CatalogueMaterial[]>([]);
+  const [catalogueLoading, setCatalogueLoading] = useState(true);
+  const [catalogueSearch, setCatalogueSearch] = useState('');
+  const [selectedCatalogueMaterialId, setSelectedCatalogueMaterialId] = useState<string | null>(null);
 
   // Keep the manual string inputs aligned whenever a slider or preset updates
   // the underlying config so the two controls never drift apart.
@@ -289,6 +298,87 @@ const ConfiguratorPage: React.FC = () => {
     setManualInputs(prev => ({ ...prev, thicknessMm: config.thicknessMm.toString() }));
   }, [config.thicknessMm]);
 
+  useEffect(() => {
+    const materialsQuery = query(collection(db, 'materials'), orderBy('name'));
+    const unsubscribe = onSnapshot(
+      materialsQuery,
+      snapshot => {
+        const nextMaterials: CatalogueMaterial[] = snapshot.docs.map(docSnap => {
+          const data = docSnap.data() as Partial<CatalogueMaterial>;
+          return {
+            id: docSnap.id,
+            name: data.name ?? 'Untitled colour',
+            materialType: data.materialType ?? '',
+            finish: data.finish ?? '',
+            supplierSku: data.supplierSku ?? '',
+            hexCode: data.hexCode,
+            maxLength: data.maxLength ?? '',
+            maxWidth: data.maxWidth ?? '',
+            availableThicknesses: data.availableThicknesses ?? []
+          };
+        });
+        setCatalogueMaterials(nextMaterials);
+        setCatalogueLoading(false);
+      },
+      error => {
+        console.error('Failed to load colour catalogue', error);
+        setCatalogueLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  const selectedCatalogueMaterial = useMemo(() => {
+    if (!selectedCatalogueMaterialId) return null;
+    return (
+      catalogueMaterials.find(material => material.id === selectedCatalogueMaterialId) ?? null
+    );
+  }, [catalogueMaterials, selectedCatalogueMaterialId]);
+
+  const filteredCatalogueMaterials = useMemo(() => {
+    const searchValue = catalogueSearch.trim().toLowerCase();
+    if (!searchValue) {
+      return catalogueMaterials.slice(0, 5);
+    }
+
+    return catalogueMaterials
+      .filter(material => {
+        const haystack = [
+          material.name,
+          material.materialType,
+          material.finish,
+          material.supplierSku
+        ]
+          .join(' ')
+          .toLowerCase();
+        return haystack.includes(searchValue);
+      })
+      .slice(0, 5);
+  }, [catalogueMaterials, catalogueSearch]);
+
+  const thicknessChoices = useMemo(() => {
+    if (!selectedCatalogueMaterial?.availableThicknesses?.length) {
+      return DEFAULT_THICKNESS_OPTIONS;
+    }
+    const parsed = selectedCatalogueMaterial.availableThicknesses
+      .map(entry => Number(entry.toString().replace(/[^0-9.]/g, '')))
+      .filter(value => !Number.isNaN(value))
+      .map(value => Math.round(value));
+    const unique = Array.from(new Set(parsed)).sort((a, b) => a - b);
+    return unique.length ? unique : DEFAULT_THICKNESS_OPTIONS;
+  }, [selectedCatalogueMaterial]);
+
+  const snapToNearestThickness = useCallback(
+    (value: number) =>
+      thicknessChoices.reduce(
+        (closest, option) =>
+          Math.abs(option - value) < Math.abs(closest - value) ? option : closest,
+        thicknessChoices[0]
+      ),
+    [thicknessChoices]
+  );
+
   const updateField = (field: keyof TabletopConfig, value: number | string) => {
     setConfig(prev => {
       // Keep circular tops perfectly round by mirroring the length/width values.
@@ -304,6 +394,14 @@ const ConfiguratorPage: React.FC = () => {
       return { ...prev, [field]: value };
     });
   };
+
+  useEffect(() => {
+    setConfig(prev => {
+      const snapped = snapToNearestThickness(prev.thicknessMm);
+      if (snapped === prev.thicknessMm) return prev;
+      return { ...prev, thicknessMm: snapped };
+    });
+  }, [snapToNearestThickness]);
 
   // Allow designers to type in exact measurements without fighting the slider
   // by keeping the raw string in state until we have a valid number.
@@ -391,6 +489,24 @@ const ConfiguratorPage: React.FC = () => {
     }));
   };
 
+  const handleCatalogueSelection = (material: CatalogueMaterial) => {
+    setSelectedCatalogueMaterialId(material.id);
+    setCatalogueSearch(material.name);
+    setConfig(prev => {
+      const mappedMaterial = materialTypeToConfigMaterial(material.materialType);
+      const finishLabel = (material.finish || '').toLowerCase();
+      let nextFinish = prev.finish;
+      if (finishLabel.includes('matte')) nextFinish = 'matte';
+      if (finishLabel.includes('satin') || finishLabel.includes('semi') || finishLabel.includes('gloss')) {
+        nextFinish = 'satin';
+      }
+      if (mappedMaterial === prev.material && nextFinish === prev.finish) {
+        return prev;
+      }
+      return { ...prev, material: mappedMaterial, finish: nextFinish };
+    });
+  };
+
   const formattedPrice =
     price != null
       ? price.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })
@@ -408,18 +524,79 @@ const ConfiguratorPage: React.FC = () => {
     }
   }, [config.shape, config.widthMm, config.edgeRadiusMm]);
 
+  const materialMaxLength = useMemo(
+    () => parseMeasurementToMm(selectedCatalogueMaterial?.maxLength),
+    [selectedCatalogueMaterial]
+  );
+  const materialMaxWidth = useMemo(
+    () => parseMeasurementToMm(selectedCatalogueMaterial?.maxWidth),
+    [selectedCatalogueMaterial]
+  );
+  const baseLengthLimit = config.shape === 'round' ? ROUND_DIAMETER_LIMIT_MM : 3600;
+  const rawLengthLimit = materialMaxLength ? Math.min(baseLengthLimit, materialMaxLength) : baseLengthLimit;
+  const effectiveLengthLimit = Math.max(500, rawLengthLimit);
+  const rawWidthLimit =
+    config.shape === 'round'
+      ? rawLengthLimit
+      : materialMaxWidth
+      ? Math.min(1800, materialMaxWidth)
+      : 1800;
+  const effectiveWidthLimit = Math.max(300, rawWidthLimit);
   const maxCornerRadius = useMemo(() => Math.floor(config.widthMm / 2), [config.widthMm]);
-  const maxLength = config.shape === 'round' ? ROUND_DIAMETER_LIMIT_MM : 3600;
   // Translate the saved thickness back to the slider position.
   const thicknessIndex = useMemo(
-    () => Math.max(thicknessOptions.indexOf(config.thicknessMm), 0),
-    [config.thicknessMm]
+    () => Math.max(thicknessChoices.indexOf(config.thicknessMm), 0),
+    [config.thicknessMm, thicknessChoices]
   );
+  const minThickness = thicknessChoices[0];
+  const maxThickness = thicknessChoices[thicknessChoices.length - 1];
 
   const dimensionLocked = config.shape === 'custom';
-  // Reuse the friendly label inside the header so operators always see what is active.
-  const selectedMaterial = materialOptions.find(option => option.value === config.material) ?? materialOptions[0];
-  const cartItemLabel = `${selectedMaterial.label} ${config.shape} ${config.lengthMm}x${config.widthMm}mm top`;
+  const limitedByCatalogueLength = Boolean(
+    selectedCatalogueMaterial && materialMaxLength && materialMaxLength < baseLengthLimit
+  );
+  const limitedByCatalogueWidth = Boolean(
+    selectedCatalogueMaterial && materialMaxWidth && materialMaxWidth < 1800
+  );
+  const cartSurfaceLabel =
+    selectedCatalogueMaterial?.name || selectedCatalogueMaterial?.materialType || 'Surface';
+  const cartItemLabel = `${cartSurfaceLabel} ${config.shape} ${config.lengthMm}x${config.widthMm}mm top`;
+  const extraSurfaceKeywords = useMemo(() => {
+    if (!selectedCatalogueMaterial) return [] as string[];
+    return [
+      selectedCatalogueMaterial.name,
+      selectedCatalogueMaterial.materialType,
+      selectedCatalogueMaterial.finish,
+      selectedCatalogueMaterial.supplierSku
+    ]
+      .filter((term): term is string => Boolean(term))
+      .map(term => term.toString());
+  }, [selectedCatalogueMaterial]);
+
+  useEffect(() => {
+    if (dimensionLocked) return;
+    setConfig(prev => {
+      if (prev.lengthMm <= effectiveLengthLimit) return prev;
+      const nextLength = effectiveLengthLimit;
+      if (prev.shape === 'round') {
+        return { ...prev, lengthMm: nextLength, widthMm: nextLength };
+      }
+      return { ...prev, lengthMm: nextLength };
+    });
+  }, [dimensionLocked, effectiveLengthLimit]);
+
+  useEffect(() => {
+    if (dimensionLocked) return;
+    setConfig(prev => {
+      if (prev.widthMm <= effectiveWidthLimit) return prev;
+      const clampedWidth = effectiveWidthLimit;
+      if (prev.shape === 'round') {
+        const synchronized = Math.min(clampedWidth, effectiveLengthLimit);
+        return { ...prev, widthMm: synchronized, lengthMm: synchronized };
+      }
+      return { ...prev, widthMm: clampedWidth };
+    });
+  }, [dimensionLocked, effectiveWidthLimit, effectiveLengthLimit]);
 
   // Persist the current configuration to Firestore so customers can reference it later.
   const handleAddToCart = async () => {
@@ -443,17 +620,31 @@ const ConfiguratorPage: React.FC = () => {
             notes: customShape.notes ?? null
           }
         : null;
+      const selectedColourMeta = selectedCatalogueMaterial
+        ? {
+            id: selectedCatalogueMaterial.id,
+            name: selectedCatalogueMaterial.name,
+            materialType: selectedCatalogueMaterial.materialType,
+            finish: selectedCatalogueMaterial.finish,
+            supplierSku: selectedCatalogueMaterial.supplierSku,
+            maxLength: selectedCatalogueMaterial.maxLength,
+            maxWidth: selectedCatalogueMaterial.maxWidth,
+            availableThicknesses: selectedCatalogueMaterial.availableThicknesses
+          }
+        : null;
       await addDoc(cartCollection, {
         userId: profile.id,
         label: cartItemLabel,
         config,
         customShape: customShapeMeta,
+        selectedColour: selectedColourMeta,
         estimatedPrice: price ?? null,
         searchKeywords: buildCartSearchKeywords(
           config,
-          selectedMaterial.label,
+          cartSurfaceLabel,
           customShape,
-          cartItemLabel
+          cartItemLabel,
+          extraSurfaceKeywords
         ),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
@@ -530,6 +721,109 @@ const ConfiguratorPage: React.FC = () => {
           ))}
         </div>
 
+        {/* Colour search surfaces live catalogue data so operators pick real-world blanks. */}
+        <div className="space-y-2">
+          <label className="flex flex-col gap-1 text-[0.75rem] font-medium text-slate-200" htmlFor="catalogue-search">
+            <span>Colour catalogue search</span>
+            <input
+              id="catalogue-search"
+              type="text"
+              value={catalogueSearch}
+              onChange={event => {
+                setCatalogueSearch(event.target.value);
+                if (!event.target.value) {
+                  setSelectedCatalogueMaterialId(null);
+                }
+              }}
+              placeholder="Search saved colours, finishes or SKU codes…"
+              className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+            />
+          </label>
+          <p className="text-[0.65rem] text-slate-400">
+            Enter the colour name, finish, supplier or SKU. Selecting a result locks the maximum blank size and the available
+            thicknesses so you stay within catalogue limits.
+          </p>
+          <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+            {catalogueLoading ? (
+              <p className="text-[0.7rem] text-slate-400">Loading colour catalogue…</p>
+            ) : filteredCatalogueMaterials.length ? (
+              <ul className="space-y-2" role="listbox" aria-label="Colour search results">
+                {filteredCatalogueMaterials.map(material => {
+                  const isActive = material.id === selectedCatalogueMaterialId;
+                  return (
+                    <li key={material.id}>
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={isActive}
+                        onClick={() => handleCatalogueSelection(material)}
+                        className={`flex w-full flex-col rounded-lg border p-2 text-left transition ${
+                          isActive
+                            ? 'border-emerald-400 bg-emerald-400/5 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
+                            : 'border-slate-800 hover:border-emerald-300/60'
+                        }`}
+                      >
+                        <span className="text-sm font-semibold text-slate-100">{material.name}</span>
+                        <span className="text-[0.7rem] text-slate-400">
+                          {(material.materialType || 'Material type TBD') + ' • ' + (material.finish || 'Finish TBD')}
+                        </span>
+                        {material.supplierSku && (
+                          <span className="text-[0.65rem] text-slate-500">Supplier SKU: {material.supplierSku}</span>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="text-[0.7rem] text-slate-400">
+                No colours match that search. Try a different name, finish description or SKU.
+              </p>
+            )}
+          </div>
+          {selectedCatalogueMaterial && (
+            <div className="space-y-2 rounded-xl border border-emerald-400/40 bg-emerald-400/5 p-3 text-[0.7rem] text-slate-100">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-emerald-200">Selected colour</p>
+                  <p className="text-base font-semibold text-slate-100">{selectedCatalogueMaterial.name}</p>
+                  <p className="text-slate-300">
+                    {(selectedCatalogueMaterial.materialType || 'Material type TBD') + ' • ' + (selectedCatalogueMaterial.finish || 'Finish TBD')}
+                  </p>
+                  {selectedCatalogueMaterial.supplierSku && (
+                    <p className="text-[0.65rem] text-slate-400">Supplier SKU: {selectedCatalogueMaterial.supplierSku}</p>
+                  )}
+                </div>
+                {selectedCatalogueMaterial.hexCode && (
+                  <span
+                    className="h-12 w-12 rounded-lg border border-white/10"
+                    aria-label={`Swatch for ${selectedCatalogueMaterial.name}`}
+                    style={{ backgroundColor: selectedCatalogueMaterial.hexCode }}
+                  />
+                )}
+              </div>
+              <div className="grid gap-3 text-slate-200 sm:grid-cols-3">
+                <div>
+                  <p className="text-[0.6rem] uppercase tracking-wide text-slate-400">Max blank length</p>
+                  <p className="text-sm">{selectedCatalogueMaterial.maxLength || `${effectiveLengthLimit}mm`}</p>
+                </div>
+                <div>
+                  <p className="text-[0.6rem] uppercase tracking-wide text-slate-400">Max blank width</p>
+                  <p className="text-sm">{selectedCatalogueMaterial.maxWidth || `${effectiveWidthLimit}mm`}</p>
+                </div>
+                <div>
+                  <p className="text-[0.6rem] uppercase tracking-wide text-slate-400">Thicknesses stocked</p>
+                  <p className="text-sm">
+                    {selectedCatalogueMaterial.availableThicknesses.length
+                      ? `${selectedCatalogueMaterial.availableThicknesses.join(', ')} mm`
+                      : `${thicknessChoices.join(', ')} mm`}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
         {config.shape === 'custom' && (
           <CustomShapeUpload
             value={customShape}
@@ -545,11 +839,11 @@ const ConfiguratorPage: React.FC = () => {
               <input
                 type="number"
                 min={500}
-                max={maxLength}
+                max={effectiveLengthLimit}
                 step={10}
                 value={manualInputs.lengthMm}
-                onChange={handleManualNumberChange('lengthMm', 500, maxLength)}
-                onBlur={handleManualNumberBlur('lengthMm', 500, maxLength)}
+                onChange={handleManualNumberChange('lengthMm', 500, effectiveLengthLimit)}
+                onBlur={handleManualNumberBlur('lengthMm', 500, effectiveLengthLimit)}
                 className={`w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-right text-sm text-slate-100 focus:border-emerald-400 focus:outline-none ${
                   dimensionLocked ? 'cursor-not-allowed opacity-50' : ''
                 }`}
@@ -558,14 +852,14 @@ const ConfiguratorPage: React.FC = () => {
                 disabled={dimensionLocked}
               />
               <p className="text-[0.6rem] font-normal text-slate-500">
-                Type an exact length between 500&nbsp;mm and {maxLength}&nbsp;mm.
+                Type an exact length between 500&nbsp;mm and {effectiveLengthLimit}&nbsp;mm.
               </p>
             </div>
           </div>
           <input
             type="range"
             min={500}
-            max={maxLength}
+            max={effectiveLengthLimit}
             step={10}
             value={config.lengthMm}
             onChange={e => updateField('lengthMm', Number(e.target.value))}
@@ -574,9 +868,14 @@ const ConfiguratorPage: React.FC = () => {
           />
           <p className="text-[0.7rem] text-slate-400">
             {config.shape === 'round'
-              ? 'Round tops are limited to 1800 mm in diameter so they stay practical to machine and transport.'
-              : 'Slide between 500 mm and 3600 mm.'}
+              ? `Round tops are limited to ${effectiveLengthLimit} mm in diameter so they stay practical to machine and transport.`
+              : `Slide between 500 mm and ${effectiveLengthLimit} mm.`}
           </p>
+          {limitedByCatalogueLength && selectedCatalogueMaterial && (
+            <p className="text-[0.65rem] text-emerald-300">
+              {selectedCatalogueMaterial.name} blanks top out at {selectedCatalogueMaterial.maxLength || `${effectiveLengthLimit} mm`}.
+            </p>
+          )}
           {dimensionLocked && (
             <p className="text-[0.7rem] text-amber-300">
               Length follows the bounding box of the uploaded DXF. Update your CAD file to adjust.
@@ -591,11 +890,11 @@ const ConfiguratorPage: React.FC = () => {
               <input
                 type="number"
                 min={300}
-                max={1800}
+                max={effectiveWidthLimit}
                 step={10}
                 value={manualInputs.widthMm}
-                onChange={handleManualNumberChange('widthMm', 300, 1800)}
-                onBlur={handleManualNumberBlur('widthMm', 300, 1800)}
+                onChange={handleManualNumberChange('widthMm', 300, effectiveWidthLimit)}
+                onBlur={handleManualNumberBlur('widthMm', 300, effectiveWidthLimit)}
                 className={`w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-right text-sm text-slate-100 focus:border-emerald-400 focus:outline-none ${
                   dimensionLocked ? 'cursor-not-allowed opacity-50' : ''
                 }`}
@@ -604,14 +903,14 @@ const ConfiguratorPage: React.FC = () => {
                 disabled={dimensionLocked}
               />
               <p className="text-[0.6rem] font-normal text-slate-500">
-                Enter a width between 300&nbsp;mm and 1800&nbsp;mm.
+                Enter a width between 300&nbsp;mm and {effectiveWidthLimit}&nbsp;mm.
               </p>
             </div>
           </div>
           <input
             type="range"
             min={300}
-            max={1800}
+            max={effectiveWidthLimit}
             step={10}
             value={config.widthMm}
             onChange={e => updateField('widthMm', Number(e.target.value))}
@@ -621,8 +920,13 @@ const ConfiguratorPage: React.FC = () => {
           <p className="text-[0.7rem] text-slate-400">
             {config.shape === 'round'
               ? 'Width mirrors the length so the new round top stays perfectly circular.'
-              : 'Choose a width from 300 mm to 1800 mm.'}
+              : `Choose a width from 300 mm to ${effectiveWidthLimit} mm.`}
           </p>
+          {limitedByCatalogueWidth && selectedCatalogueMaterial && (
+            <p className="text-[0.65rem] text-emerald-300">
+              {selectedCatalogueMaterial.name} sheets max out at {selectedCatalogueMaterial.maxWidth || `${effectiveWidthLimit} mm`}.
+            </p>
+          )}
           {dimensionLocked && (
             <p className="text-[0.7rem] text-amber-300">
               Width is locked to your DXF outline so the preview and pricing stay accurate.
@@ -714,20 +1018,20 @@ const ConfiguratorPage: React.FC = () => {
             <div className="flex flex-col items-end text-right">
               <input
                 type="number"
-                min={thicknessOptions[0]}
-                max={thicknessOptions[thicknessOptions.length - 1]}
+                min={minThickness}
+                max={maxThickness}
                 step={1}
                 value={manualInputs.thicknessMm}
                 onChange={handleManualNumberChange(
                   'thicknessMm',
-                  thicknessOptions[0],
-                  thicknessOptions[thicknessOptions.length - 1],
+                  minThickness,
+                  maxThickness,
                   snapToNearestThickness
                 )}
                 onBlur={handleManualNumberBlur(
                   'thicknessMm',
-                  thicknessOptions[0],
-                  thicknessOptions[thicknessOptions.length - 1],
+                  minThickness,
+                  maxThickness,
                   snapToNearestThickness
                 )}
                 className="w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-right text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
@@ -735,23 +1039,25 @@ const ConfiguratorPage: React.FC = () => {
                 pattern="[0-9]*"
               />
               <p className="text-[0.6rem] font-normal text-slate-500">
-                Enter any supported board size (12, 16, 18, 25 or 33&nbsp;mm).
+                Enter one of the stocked thicknesses ({thicknessChoices.join(', ')}&nbsp;mm).
               </p>
             </div>
           </div>
           <input
             type="range"
             min={0}
-            max={thicknessOptions.length - 1}
+            max={thicknessChoices.length - 1}
             step={1}
             value={thicknessIndex}
             onChange={e => {
               const nextIndex = Number(e.target.value);
-              updateField('thicknessMm', thicknessOptions[nextIndex]);
+              updateField('thicknessMm', thicknessChoices[nextIndex]);
             }}
             className="accent-emerald-400"
           />
-          <p className="text-[0.7rem] text-slate-400">Snap to common board sizes: 12, 16, 18, 25 or 33&nbsp;mm thicknesses.</p>
+          <p className="text-[0.7rem] text-slate-400">
+            Snap to the catalogue-supported thicknesses: {thicknessChoices.join(', ')}&nbsp;mm.
+          </p>
         </label>
 
         {/* Radio buttons mirror the material UI so operators immediately recognise how to flag the edge treatment. */}
@@ -798,41 +1104,6 @@ const ConfiguratorPage: React.FC = () => {
                     <p className="mt-1 text-[0.7rem] text-slate-400">{option.description}</p>
                   </div>
                   <p className="mt-3 text-[0.65rem] text-emerald-300">{option.searchHint}</p>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-2" aria-labelledby="material-choice-label" aria-describedby="material-choice-help" role="radiogroup">
-          <div className="flex items-center justify-between text-[0.75rem] font-medium" id="material-choice-label">
-            <span>Material build</span>
-            <span className="text-slate-400">{selectedMaterial.label}</span>
-          </div>
-          <p id="material-choice-help" className="text-[0.7rem] text-slate-400">
-            Choose the core and surface finish so pricing reflects the right labour and the order can be searched by material later.
-          </p>
-          <div className="grid gap-2 sm:grid-cols-3">
-            {materialOptions.map(option => {
-              const isActive = option.value === config.material;
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => updateField('material', option.value)}
-                  role="radio"
-                  aria-checked={isActive}
-                  className={`flex h-full flex-col justify-between rounded-xl border p-3 text-left transition ${
-                    isActive
-                      ? 'border-emerald-400 bg-emerald-400/5 shadow-[0_0_20px_rgba(16,185,129,0.15)]'
-                      : 'border-slate-700 bg-slate-950/70 hover:border-emerald-300/80'
-                  }`}
-                >
-                  <div>
-                    <p className="text-sm font-semibold text-slate-100">{option.label}</p>
-                    <p className="mt-1 text-[0.7rem] text-slate-400">{option.description}</p>
-                  </div>
-                  <p className="mt-3 text-[0.65rem] text-emerald-300">{option.edgeNote}</p>
                 </button>
               );
             })}
