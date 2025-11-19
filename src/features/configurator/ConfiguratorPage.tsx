@@ -19,6 +19,12 @@ const ROUND_DIAMETER_LIMIT_MM = 1800;
 // Supported board thickness increments for the slider.
 const DEFAULT_THICKNESS_OPTIONS = [12, 16, 18, 25, 33];
 
+interface ThicknessDimension {
+  thickness: string;
+  maxLength: string;
+  maxWidth: string;
+}
+
 interface CatalogueMaterial {
   id: string;
   name: string;
@@ -29,6 +35,7 @@ interface CatalogueMaterial {
   maxLength: string;
   maxWidth: string;
   availableThicknesses: string[];
+  thicknessDimensions: ThicknessDimension[];
 }
 
 // Convert stored catalogue measurements (e.g. "3600mm" or "3.6m")
@@ -47,6 +54,17 @@ const parseMeasurementToMm = (value?: string | null): number | null => {
     return Math.round(parsed);
   }
   return Math.round(parsed * 1000);
+};
+
+const parseThicknessToNumber = (value?: string | number | null): number | null => {
+  if (value == null) return null;
+  const trimmed = value.toString().trim();
+  if (!trimmed) return null;
+  const numericPortion = trimmed.replace(/[^0-9.]/g, '');
+  if (!numericPortion) return null;
+  const parsed = Number(numericPortion);
+  if (Number.isNaN(parsed)) return null;
+  return Math.round(parsed);
 };
 
 const materialTypeToConfigMaterial = (
@@ -304,7 +322,23 @@ const ConfiguratorPage: React.FC = () => {
       materialsQuery,
       snapshot => {
         const nextMaterials: CatalogueMaterial[] = snapshot.docs.map(docSnap => {
-          const data = docSnap.data() as Partial<CatalogueMaterial>;
+          const data = docSnap.data() as Partial<CatalogueMaterial> & {
+            thicknessDimensions?: ThicknessDimension[];
+          };
+          const normalizedDimensions = Array.isArray(data.thicknessDimensions)
+            ? data.thicknessDimensions
+                .map(dimension => ({
+                  thickness: dimension.thickness ?? '',
+                  maxLength: dimension.maxLength ?? '',
+                  maxWidth: dimension.maxWidth ?? ''
+                }))
+                .filter(
+                  dimension => dimension.thickness || dimension.maxLength || dimension.maxWidth
+                )
+            : [];
+          const derivedThicknesses = normalizedDimensions
+            .map(dimension => dimension.thickness)
+            .filter((entry): entry is string => Boolean(entry));
           return {
             id: docSnap.id,
             name: data.name ?? 'Untitled colour',
@@ -314,7 +348,10 @@ const ConfiguratorPage: React.FC = () => {
             hexCode: data.hexCode,
             maxLength: data.maxLength ?? '',
             maxWidth: data.maxWidth ?? '',
-            availableThicknesses: data.availableThicknesses ?? []
+            availableThicknesses: derivedThicknesses.length
+              ? derivedThicknesses
+              : data.availableThicknesses ?? [],
+            thicknessDimensions: normalizedDimensions
           };
         });
         setCatalogueMaterials(nextMaterials);
@@ -358,6 +395,16 @@ const ConfiguratorPage: React.FC = () => {
   }, [catalogueMaterials, catalogueSearch]);
 
   const thicknessChoices = useMemo(() => {
+    const parsedFromDimensions = selectedCatalogueMaterial?.thicknessDimensions?.length
+      ? selectedCatalogueMaterial.thicknessDimensions
+          .map(dimension => parseThicknessToNumber(dimension.thickness))
+          .filter((value): value is number => value != null)
+      : [];
+
+    if (parsedFromDimensions.length) {
+      return Array.from(new Set(parsedFromDimensions)).sort((a, b) => a - b);
+    }
+
     if (!selectedCatalogueMaterial?.availableThicknesses?.length) {
       return DEFAULT_THICKNESS_OPTIONS;
     }
@@ -368,6 +415,20 @@ const ConfiguratorPage: React.FC = () => {
     const unique = Array.from(new Set(parsed)).sort((a, b) => a - b);
     return unique.length ? unique : DEFAULT_THICKNESS_OPTIONS;
   }, [selectedCatalogueMaterial]);
+
+  const activeThicknessDimensions = useMemo(() => {
+    if (!selectedCatalogueMaterial?.thicknessDimensions?.length) return null;
+    const enrichedDimensions = selectedCatalogueMaterial.thicknessDimensions.map(dimension => ({
+      ...dimension,
+      numericThickness: parseThicknessToNumber(dimension.thickness)
+    }));
+    const exactMatch = enrichedDimensions.find(
+      dimension => dimension.numericThickness === config.thicknessMm
+    );
+    if (exactMatch) return exactMatch;
+    const fallback = enrichedDimensions.find(dimension => dimension.numericThickness != null);
+    return fallback ?? enrichedDimensions[0];
+  }, [config.thicknessMm, selectedCatalogueMaterial]);
 
   const snapToNearestThickness = useCallback(
     (value: number) =>
@@ -525,12 +586,18 @@ const ConfiguratorPage: React.FC = () => {
   }, [config.shape, config.widthMm, config.edgeRadiusMm]);
 
   const materialMaxLength = useMemo(
-    () => parseMeasurementToMm(selectedCatalogueMaterial?.maxLength),
-    [selectedCatalogueMaterial]
+    () =>
+      parseMeasurementToMm(
+        activeThicknessDimensions?.maxLength ?? selectedCatalogueMaterial?.maxLength
+      ),
+    [activeThicknessDimensions, selectedCatalogueMaterial]
   );
   const materialMaxWidth = useMemo(
-    () => parseMeasurementToMm(selectedCatalogueMaterial?.maxWidth),
-    [selectedCatalogueMaterial]
+    () =>
+      parseMeasurementToMm(
+        activeThicknessDimensions?.maxWidth ?? selectedCatalogueMaterial?.maxWidth
+      ),
+    [activeThicknessDimensions, selectedCatalogueMaterial]
   );
   const baseLengthLimit = config.shape === 'round' ? ROUND_DIAMETER_LIMIT_MM : 3600;
   const rawLengthLimit = materialMaxLength ? Math.min(baseLengthLimit, materialMaxLength) : baseLengthLimit;
@@ -550,6 +617,11 @@ const ConfiguratorPage: React.FC = () => {
   );
   const minThickness = thicknessChoices[0];
   const maxThickness = thicknessChoices[thicknessChoices.length - 1];
+  const activeThicknessLabel = activeThicknessDimensions?.thickness?.trim();
+  const catalogueMaxLengthLabel =
+    activeThicknessDimensions?.maxLength || selectedCatalogueMaterial?.maxLength;
+  const catalogueMaxWidthLabel =
+    activeThicknessDimensions?.maxWidth || selectedCatalogueMaterial?.maxWidth;
 
   const dimensionLocked = config.shape === 'custom';
   const limitedByCatalogueLength = Boolean(
@@ -805,21 +877,22 @@ const ConfiguratorPage: React.FC = () => {
               <div className="grid gap-3 text-slate-200 sm:grid-cols-3">
                 <div>
                   <p className="text-[0.6rem] uppercase tracking-wide text-slate-400">Max blank length</p>
-                  <p className="text-sm">{selectedCatalogueMaterial.maxLength || `${effectiveLengthLimit}mm`}</p>
+                  <p className="text-sm">{catalogueMaxLengthLabel || `${effectiveLengthLimit}mm`}</p>
                 </div>
                 <div>
                   <p className="text-[0.6rem] uppercase tracking-wide text-slate-400">Max blank width</p>
-                  <p className="text-sm">{selectedCatalogueMaterial.maxWidth || `${effectiveWidthLimit}mm`}</p>
+                  <p className="text-sm">{catalogueMaxWidthLabel || `${effectiveWidthLimit}mm`}</p>
                 </div>
                 <div>
                   <p className="text-[0.6rem] uppercase tracking-wide text-slate-400">Thicknesses stocked</p>
-                  <p className="text-sm">
-                    {selectedCatalogueMaterial.availableThicknesses.length
-                      ? `${selectedCatalogueMaterial.availableThicknesses.join(', ')} mm`
-                      : `${thicknessChoices.join(', ')} mm`}
-                  </p>
+                  <p className="text-sm">{`${thicknessChoices.join(', ')} mm`}</p>
                 </div>
               </div>
+              {activeThicknessLabel && (
+                <p className="text-[0.6rem] uppercase tracking-wide text-slate-400">
+                  Limits shown for {activeThicknessLabel} stock.
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -873,7 +946,7 @@ const ConfiguratorPage: React.FC = () => {
           </p>
           {limitedByCatalogueLength && selectedCatalogueMaterial && (
             <p className="text-[0.65rem] text-emerald-300">
-              {selectedCatalogueMaterial.name} blanks top out at {selectedCatalogueMaterial.maxLength || `${effectiveLengthLimit} mm`}.
+              {selectedCatalogueMaterial.name} blanks top out at {catalogueMaxLengthLabel || `${effectiveLengthLimit} mm`}.
             </p>
           )}
           {dimensionLocked && (
@@ -924,7 +997,7 @@ const ConfiguratorPage: React.FC = () => {
           </p>
           {limitedByCatalogueWidth && selectedCatalogueMaterial && (
             <p className="text-[0.65rem] text-emerald-300">
-              {selectedCatalogueMaterial.name} sheets max out at {selectedCatalogueMaterial.maxWidth || `${effectiveWidthLimit} mm`}.
+              {selectedCatalogueMaterial.name} sheets max out at {catalogueMaxWidthLabel || `${effectiveWidthLimit} mm`}.
             </p>
           )}
           {dimensionLocked && (
