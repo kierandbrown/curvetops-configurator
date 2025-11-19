@@ -19,6 +19,8 @@ export type TableShape =
   | 'super-ellipse'
   | 'custom';
 
+export type EdgeProfile = 'edged' | 'painted-sharknose';
+
 export interface TabletopConfig {
   shape: TableShape;
   lengthMm: number;
@@ -28,6 +30,7 @@ export interface TabletopConfig {
   superEllipseExponent: number;
   material: 'laminate' | 'timber' | 'linoleum';
   finish: 'matte' | 'satin';
+  edgeProfile: EdgeProfile;
   quantity: number;
 }
 

@@ -53,6 +53,7 @@ export const usePricing = (config: TabletopConfig) => {
     superEllipseExponent: Number(config.superEllipseExponent),
     material: config.material,
     finish: config.finish,
+    edgeProfile: config.edgeProfile,
     quantity: Number(config.quantity)
   }), [
     config.shape,
@@ -63,6 +64,7 @@ export const usePricing = (config: TabletopConfig) => {
     config.superEllipseExponent,
     config.material,
     config.finish,
+    config.edgeProfile,
     config.quantity
   ]);
 

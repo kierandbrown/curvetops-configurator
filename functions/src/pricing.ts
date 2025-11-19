@@ -9,6 +9,7 @@ interface TabletopConfig {
   superEllipseExponent: number;
   material: 'laminate' | 'timber' | 'linoleum';
   finish: 'matte' | 'satin';
+  edgeProfile: 'edged' | 'painted-sharknose';
   quantity: number;
 }
 
