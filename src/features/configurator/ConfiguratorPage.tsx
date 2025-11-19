@@ -29,6 +29,27 @@ const defaultConfig: TabletopConfig = {
 // Supported board thickness increments for the slider.
 const thicknessOptions = [12, 16, 18, 25, 33];
 
+// Edge styles that shop floor teams can filter against in the search UI.
+const edgeProfileOptions: {
+  value: TabletopConfig['edgeProfile'];
+  label: string;
+  description: string;
+  searchHint: string;
+}[] = [
+  {
+    value: 'edged',
+    label: 'Square ABS edge',
+    description: 'Standard straight edge banding for fast production and resilient school/workplace installs.',
+    searchHint: 'Search for “edged ABS” to filter quotes.'
+  },
+  {
+    value: 'painted-sharknose',
+    label: 'Painted sharknose',
+    description: 'Hand-finished underside bevel that hides the board thickness and delivers a premium floating look.',
+    searchHint: 'Search using “sharknose paint” when chasing this finish.'
+  }
+];
+
 // Visual previews for each tabletop shape help replace the plain text buttons and
 // keep the UI consistent with the request for image-based selectors.
 const shapeOptions: { shape: TableShape; label: string; icon: JSX.Element }[] = [
