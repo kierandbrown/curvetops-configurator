@@ -37,18 +37,67 @@ const edgeProfileOptions: {
   label: string;
   description: string;
   searchHint: string;
+  preview: JSX.Element;
 }[] = [
   {
     value: 'edged',
     label: 'Square ABS edge',
     description: 'Standard straight edge banding for fast production and resilient school/workplace installs.',
-    searchHint: 'Search for “edged ABS” to filter quotes.'
+    searchHint: 'Search for “edged ABS” to filter quotes.',
+    preview: (
+      // Stylised square edge that highlights the ABS band being applied.
+      <svg
+        viewBox="0 0 160 90"
+        className="h-20 w-full text-emerald-300"
+        role="img"
+        aria-label="Cross-section of a square ABS edge band"
+      >
+        <defs>
+          <linearGradient id="absEdge" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#d1fae5" stopOpacity={0.9} />
+            <stop offset="100%" stopColor="#34d399" stopOpacity={0.5} />
+          </linearGradient>
+        </defs>
+        <rect x="15" y="25" width="130" height="45" fill="#0f172a" stroke="#34d399" strokeWidth={3} rx={4} />
+        <rect x="118" y="25" width="27" height="45" fill="url(#absEdge)" stroke="#34d399" strokeWidth={3} />
+        <text x="95" y="20" className="fill-emerald-200 text-[10px]" textAnchor="middle">
+          ABS band
+        </text>
+      </svg>
+    )
   },
   {
     value: 'painted-sharknose',
     label: 'Painted sharknose',
     description: 'Hand-finished underside bevel that hides the board thickness and delivers a premium floating look.',
-    searchHint: 'Search using “sharknose paint” when chasing this finish.'
+    searchHint: 'Search using “sharknose paint” when chasing this finish.',
+    preview: (
+      // Underside bevel illustration emphasising the painted sharknose reveal.
+      <svg
+        viewBox="0 0 160 90"
+        className="h-20 w-full text-emerald-300"
+        role="img"
+        aria-label="Cross-section of a painted sharknose edge"
+      >
+        <defs>
+          <linearGradient id="sharknosePaint" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#f472b6" stopOpacity={0.9} />
+            <stop offset="100%" stopColor="#ec4899" stopOpacity={0.5} />
+          </linearGradient>
+        </defs>
+        <path
+          d="M20 25 H140 L120 70 H20 Z"
+          fill="#0f172a"
+          stroke="#34d399"
+          strokeWidth={3}
+          strokeLinejoin="round"
+        />
+        <path d="M140 25 L120 70" stroke="url(#sharknosePaint)" strokeWidth={5} strokeLinecap="round" />
+        <text x="115" y="20" className="fill-emerald-200 text-[10px]" textAnchor="middle">
+          Hand-painted bevel
+        </text>
+      </svg>
+    )
   }
 ];
 
@@ -550,6 +599,10 @@ const ConfiguratorPage: React.FC = () => {
                       : 'border-slate-700 bg-slate-950/70 hover:border-emerald-300/80'
                   }`}
                 >
+                  <div className="mb-3 flex items-center justify-center rounded-lg bg-slate-900/70 p-2">
+                    {/* Inline SVG previews give installers a quick visual cue for the profile. */}
+                    {option.preview}
+                  </div>
                   <div>
                     <p className="text-sm font-semibold text-slate-100">{option.label}</p>
                     <p className="mt-1 text-[0.7rem] text-slate-400">{option.description}</p>
