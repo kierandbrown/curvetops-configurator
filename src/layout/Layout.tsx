@@ -9,8 +9,8 @@ const Layout: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-slate-950 text-slate-50">
       <Header />
       <div className="flex flex-1">
-        <aside className="hidden md:block w-64 border-r border-slate-800 bg-slate-900/60">
-          <nav className="p-4 space-y-2 text-sm">
+        <aside className="hidden md:flex w-80 flex-col border-r border-slate-800 bg-slate-900/60">
+          <nav className="p-4 space-y-2 border-b border-slate-800 text-sm">
             <NavLink
               to="/"
               className={({ isActive }) =>
@@ -66,6 +66,8 @@ const Layout: React.FC = () => {
               </NavLink>
             )}
           </nav>
+          {/* Give feature pages (such as the configurator) a place to portal sidebar tools. */}
+          <div id="configurator-sidebar" className="flex-1 overflow-y-auto p-4 space-y-4" />
         </aside>
         <main className="flex-1 p-4 md:p-6">
           <Outlet />
