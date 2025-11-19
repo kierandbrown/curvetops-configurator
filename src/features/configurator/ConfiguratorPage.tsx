@@ -12,6 +12,7 @@ import CustomShapeUpload from './CustomShapeUpload';
 import { CustomShapeDetails } from './customShapeTypes';
 import { defaultTabletopConfig } from './defaultConfig';
 import { buildCartSearchKeywords } from '../cart/cartUtils';
+import ViewportMouseGuide from './ViewportMouseGuide';
 
 const ROUND_DIAMETER_LIMIT_MM = 1800;
 
@@ -842,6 +843,7 @@ const ConfiguratorPage: React.FC = () => {
         </p>
         <div className="relative h-[420px] overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
           <Configurator3D config={config} customOutline={customShape?.outline ?? null} />
+          <ViewportMouseGuide />
           {config.shape === 'custom' && !customShape?.outline && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/70 px-6 text-center text-sm text-slate-200">
               Upload a DXF file to see the custom outline in the preview window.
