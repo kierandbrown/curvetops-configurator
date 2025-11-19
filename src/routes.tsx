@@ -9,7 +9,6 @@ import AdminPage from './features/admin/AdminPage';
 import MaterialsPage from './features/materials/MaterialsPage';
 import AccountPage from './pages/AccountPage';
 import { ProtectedRoute } from '@auth/ProtectedRoute';
-import AccountPage from './pages/AccountPage';
 
 export const routes: RouteObject[] = [
   {
