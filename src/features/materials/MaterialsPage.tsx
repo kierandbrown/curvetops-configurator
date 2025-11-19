@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, DragEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import {
   addDoc,
   collection,
@@ -10,7 +10,8 @@ import {
   serverTimestamp,
   updateDoc
 } from 'firebase/firestore';
-import { db } from '@auth/firebase';
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { db, storage } from '@auth/firebase';
 import { useAuth } from '@auth/AuthContext';
 import Loader from '@/components/ui/Loader';
 
@@ -18,8 +19,12 @@ interface MaterialInput {
   name: string;
   materialType: string;
   finish: string;
-  colorFamily: string;
   hexCode: string;
+  supplierSku: string;
+  maxLength: string;
+  maxWidth: string;
+  availableThicknesses: string[];
+  imageUrl: string;
   notes: string;
 }
 
@@ -27,13 +32,38 @@ interface MaterialRecord extends MaterialInput {
   id: string;
 }
 
+type FilterKeys =
+  | 'name'
+  | 'materialType'
+  | 'finish'
+  | 'supplierSku'
+  | 'maxLength'
+  | 'maxWidth'
+  | 'availableThicknesses';
+
 const emptyMaterial: MaterialInput = {
   name: '',
   materialType: '',
   finish: '',
-  colorFamily: '',
   hexCode: '#ffffff',
+  supplierSku: '',
+  maxLength: '',
+  maxWidth: '',
+  availableThicknesses: [],
+  imageUrl: '',
   notes: ''
+};
+
+const materialTypeOptions = ['Melamine', 'Veneer', 'Solid Surface', 'Linoleum'];
+const thicknessOptions = ['12', '16', '18', '25', '32', '33'];
+const initialFilters: Record<FilterKeys, string> = {
+  name: '',
+  materialType: '',
+  finish: '',
+  supplierSku: '',
+  maxLength: '',
+  maxWidth: '',
+  availableThicknesses: ''
 };
 
 const buildSearchKeywords = (material: MaterialInput): string[] => {
@@ -41,8 +71,11 @@ const buildSearchKeywords = (material: MaterialInput): string[] => {
     material.name,
     material.materialType,
     material.finish,
-    material.colorFamily,
     material.hexCode,
+    material.supplierSku,
+    material.maxLength,
+    material.maxWidth,
+    material.availableThicknesses.join(' '),
     material.notes
   ];
   const words = combinedValues
@@ -60,24 +93,28 @@ const MaterialsPage: React.FC = () => {
 
   const [materials, setMaterials] = useState<MaterialRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({
-    name: '',
-    materialType: '',
-    finish: '',
-    colorFamily: ''
-  });
+  const [filters, setFilters] = useState<Record<FilterKeys, string>>(initialFilters);
   const [formState, setFormState] = useState<MaterialInput>(emptyMaterial);
   const [activeMaterialId, setActiveMaterialId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState('');
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
 
   useEffect(() => {
     const materialsQuery = query(collection(db, 'materials'), orderBy('name'));
     const unsubscribe = onSnapshot(materialsQuery, snapshot => {
-      const nextMaterials: MaterialRecord[] = snapshot.docs.map(docSnap => ({
-        id: docSnap.id,
-        ...(docSnap.data() as MaterialInput)
-      }));
+      const nextMaterials: MaterialRecord[] = snapshot.docs.map(docSnap => {
+        const data = docSnap.data() as Partial<MaterialInput>;
+        return {
+          id: docSnap.id,
+          ...emptyMaterial,
+          ...data,
+          availableThicknesses: data.availableThicknesses || [],
+          imageUrl: data.imageUrl || ''
+        };
+      });
       setMaterials(nextMaterials);
       setLoading(false);
     });
@@ -89,7 +126,13 @@ const MaterialsPage: React.FC = () => {
     if (!activeMaterialId) return;
     const match = materials.find(material => material.id === activeMaterialId);
     if (match) {
-      setFormState(match);
+      setFormState({
+        ...emptyMaterial,
+        ...match,
+        availableThicknesses: match.availableThicknesses || []
+      });
+      setImagePreview(match.imageUrl || '');
+      setPendingImageFile(null);
     }
   }, [activeMaterialId, materials]);
 
@@ -99,12 +142,24 @@ const MaterialsPage: React.FC = () => {
     return () => document.removeEventListener('click', closeMenus);
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (imagePreview && imagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [imagePreview]);
+
   const filteredMaterials = useMemo(() => {
     return materials.filter(material =>
       Object.entries(filters).every(([key, value]) => {
         const filterValue = value.trim().toLowerCase();
         if (!filterValue) return true;
-        const materialValue = String(material[key as keyof typeof filters] || '')
+        const rawValue = material[key as keyof typeof filters];
+        if (Array.isArray(rawValue)) {
+          return rawValue.some(option => option.toLowerCase().includes(filterValue));
+        }
+        const materialValue = String(rawValue || '')
           .toLowerCase()
           .trim();
         return materialValue.includes(filterValue);
@@ -112,22 +167,83 @@ const MaterialsPage: React.FC = () => {
     );
   }, [materials, filters]);
 
-  const handleFilterChange = (field: keyof typeof filters, value: string) => {
+  const handleFilterChange = (field: FilterKeys, value: string) => {
     setFilters(prev => ({ ...prev, [field]: value }));
   };
 
   const handleNameClick = (material: MaterialRecord) => {
     setActiveMaterialId(material.id);
-    setFormState(material);
+    setFormState({
+      ...emptyMaterial,
+      ...material,
+      availableThicknesses: material.availableThicknesses || []
+    });
+    setImagePreview(material.imageUrl || '');
+    setPendingImageFile(null);
   };
 
   const startCreateFlow = () => {
     setActiveMaterialId(null);
     setFormState(emptyMaterial);
+    setPendingImageFile(null);
+    setImagePreview('');
   };
 
-  const handleFormChange = (field: keyof MaterialInput, value: string) => {
+  const handleFormChange = (field: keyof MaterialInput, value: string | string[]) => {
     setFormState(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleThicknessChange = (options: HTMLSelectElement) => {
+    const values = Array.from(options.selectedOptions).map(option => option.value);
+    handleFormChange('availableThicknesses', values);
+  };
+
+  const handleImageSelection = (file: File | null) => {
+    if (!file) {
+      setPendingImageFile(null);
+      setImagePreview(formState.imageUrl || '');
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      console.warn('Unsupported file type.');
+      return;
+    }
+
+    setPendingImageFile(file);
+    const nextPreview = URL.createObjectURL(file);
+    setImagePreview(nextPreview);
+  };
+
+  const handleImageInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] || null;
+    handleImageSelection(file);
+  };
+
+  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDraggingFile(true);
+  };
+
+  const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDraggingFile(false);
+  };
+
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDraggingFile(false);
+    const file = event.dataTransfer.files?.[0] || null;
+    handleImageSelection(file);
+  };
+
+  const clearImage = () => {
+    setPendingImageFile(null);
+    setImagePreview('');
+    handleFormChange('imageUrl', '');
   };
 
   const persistMaterial = async (event: FormEvent) => {
@@ -136,13 +252,29 @@ const MaterialsPage: React.FC = () => {
 
     setIsSubmitting(true);
     try {
+      let imageUrl = formState.imageUrl;
+      if (pendingImageFile) {
+        const fileRef = ref(storage, `materials/${Date.now()}_${pendingImageFile.name}`);
+        const uploadResult = await uploadBytes(fileRef, pendingImageFile);
+        imageUrl = await getDownloadURL(uploadResult.ref);
+      }
+
       const sanitizedHex = formState.hexCode.startsWith('#')
         ? formState.hexCode
         : `#${formState.hexCode}`;
       const trimmedNotes = formState.notes.trim();
+      const sanitizedSupplierSku = formState.supplierSku.trim();
+      const sanitizedMaxLength = formState.maxLength.trim();
+      const sanitizedMaxWidth = formState.maxWidth.trim();
+      const sanitizedThicknesses = formState.availableThicknesses.filter(Boolean);
       const baseMaterial: MaterialInput = {
         ...formState,
         hexCode: sanitizedHex.toUpperCase(),
+        supplierSku: sanitizedSupplierSku,
+        maxLength: sanitizedMaxLength,
+        maxWidth: sanitizedMaxWidth,
+        availableThicknesses: sanitizedThicknesses,
+        imageUrl,
         notes: trimmedNotes
       };
       const payload = {
@@ -153,12 +285,14 @@ const MaterialsPage: React.FC = () => {
 
       if (activeMaterialId) {
         await updateDoc(doc(db, 'materials', activeMaterialId), payload);
+        setFormState(baseMaterial);
+        setImagePreview(imageUrl);
       } else {
         await addDoc(collection(db, 'materials'), payload);
-      }
-      if (!activeMaterialId) {
         setFormState(emptyMaterial);
+        setImagePreview('');
       }
+      setPendingImageFile(null);
     } finally {
       setIsSubmitting(false);
     }
@@ -184,11 +318,13 @@ const MaterialsPage: React.FC = () => {
     if (activeMaterialId === materialId) {
       setActiveMaterialId(null);
       setFormState(emptyMaterial);
+      setPendingImageFile(null);
+      setImagePreview('');
     }
   };
 
   const tableColumns: {
-    key: keyof typeof filters;
+    key: FilterKeys;
     label: string;
     placeholder: string;
     helper: string;
@@ -202,7 +338,7 @@ const MaterialsPage: React.FC = () => {
     {
       key: 'materialType',
       label: 'Material type',
-      placeholder: 'Laminate, timber…',
+      placeholder: 'Melamine, veneer…',
       helper: 'Filter materials by their core substrate or supplier category.'
     },
     {
@@ -212,12 +348,63 @@ const MaterialsPage: React.FC = () => {
       helper: 'Limit the table to a specific sheen or surface treatment.'
     },
     {
-      key: 'colorFamily',
-      label: 'Colour family',
-      placeholder: 'Neutrals, greens…',
-      helper: 'Group colours into the palette family you need right now.'
+      key: 'supplierSku',
+      label: 'Supplier SKU',
+      placeholder: 'SKU, code…',
+      helper: 'Search by catalogue or supplier code when ordering replacements.'
+    },
+    {
+      key: 'maxLength',
+      label: 'Maximum length',
+      placeholder: 'e.g. 3600mm',
+      helper: 'Filter by blank length to match island and benchtop spans.'
+    },
+    {
+      key: 'maxWidth',
+      label: 'Maximum width',
+      placeholder: 'e.g. 1350mm',
+      helper: 'Quickly find sheets wide enough for your design.'
+    },
+    {
+      key: 'availableThicknesses',
+      label: 'Thicknesses',
+      placeholder: '12, 16, 18…',
+      helper: 'Enter a number to see all finishes stocked in that thickness.'
     }
   ];
+
+  const renderTableCell = (material: MaterialRecord, key: FilterKeys) => {
+    const sharedClass = 'text-slate-200';
+    switch (key) {
+      case 'name':
+        return (
+          <div>
+            <button
+              className="text-left font-semibold text-emerald-300 hover:underline"
+              onClick={event => {
+                event.stopPropagation();
+                handleNameClick(material);
+              }}
+            >
+              {material.name || 'Untitled colour'}
+            </button>
+            <p className="text-xs text-slate-400">Tap a name to edit the record.</p>
+          </div>
+        );
+      case 'availableThicknesses':
+        return (
+          <div className={sharedClass}>
+            {material.availableThicknesses.length
+              ? `${material.availableThicknesses.join(', ')} mm`
+              : '—'}
+          </div>
+        );
+      default: {
+        const value = material[key];
+        return <span className={sharedClass}>{value ? value : '—'}</span>;
+      }
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -297,23 +484,31 @@ const MaterialsPage: React.FC = () => {
                         className="border-t border-slate-800/70 hover:bg-slate-900/40"
                       >
                         <td className="px-4 py-3">
-                          <div className="h-8 w-8 rounded-md border border-white/10" style={{ backgroundColor: material.hexCode }} />
+                          <div className="flex flex-col gap-2">
+                            <div className="h-12 w-12 overflow-hidden rounded-md border border-white/10 bg-slate-900">
+                              {material.imageUrl ? (
+                                <img
+                                  src={material.imageUrl}
+                                  alt={`${material.name} swatch`}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div
+                                  className="h-full w-full"
+                                  style={{ backgroundColor: material.hexCode }}
+                                />
+                              )}
+                            </div>
+                            <p className="text-[0.65rem] uppercase tracking-wide text-slate-500">
+                              {material.hexCode}
+                            </p>
+                          </div>
                         </td>
-                        <td className="px-4 py-3">
-                          <button
-                            className="text-left font-semibold text-emerald-300 hover:underline"
-                            onClick={event => {
-                              event.stopPropagation();
-                              handleNameClick(material);
-                            }}
-                          >
-                            {material.name || 'Untitled colour'}
-                          </button>
-                          <p className="text-xs text-slate-400">Tap a name to edit the record.</p>
-                        </td>
-                        <td className="px-4 py-3 text-slate-200">{material.materialType || '—'}</td>
-                        <td className="px-4 py-3 text-slate-200">{material.finish || '—'}</td>
-                        <td className="px-4 py-3 text-slate-200">{material.colorFamily || '—'}</td>
+                        {tableColumns.map(column => (
+                          <td key={column.key} className="px-4 py-3">
+                            {renderTableCell(material, column.key)}
+                          </td>
+                        ))}
                         <td className="px-4 py-3 text-right">
                           {isAdmin ? (
                             <div className="relative inline-block text-left" onClick={event => event.stopPropagation()}>
@@ -402,17 +597,23 @@ const MaterialsPage: React.FC = () => {
                 <label className="text-sm font-semibold text-slate-100" htmlFor="material-type">
                   Material type
                 </label>
-                <input
+                <select
                   id="material-type"
-                  type="text"
                   className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
                   value={formState.materialType}
                   onChange={event => handleFormChange('materialType', event.target.value)}
-                  placeholder="Laminate, veneer, solid surface…"
                   aria-describedby="material-type-help"
-                />
+                >
+                  <option value="">Select a substrate…</option>
+                  {materialTypeOptions.map(option => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
                 <p id="material-type-help" className="mt-1 text-xs text-slate-400">
-                  Describe the core material (laminate, solid timber, etc.) to keep pricing rules accurate.
+                  Pick from the standard list (melamine, veneer, solid surface or linoleum) so pricing and cut lists stay
+                  aligned.
                 </p>
               </div>
 
@@ -435,20 +636,81 @@ const MaterialsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-sm font-semibold text-slate-100" htmlFor="material-family">
-                  Colour family
+                <label className="text-sm font-semibold text-slate-100" htmlFor="material-sku">
+                  Supplier SKU
                 </label>
                 <input
-                  id="material-family"
+                  id="material-sku"
                   type="text"
                   className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
-                  value={formState.colorFamily}
-                  onChange={event => handleFormChange('colorFamily', event.target.value)}
-                  placeholder="Earthy greens, warm neutrals…"
-                  aria-describedby="material-family-help"
+                  value={formState.supplierSku}
+                  onChange={event => handleFormChange('supplierSku', event.target.value)}
+                  placeholder="e.g. MELA-12345"
+                  aria-describedby="material-sku-help"
                 />
-                <p id="material-family-help" className="mt-1 text-xs text-slate-400">
-                  Group similar hues (neutrals, pastels, bolds) to make the search inputs more powerful.
+                <p id="material-sku-help" className="mt-1 text-xs text-slate-400">
+                  Add the supplier code exactly as it appears on the order sheet so procurement can search and cross
+                  check fast.
+                </p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="text-sm font-semibold text-slate-100" htmlFor="material-max-length">
+                    Maximum length
+                  </label>
+                  <input
+                    id="material-max-length"
+                    type="text"
+                    className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                    value={formState.maxLength}
+                    onChange={event => handleFormChange('maxLength', event.target.value)}
+                    placeholder="e.g. 3600mm"
+                    aria-describedby="material-max-length-help"
+                  />
+                  <p id="material-max-length-help" className="mt-1 text-xs text-slate-400">
+                    Note the maximum blank length so designers know which spans need joins.
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-semibold text-slate-100" htmlFor="material-max-width">
+                    Maximum width
+                  </label>
+                  <input
+                    id="material-max-width"
+                    type="text"
+                    className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                    value={formState.maxWidth}
+                    onChange={event => handleFormChange('maxWidth', event.target.value)}
+                    placeholder="e.g. 1350mm"
+                    aria-describedby="material-max-width-help"
+                  />
+                  <p id="material-max-width-help" className="mt-1 text-xs text-slate-400">
+                    Capture the usable sheet width so quoting knows when a benchtop needs to be laminated up.
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold text-slate-100" htmlFor="material-thicknesses">
+                  Available thicknesses
+                </label>
+                <select
+                  id="material-thicknesses"
+                  multiple
+                  className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                  value={formState.availableThicknesses}
+                  onChange={event => handleThicknessChange(event.currentTarget)}
+                  aria-describedby="material-thicknesses-help"
+                >
+                  {thicknessOptions.map(option => (
+                    <option key={option} value={option}>
+                      {option} mm
+                    </option>
+                  ))}
+                </select>
+                <p id="material-thicknesses-help" className="mt-1 text-xs text-slate-400">
+                  Hold Ctrl (Windows) or Command (Mac) while clicking to select every stocked thickness that applies.
                 </p>
               </div>
 
@@ -471,6 +733,50 @@ const MaterialsPage: React.FC = () => {
               </div>
 
               <div>
+                <label className="text-sm font-semibold text-slate-100" htmlFor="material-image">
+                  Swatch image
+                </label>
+                <div
+                  className={`mt-2 flex flex-col items-center justify-center rounded-lg border border-dashed px-4 py-6 text-center text-sm transition ${
+                    isDraggingFile ? 'border-emerald-400 bg-emerald-500/10 text-emerald-200' : 'border-slate-700 text-slate-300'
+                  }`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
+                  <input
+                    id="material-image"
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    onChange={handleImageInputChange}
+                  />
+                  <label htmlFor="material-image" className="cursor-pointer font-semibold text-emerald-300">
+                    Drag & drop or click to upload
+                  </label>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Drop a high quality supplier swatch so the preview matches the physical sheet.
+                  </p>
+                  {imagePreview && (
+                    <div className="mt-4 flex flex-col items-center gap-2">
+                      <img
+                        src={imagePreview}
+                        alt="Selected swatch preview"
+                        className="h-24 w-24 rounded-md border border-white/10 object-cover"
+                      />
+                      <button type="button" className="text-xs text-rose-300 hover:text-rose-200" onClick={clearImage}>
+                        Remove image
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-slate-400">
+                  You can drag a file from your desktop straight onto this panel—perfect when saving client supplied
+                  imagery.
+                </p>
+              </div>
+
+              <div>
                 <label className="text-sm font-semibold text-slate-100" htmlFor="material-notes">
                   Notes
                 </label>
@@ -480,11 +786,12 @@ const MaterialsPage: React.FC = () => {
                   rows={4}
                   value={formState.notes}
                   onChange={event => handleFormChange('notes', event.target.value)}
-                  placeholder="Supplier SKU, edge band availability, minimum order notes…"
+                  placeholder="Edge band availability, matching panels, delivery lead times, fabrication tips…"
                   aria-describedby="material-notes-help"
                 />
                 <p id="material-notes-help" className="mt-1 text-xs text-slate-400">
-                  These notes appear in the search index, so list anything installers or estimators need to know.
+                  These notes appear in the search index, so include anything installers, estimators or drafters should
+                  know.
                 </p>
               </div>
 
