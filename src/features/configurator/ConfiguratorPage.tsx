@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { useAuth } from '@auth/AuthContext';
+import { db } from '@auth/firebase';
 import Configurator3D, {
   TableShape,
   TabletopConfig
@@ -157,15 +160,57 @@ const materialOptions: {
   }
 ];
 
+// Build search tokens so the saved configuration can be surfaced by the global search bar.
+const buildCartSearchKeywords = (
+  config: TabletopConfig,
+  materialLabel: string,
+  customShape: CustomShapeDetails | null
+): string[] => {
+  const rawTerms = [
+    'cart',
+    'top',
+    config.shape,
+    config.material,
+    config.finish,
+    `${config.lengthMm}x${config.widthMm}`,
+    `${config.thicknessMm}mm`,
+    `qty ${config.quantity}`,
+    materialLabel,
+    customShape?.fileName ?? '',
+    customShape?.notes ?? ''
+  ];
+
+  return Array.from(
+    new Set(
+      rawTerms
+        .filter(Boolean)
+        .flatMap(term =>
+          term
+            .toString()
+            .toLowerCase()
+            .split(/[^a-z0-9]+/)
+            .filter(Boolean)
+        )
+    )
+  );
+};
+
 const ConfiguratorPage: React.FC = () => {
   const [config, setConfig] = useState<TabletopConfig>(defaultConfig);
   // Custom shape metadata drives the DXF preview + the locked dimensions.
   const [customShape, setCustomShape] = useState<CustomShapeDetails | null>(null);
   const { price, loading, error } = usePricing(config);
+  const { profile } = useAuth();
   // Track whether the viewport is wide enough to expose the desktop sidebar so we
   // know when to portal the parameter controls into the left menu area.
   const [isDesktopSidebar, setIsDesktopSidebar] = useState(false);
   const [sidebarContainer, setSidebarContainer] = useState<HTMLElement | null>(null);
+  const [addingToCart, setAddingToCart] = useState(false);
+  const [cartFeedback, setCartFeedback] = useState<
+    | { type: 'success'; message: string }
+    | { type: 'error'; message: string }
+    | null
+  >(null);
 
   const updateField = (field: keyof TabletopConfig, value: number | string) => {
     setConfig(prev => {
@@ -246,6 +291,54 @@ const ConfiguratorPage: React.FC = () => {
   const dimensionLocked = config.shape === 'custom';
   // Reuse the friendly label inside the header so operators always see what is active.
   const selectedMaterial = materialOptions.find(option => option.value === config.material) ?? materialOptions[0];
+  const cartItemLabel = `${selectedMaterial.label} ${config.shape} ${config.lengthMm}x${config.widthMm}mm top`;
+
+  // Persist the current configuration to Firestore so customers can reference it later.
+  const handleAddToCart = async () => {
+    if (!profile) {
+      setCartFeedback({
+        type: 'error',
+        message: 'Sign in so we can store this configuration in your cart.'
+      });
+      return;
+    }
+
+    setAddingToCart(true);
+    setCartFeedback(null);
+    try {
+      const cartCollection = collection(db, 'cartItems');
+      const customShapeMeta = customShape
+        ? {
+            fileName: customShape.fileName,
+            fileSize: customShape.fileSize,
+            fileType: customShape.fileType,
+            notes: customShape.notes ?? null
+          }
+        : null;
+      await addDoc(cartCollection, {
+        userId: profile.id,
+        label: cartItemLabel,
+        config,
+        customShape: customShapeMeta,
+        estimatedPrice: price ?? null,
+        searchKeywords: buildCartSearchKeywords(config, selectedMaterial.label, customShape),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      setCartFeedback({
+        type: 'success',
+        message: 'Top added to your cart. Use the global search to find it by size, material or file name.'
+      });
+    } catch (err) {
+      console.error('Failed to add cart item', err);
+      setCartFeedback({
+        type: 'error',
+        message: 'We could not save this configuration. Please try again after checking your connection.'
+      });
+    } finally {
+      setAddingToCart(false);
+    }
+  };
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(min-width: 768px)');
@@ -491,6 +584,37 @@ const ConfiguratorPage: React.FC = () => {
         </div>
         {loading && <p className="text-xs text-slate-400">Recalculating price…</p>}
         {error && <p className="text-xs text-red-400">Pricing error: {error}</p>}
+        <button
+          type="button"
+          onClick={handleAddToCart}
+          disabled={addingToCart || !profile}
+          className={`w-full rounded-lg px-4 py-2 text-sm font-semibold transition ${
+            addingToCart || !profile
+              ? 'cursor-not-allowed bg-slate-800 text-slate-400'
+              : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
+          }`}
+        >
+          {addingToCart ? 'Saving top…' : 'Add to cart'}
+        </button>
+        <p className="text-[0.7rem] text-slate-400">
+          This stores the exact dimensions, material selection and estimated price so you can retrieve the top from the
+          search bar or during checkout later on.
+        </p>
+        {!profile && (
+          <p className="text-[0.7rem] text-amber-300">
+            You need to sign in before saving items to the cart. This keeps your configurations private.
+          </p>
+        )}
+        {cartFeedback && (
+          <p
+            role="status"
+            className={`text-[0.7rem] ${
+              cartFeedback.type === 'success' ? 'text-emerald-300' : 'text-red-300'
+            }`}
+          >
+            {cartFeedback.message}
+          </p>
+        )}
       </div>
     </section>
   );
