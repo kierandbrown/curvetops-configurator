@@ -7,7 +7,6 @@ import {
 } from 'firebase/auth';
 import {
   doc,
-  getDoc,
   setDoc,
   serverTimestamp,
   onSnapshot,
@@ -69,6 +68,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Provide the default structure that will be written to Firestore when a user
+  // authenticates for the first time.
+  const buildDefaultProfile = useCallback(
+    (fbUser: User) => ({
+      role: 'customer' as UserRole,
+      email: fbUser.email || '',
+      firstName: '',
+      lastName: '',
+      companyName: '',
+      jobTitle: '',
+      phoneNumber: '',
+      streetAddress: '',
+      city: '',
+      stateProvince: '',
+      postalCode: '',
+      country: '',
+      displayName: fbUser.email || '',
+      searchKeywords: [(fbUser.email || '').toLowerCase()].filter(Boolean),
+      createdAt: serverTimestamp()
+    }),
+    []
+  );
+
   // Listen for Firebase auth changes and keep a real-time snapshot of the profile document.
   useEffect(() => {
     let unsubProfile: (() => void) | null = null;
@@ -87,40 +109,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       const ref = doc(db, 'users', fbUser.uid);
 
-      const snap = await getDoc(ref);
-      if (!snap.exists()) {
-        await setDoc(ref, {
-          role: 'customer',
-          email: fbUser.email || '',
-          firstName: '',
-          lastName: '',
-          companyName: '',
-          jobTitle: '',
-          phoneNumber: '',
-          streetAddress: '',
-          city: '',
-          stateProvince: '',
-          postalCode: '',
-          country: '',
-          displayName: fbUser.email || '',
-          searchKeywords: [(fbUser.email || '').toLowerCase()],
-          createdAt: serverTimestamp()
-        });
-      }
+      unsubProfile = onSnapshot(
+        ref,
+        snapshot => {
+          if (!snapshot.exists()) {
+            // When online and the document truly does not exist, seed it with
+            // the default profile structure. If we're offline we cannot write
+            // immediately, so simply stop loading for now.
+            if (!snapshot.metadata.fromCache) {
+              void setDoc(ref, buildDefaultProfile(fbUser));
+            } else {
+              setLoading(false);
+            }
+            return;
+          }
 
-      unsubProfile = onSnapshot(ref, snapshot => {
-        if (snapshot.exists()) {
-          setProfile({ id: snapshot.id, ...(snapshot.data() as UserProfile) });
+          const { id: _ignored, ...data } = snapshot.data() as UserProfile;
+          setProfile({ id: snapshot.id, ...data });
+          setLoading(false);
+        },
+        error => {
+          console.error('Failed to load user profile', error);
+          setLoading(false);
         }
-        setLoading(false);
-      });
+      );
     });
 
     return () => {
       if (unsubProfile) unsubProfile();
       unsub();
     };
-  }, []);
+  }, [buildDefaultProfile]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);
