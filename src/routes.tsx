@@ -7,6 +7,7 @@ import ConfiguratorPage from './features/configurator/ConfiguratorPage';
 import OrdersPage from './features/orders/OrdersPage';
 import AdminPage from './features/admin/AdminPage';
 import MaterialsPage from './features/materials/MaterialsPage';
+import AccountPage from './pages/AccountPage';
 import { ProtectedRoute } from '@auth/ProtectedRoute';
 
 export const routes: RouteObject[] = [
