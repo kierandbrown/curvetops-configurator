@@ -17,6 +17,7 @@ import Loader from '@/components/ui/Loader';
 
 interface MaterialInput {
   name: string;
+  supplierName: string;
   materialType: string;
   finish: string;
   hexCode: string;
@@ -34,6 +35,7 @@ interface MaterialRecord extends MaterialInput {
 
 type FilterKeys =
   | 'name'
+  | 'supplierName'
   | 'materialType'
   | 'finish'
   | 'supplierSku'
@@ -43,6 +45,7 @@ type FilterKeys =
 
 const emptyMaterial: MaterialInput = {
   name: '',
+  supplierName: '',
   materialType: '',
   finish: '',
   hexCode: '#ffffff',
@@ -55,9 +58,12 @@ const emptyMaterial: MaterialInput = {
 };
 
 const materialTypeOptions = ['Melamine', 'Veneer', 'Solid Surface', 'Linoleum'];
+// Central list of approved supplier names so the dropdown and filters stay in sync.
+const supplierOptions = ['Corian', 'Polytec', 'Laminex', 'New Age Veneers'];
 const thicknessOptions = ['12', '16', '18', '25', '32', '33'];
 const initialFilters: Record<FilterKeys, string> = {
   name: '',
+  supplierName: '',
   materialType: '',
   finish: '',
   supplierSku: '',
@@ -69,6 +75,7 @@ const initialFilters: Record<FilterKeys, string> = {
 const buildSearchKeywords = (material: MaterialInput): string[] => {
   const combinedValues = [
     material.name,
+    material.supplierName,
     material.materialType,
     material.finish,
     material.hexCode,
@@ -262,6 +269,7 @@ const MaterialsPage: React.FC = () => {
       const sanitizedHex = formState.hexCode.startsWith('#')
         ? formState.hexCode
         : `#${formState.hexCode}`;
+      const sanitizedSupplierName = formState.supplierName.trim();
       const trimmedNotes = formState.notes.trim();
       const sanitizedSupplierSku = formState.supplierSku.trim();
       const sanitizedMaxLength = formState.maxLength.trim();
@@ -270,6 +278,7 @@ const MaterialsPage: React.FC = () => {
       const baseMaterial: MaterialInput = {
         ...formState,
         hexCode: sanitizedHex.toUpperCase(),
+        supplierName: sanitizedSupplierName,
         supplierSku: sanitizedSupplierSku,
         maxLength: sanitizedMaxLength,
         maxWidth: sanitizedMaxWidth,
@@ -334,6 +343,12 @@ const MaterialsPage: React.FC = () => {
       label: 'Colour name',
       placeholder: 'Search names…',
       helper: 'Type any part of the colour name to filter the list.'
+    },
+    {
+      key: 'supplierName',
+      label: 'Supplier',
+      placeholder: 'Corian, Polytec…',
+      helper: 'Filter by the distributor so procurement knows who to contact.'
     },
     {
       key: 'materialType',
@@ -590,6 +605,30 @@ const MaterialsPage: React.FC = () => {
                 />
                 <p id="material-name-help" className="mt-1 text-xs text-slate-400">
                   Use the supplier friendly name so other team members can easily search for the same finish.
+                </p>
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold text-slate-100" htmlFor="material-supplier">
+                  Supplier name
+                </label>
+                {/* Using a select ensures only the approved supplier list can be saved, keeping reporting tidy. */}
+                <select
+                  id="material-supplier"
+                  className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                  value={formState.supplierName}
+                  onChange={event => handleFormChange('supplierName', event.target.value)}
+                  aria-describedby="material-supplier-help"
+                >
+                  <option value="">Select a supplier…</option>
+                  {supplierOptions.map(option => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+                <p id="material-supplier-help" className="mt-1 text-xs text-slate-400">
+                  Choose the brand or wholesaler responsible for this colour so search and reporting stay consistent.
                 </p>
               </div>
 
