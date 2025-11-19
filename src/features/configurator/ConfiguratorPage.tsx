@@ -8,6 +8,8 @@ import { usePricing } from './usePricing';
 import CustomShapeUpload from './CustomShapeUpload';
 import { CustomShapeDetails } from './customShapeTypes';
 
+const ROUND_DIAMETER_LIMIT_MM = 1800;
+
 const defaultConfig: TabletopConfig = {
   shape: 'rounded-rect',
   lengthMm: 2000,
@@ -155,7 +157,26 @@ const ConfiguratorPage: React.FC = () => {
   };
 
   const handleShapeChange = (shape: TableShape) => {
-    setConfig(prev => ({ ...prev, shape }));
+    setConfig(prev => {
+      if (shape === 'round') {
+        // Keep the diameter within the 1800 mm manufacturing constraint and
+        // reuse the smallest dimension as the starting point so we don't grow
+        // the design unexpectedly when switching shapes.
+        const targetDiameter = Math.min(
+          ROUND_DIAMETER_LIMIT_MM,
+          Math.max(500, Math.min(prev.lengthMm, prev.widthMm))
+        );
+
+        return {
+          ...prev,
+          shape,
+          lengthMm: targetDiameter,
+          widthMm: targetDiameter
+        };
+      }
+
+      return { ...prev, shape };
+    });
   };
 
   // Whenever we parse a DXF we push the detected bounding box into the sliders so
@@ -270,14 +291,18 @@ const ConfiguratorPage: React.FC = () => {
           <input
             type="range"
             min={500}
-            max={3600}
+            max={config.shape === 'round' ? ROUND_DIAMETER_LIMIT_MM : 3600}
             step={10}
             value={config.lengthMm}
             onChange={e => updateField('lengthMm', Number(e.target.value))}
             className={`accent-emerald-400 ${dimensionLocked ? 'cursor-not-allowed opacity-50' : ''}`}
             disabled={dimensionLocked}
           />
-          <p className="text-[0.7rem] text-slate-400">Slide between 500&nbsp;mm and 3600&nbsp;mm.</p>
+          <p className="text-[0.7rem] text-slate-400">
+            {config.shape === 'round'
+              ? 'Round tops are limited to 1800 mm in diameter so they stay practical to machine and transport.'
+              : 'Slide between 500 mm and 3600 mm.'}
+          </p>
           {dimensionLocked && (
             <p className="text-[0.7rem] text-amber-300">
               Length follows the bounding box of the uploaded DXF. Update your CAD file to adjust.
