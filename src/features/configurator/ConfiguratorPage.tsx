@@ -15,6 +15,19 @@ import { buildCartSearchKeywords } from '../cart/cartUtils';
 
 const ROUND_DIAMETER_LIMIT_MM = 1800;
 
+const defaultConfig: TabletopConfig = {
+  shape: 'rounded-rect',
+  lengthMm: 2000,
+  widthMm: 900,
+  thicknessMm: 25,
+  edgeRadiusMm: 150,
+  superEllipseExponent: 2.5,
+  material: 'laminate',
+  finish: 'matte',
+  edgeProfile: 'edged',
+  quantity: 1
+};
+
 // Supported board thickness increments for the slider.
 const thicknessOptions = [12, 16, 18, 25, 33];
 
@@ -480,6 +493,52 @@ const ConfiguratorPage: React.FC = () => {
           />
           <p className="text-[0.7rem] text-slate-400">Snap to common board sizes: 12, 16, 18, 25 or 33&nbsp;mm thicknesses.</p>
         </label>
+
+        {/* Radio buttons mirror the material UI so operators immediately recognise how to flag the edge treatment. */}
+        <div
+          className="flex flex-col gap-2"
+          aria-labelledby="edge-profile-label"
+          aria-describedby="edge-profile-help"
+          role="radiogroup"
+        >
+          <div
+            className="flex items-center justify-between text-[0.75rem] font-medium"
+            id="edge-profile-label"
+          >
+            <span>Edge profile</span>
+            <span className="text-slate-400">
+              {edgeProfileOptions.find(option => option.value === config.edgeProfile)?.label}
+            </span>
+          </div>
+          <p id="edge-profile-help" className="text-[0.7rem] text-slate-400">
+            Pick how the perimeter is finished so installers can search specs for “edged” or “sharknose” later on.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {edgeProfileOptions.map(option => {
+              const isActive = option.value === config.edgeProfile;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => updateField('edgeProfile', option.value)}
+                  role="radio"
+                  aria-checked={isActive}
+                  className={`flex h-full flex-col justify-between rounded-xl border p-3 text-left transition ${
+                    isActive
+                      ? 'border-emerald-400 bg-emerald-400/5 shadow-[0_0_20px_rgba(16,185,129,0.15)]'
+                      : 'border-slate-700 bg-slate-950/70 hover:border-emerald-300/80'
+                  }`}
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-slate-100">{option.label}</p>
+                    <p className="mt-1 text-[0.7rem] text-slate-400">{option.description}</p>
+                  </div>
+                  <p className="mt-3 text-[0.65rem] text-emerald-300">{option.searchHint}</p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         <div className="flex flex-col gap-2" aria-labelledby="material-choice-label" aria-describedby="material-choice-help" role="radiogroup">
           <div className="flex items-center justify-between text-[0.75rem] font-medium" id="material-choice-label">
