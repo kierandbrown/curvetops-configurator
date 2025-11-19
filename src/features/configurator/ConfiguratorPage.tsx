@@ -15,19 +15,6 @@ import { buildCartSearchKeywords } from '../cart/cartUtils';
 
 const ROUND_DIAMETER_LIMIT_MM = 1800;
 
-const defaultConfig: TabletopConfig = {
-  shape: 'rounded-rect',
-  lengthMm: 2000,
-  widthMm: 900,
-  thicknessMm: 25,
-  edgeRadiusMm: 150,
-  superEllipseExponent: 2.5,
-  material: 'laminate',
-  finish: 'matte',
-  edgeProfile: 'edged',
-  quantity: 1
-};
-
 // Supported board thickness increments for the slider.
 const thicknessOptions = [12, 16, 18, 25, 33];
 
@@ -218,6 +205,14 @@ const shapeOptions: { shape: TableShape; label: string; icon: JSX.Element }[] = 
   }
 ];
 
+// Numeric fields that expose both a slider and manual entry.
+type NumericConfigField =
+  | 'lengthMm'
+  | 'widthMm'
+  | 'edgeRadiusMm'
+  | 'superEllipseExponent'
+  | 'thicknessMm';
+
 // Surface build presets keep pricing and the 3D appearance in sync with what customers pick.
 const materialOptions: {
   value: TabletopConfig['material'];
@@ -247,6 +242,15 @@ const materialOptions: {
 
 const ConfiguratorPage: React.FC = () => {
   const [config, setConfig] = useState<TabletopConfig>(defaultTabletopConfig);
+  // Mirror the manual inputs as strings so makers can type freely before we
+  // clamp and sync the values back to the sliders.
+  const [manualInputs, setManualInputs] = useState<Record<NumericConfigField, string>>({
+    lengthMm: defaultTabletopConfig.lengthMm.toString(),
+    widthMm: defaultTabletopConfig.widthMm.toString(),
+    edgeRadiusMm: defaultTabletopConfig.edgeRadiusMm.toString(),
+    superEllipseExponent: defaultTabletopConfig.superEllipseExponent.toString(),
+    thicknessMm: defaultTabletopConfig.thicknessMm.toString()
+  });
   // Custom shape metadata drives the DXF preview + the locked dimensions.
   const [customShape, setCustomShape] = useState<CustomShapeDetails | null>(null);
   const { price, loading, error } = usePricing(config);
@@ -261,6 +265,28 @@ const ConfiguratorPage: React.FC = () => {
     | { type: 'error'; message: string }
     | null
   >(null);
+
+  // Keep the manual string inputs aligned whenever a slider or preset updates
+  // the underlying config so the two controls never drift apart.
+  useEffect(() => {
+    setManualInputs(prev => ({ ...prev, lengthMm: config.lengthMm.toString() }));
+  }, [config.lengthMm]);
+
+  useEffect(() => {
+    setManualInputs(prev => ({ ...prev, widthMm: config.widthMm.toString() }));
+  }, [config.widthMm]);
+
+  useEffect(() => {
+    setManualInputs(prev => ({ ...prev, edgeRadiusMm: config.edgeRadiusMm.toString() }));
+  }, [config.edgeRadiusMm]);
+
+  useEffect(() => {
+    setManualInputs(prev => ({ ...prev, superEllipseExponent: config.superEllipseExponent.toString() }));
+  }, [config.superEllipseExponent]);
+
+  useEffect(() => {
+    setManualInputs(prev => ({ ...prev, thicknessMm: config.thicknessMm.toString() }));
+  }, [config.thicknessMm]);
 
   const updateField = (field: keyof TabletopConfig, value: number | string) => {
     setConfig(prev => {
@@ -278,31 +304,54 @@ const ConfiguratorPage: React.FC = () => {
     });
   };
 
-  // Allow designers to type in exact measurements while still clamping the
-  // value to the slider's valid range.
-  const handleManualNumberInput = (
-    field: keyof TabletopConfig,
+  // Allow designers to type in exact measurements without fighting the slider
+  // by keeping the raw string in state until we have a valid number.
+  const handleManualNumberChange = (
+    field: NumericConfigField,
     min: number,
-    max: number
+    max: number,
+    snapToOption?: (value: number) => number
   ) => (event: ChangeEvent<HTMLInputElement>) => {
-    const numericValue = event.target.valueAsNumber;
+    const { value } = event.target;
+    setManualInputs(prev => ({ ...prev, [field]: value }));
+
+    if (value.trim() === '') {
+      // Let makers clear the field before entering a new size without forcing
+      // the previous number back in.
+      return;
+    }
+
+    const numericValue = Number(value);
     if (Number.isNaN(numericValue)) return;
-    updateField(field, clampNumber(numericValue, min, max));
+
+    const clampedValue = clampNumber(numericValue, min, max);
+    const normalizedValue = snapToOption ? snapToOption(clampedValue) : clampedValue;
+
+    updateField(field, normalizedValue);
   };
 
-  // Snap any typed thickness back to the nearest supported board option so we
-  // keep pricing aligned with the discrete material schedule.
-  const handleManualThicknessInput = (event: ChangeEvent<HTMLInputElement>) => {
-    const numericValue = event.target.valueAsNumber;
-    if (Number.isNaN(numericValue)) return;
-    const snappedValue = snapToNearestThickness(
-      clampNumber(
-        numericValue,
-        thicknessOptions[0],
-        thicknessOptions[thicknessOptions.length - 1]
-      )
-    );
-    updateField('thicknessMm', snappedValue);
+  // When the input loses focus make sure we clamp/snaps the typed value so the
+  // slider and preview are always in sync.
+  const handleManualNumberBlur = (
+    field: NumericConfigField,
+    min: number,
+    max: number,
+    snapToOption?: (value: number) => number
+  ) => () => {
+    setManualInputs(prev => {
+      const rawValue = prev[field];
+      const numericValue = Number(rawValue);
+      const fallbackValue = Number.isNaN(numericValue) ? config[field] : numericValue;
+      const clampedValue = clampNumber(fallbackValue, min, max);
+      const normalizedValue = snapToOption ? snapToOption(clampedValue) : clampedValue;
+
+      updateField(field, normalizedValue);
+
+      return {
+        ...prev,
+        [field]: normalizedValue.toString()
+      };
+    });
   };
 
   const handleShapeChange = (shape: TableShape) => {
@@ -497,8 +546,9 @@ const ConfiguratorPage: React.FC = () => {
                 min={500}
                 max={maxLength}
                 step={10}
-                value={config.lengthMm}
-                onChange={handleManualNumberInput('lengthMm', 500, maxLength)}
+                value={manualInputs.lengthMm}
+                onChange={handleManualNumberChange('lengthMm', 500, maxLength)}
+                onBlur={handleManualNumberBlur('lengthMm', 500, maxLength)}
                 className={`w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-right text-sm text-slate-100 focus:border-emerald-400 focus:outline-none ${
                   dimensionLocked ? 'cursor-not-allowed opacity-50' : ''
                 }`}
@@ -542,8 +592,9 @@ const ConfiguratorPage: React.FC = () => {
                 min={300}
                 max={1800}
                 step={10}
-                value={config.widthMm}
-                onChange={handleManualNumberInput('widthMm', 300, 1800)}
+                value={manualInputs.widthMm}
+                onChange={handleManualNumberChange('widthMm', 300, 1800)}
+                onBlur={handleManualNumberBlur('widthMm', 300, 1800)}
                 className={`w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-right text-sm text-slate-100 focus:border-emerald-400 focus:outline-none ${
                   dimensionLocked ? 'cursor-not-allowed opacity-50' : ''
                 }`}
@@ -593,8 +644,9 @@ const ConfiguratorPage: React.FC = () => {
                   min={50}
                   max={maxCornerRadius}
                   step={5}
-                  value={config.edgeRadiusMm}
-                  onChange={handleManualNumberInput('edgeRadiusMm', 50, maxCornerRadius)}
+                  value={manualInputs.edgeRadiusMm}
+                  onChange={handleManualNumberChange('edgeRadiusMm', 50, maxCornerRadius)}
+                  onBlur={handleManualNumberBlur('edgeRadiusMm', 50, maxCornerRadius)}
                   className="w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-right text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
                   inputMode="numeric"
                   pattern="[0-9]*"
@@ -628,8 +680,9 @@ const ConfiguratorPage: React.FC = () => {
                   min={1.5}
                   max={6}
                   step={0.1}
-                  value={config.superEllipseExponent}
-                  onChange={handleManualNumberInput('superEllipseExponent', 1.5, 6)}
+                  value={manualInputs.superEllipseExponent}
+                  onChange={handleManualNumberChange('superEllipseExponent', 1.5, 6)}
+                  onBlur={handleManualNumberBlur('superEllipseExponent', 1.5, 6)}
                   className="w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-right text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
                   inputMode="decimal"
                 />
@@ -663,8 +716,19 @@ const ConfiguratorPage: React.FC = () => {
                 min={thicknessOptions[0]}
                 max={thicknessOptions[thicknessOptions.length - 1]}
                 step={1}
-                value={config.thicknessMm}
-                onChange={handleManualThicknessInput}
+                value={manualInputs.thicknessMm}
+                onChange={handleManualNumberChange(
+                  'thicknessMm',
+                  thicknessOptions[0],
+                  thicknessOptions[thicknessOptions.length - 1],
+                  snapToNearestThickness
+                )}
+                onBlur={handleManualNumberBlur(
+                  'thicknessMm',
+                  thicknessOptions[0],
+                  thicknessOptions[thicknessOptions.length - 1],
+                  snapToNearestThickness
+                )}
                 className="w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-right text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
                 inputMode="numeric"
                 pattern="[0-9]*"
