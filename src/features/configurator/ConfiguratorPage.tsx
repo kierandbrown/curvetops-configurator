@@ -10,6 +10,8 @@ import Configurator3D, {
 import { usePricing } from './usePricing';
 import CustomShapeUpload from './CustomShapeUpload';
 import { CustomShapeDetails } from './customShapeTypes';
+import { defaultTabletopConfig } from './defaultConfig';
+import { buildCartSearchKeywords } from '../cart/cartUtils';
 
 const ROUND_DIAMETER_LIMIT_MM = 1800;
 
@@ -161,43 +163,8 @@ const materialOptions: {
   }
 ];
 
-// Build search tokens so the saved configuration can be surfaced by the global search bar.
-const buildCartSearchKeywords = (
-  config: TabletopConfig,
-  materialLabel: string,
-  customShape: CustomShapeDetails | null
-): string[] => {
-  const rawTerms = [
-    'cart',
-    'top',
-    config.shape,
-    config.material,
-    config.finish,
-    `${config.lengthMm}x${config.widthMm}`,
-    `${config.thicknessMm}mm`,
-    `qty ${config.quantity}`,
-    materialLabel,
-    customShape?.fileName ?? '',
-    customShape?.notes ?? ''
-  ];
-
-  return Array.from(
-    new Set(
-      rawTerms
-        .filter(Boolean)
-        .flatMap(term =>
-          term
-            .toString()
-            .toLowerCase()
-            .split(/[^a-z0-9]+/)
-            .filter(Boolean)
-        )
-    )
-  );
-};
-
 const ConfiguratorPage: React.FC = () => {
-  const [config, setConfig] = useState<TabletopConfig>(defaultConfig);
+  const [config, setConfig] = useState<TabletopConfig>(defaultTabletopConfig);
   // Custom shape metadata drives the DXF preview + the locked dimensions.
   const [customShape, setCustomShape] = useState<CustomShapeDetails | null>(null);
   const { price, loading, error } = usePricing(config);
