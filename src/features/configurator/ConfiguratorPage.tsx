@@ -128,6 +128,33 @@ const shapeOptions: { shape: TableShape; label: string; icon: JSX.Element }[] = 
   }
 ];
 
+// Surface build presets keep pricing and the 3D appearance in sync with what customers pick.
+const materialOptions: {
+  value: TabletopConfig['material'];
+  label: string;
+  description: string;
+  edgeNote: string;
+}[] = [
+  {
+    value: 'laminate',
+    label: 'High-pressure laminate',
+    description: 'Durable melamine surface that wipes clean quickly. Ideal for education and hospitality.',
+    edgeNote: 'Best when paired with ABS edging.'
+  },
+  {
+    value: 'timber',
+    label: 'Solid timber',
+    description: 'Premium hardwood core for boutique installs. Arrives sealed and ready for final finishing.',
+    edgeNote: 'Allow for natural grain variation.'
+  },
+  {
+    value: 'linoleum',
+    label: 'Furniture linoleum',
+    description: 'Warm, matte desktop linoleum bonded to moisture-resistant particle board.',
+    edgeNote: 'Ships with colour-matched edge banding.'
+  }
+];
+
 const ConfiguratorPage: React.FC = () => {
   const [config, setConfig] = useState<TabletopConfig>(defaultConfig);
   // Custom shape metadata drives the DXF preview + the locked dimensions.
@@ -196,6 +223,8 @@ const ConfiguratorPage: React.FC = () => {
   );
 
   const dimensionLocked = config.shape === 'custom';
+  // Reuse the friendly label inside the header so operators always see what is active.
+  const selectedMaterial = materialOptions.find(option => option.value === config.material) ?? materialOptions[0];
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(min-width: 768px)');
@@ -378,6 +407,41 @@ const ConfiguratorPage: React.FC = () => {
           />
           <p className="text-[0.7rem] text-slate-400">Snap to common board sizes: 12, 16, 18, 25 or 33&nbsp;mm thicknesses.</p>
         </label>
+
+        <div className="flex flex-col gap-2" aria-labelledby="material-choice-label" aria-describedby="material-choice-help" role="radiogroup">
+          <div className="flex items-center justify-between text-[0.75rem] font-medium" id="material-choice-label">
+            <span>Material build</span>
+            <span className="text-slate-400">{selectedMaterial.label}</span>
+          </div>
+          <p id="material-choice-help" className="text-[0.7rem] text-slate-400">
+            Choose the core and surface finish so pricing reflects the right labour and the order can be searched by material later.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {materialOptions.map(option => {
+              const isActive = option.value === config.material;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => updateField('material', option.value)}
+                  role="radio"
+                  aria-checked={isActive}
+                  className={`flex h-full flex-col justify-between rounded-xl border p-3 text-left transition ${
+                    isActive
+                      ? 'border-emerald-400 bg-emerald-400/5 shadow-[0_0_20px_rgba(16,185,129,0.15)]'
+                      : 'border-slate-700 bg-slate-950/70 hover:border-emerald-300/80'
+                  }`}
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-slate-100">{option.label}</p>
+                    <p className="mt-1 text-[0.7rem] text-slate-400">{option.description}</p>
+                  </div>
+                  <p className="mt-3 text-[0.65rem] text-emerald-300">{option.edgeNote}</p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         <label className="flex flex-col gap-1">
           <span>Quantity</span>
