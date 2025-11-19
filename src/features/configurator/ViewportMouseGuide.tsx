@@ -53,7 +53,9 @@ const interactions = [
 ];
 
 const ViewportMouseGuide = () => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  // Default the guide to its minimized state so it never obscures the viewport
+  // when users first arrive. They can opt in to seeing the helper if desired.
+  const [isCollapsed, setIsCollapsed] = useState(true);
 
   return (
     <div className="pointer-events-none absolute bottom-3 left-3 z-10">
