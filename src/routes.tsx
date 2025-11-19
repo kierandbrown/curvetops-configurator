@@ -16,7 +16,14 @@ export const routes: RouteObject[] = [
     children: [
       { index: true, element: <LandingPage /> },
       { path: 'configurator', element: <ConfiguratorPage /> },
-      { path: 'materials', element: <MaterialsPage /> },
+      {
+        path: 'materials',
+        element: (
+          <ProtectedRoute requiredRole="admin">
+            <MaterialsPage />
+          </ProtectedRoute>
+        )
+      },
       {
         path: 'orders',
         element: (

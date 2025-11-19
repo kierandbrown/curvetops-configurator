@@ -3,7 +3,8 @@ import { useAuth } from '@auth/AuthContext';
 import Header from './Header';
 
 const Layout: React.FC = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-950 text-slate-50">
@@ -31,16 +32,18 @@ const Layout: React.FC = () => {
             >
               Configurator
             </NavLink>
-            <NavLink
-              to="/materials"
-              className={({ isActive }) =>
-                `block rounded px-3 py-2 hover:bg-slate-800 ${
-                  isActive ? 'bg-slate-800 font-medium' : ''
-                }`
-              }
-            >
-              Materials
-            </NavLink>
+            {isAdmin && (
+              <NavLink
+                to="/materials"
+                className={({ isActive }) =>
+                  `block rounded px-3 py-2 hover:bg-slate-800 ${
+                    isActive ? 'bg-slate-800 font-medium' : ''
+                  }`
+                }
+              >
+                Materials
+              </NavLink>
+            )}
             {user && (
               <NavLink
                 to="/orders"
