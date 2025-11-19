@@ -6,7 +6,7 @@ import SignUpPage from './pages/SignUpPage';
 import ConfiguratorPage from './features/configurator/ConfiguratorPage';
 import OrdersPage from './features/orders/OrdersPage';
 import AdminPage from './features/admin/AdminPage';
-import AccountPage from './pages/AccountPage';
+import MaterialsPage from './features/materials/MaterialsPage';
 import { ProtectedRoute } from '@auth/ProtectedRoute';
 
 export const routes: RouteObject[] = [
@@ -15,6 +15,7 @@ export const routes: RouteObject[] = [
     children: [
       { index: true, element: <LandingPage /> },
       { path: 'configurator', element: <ConfiguratorPage /> },
+      { path: 'materials', element: <MaterialsPage /> },
       {
         path: 'orders',
         element: (
