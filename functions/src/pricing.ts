@@ -1,4 +1,4 @@
-import * as functions from 'firebase-functions';
+import { onCall } from 'firebase-functions/v2/https';
 
 interface TabletopConfig {
   shape: 'rect' | 'rounded-rect' | 'ellipse' | 'super-ellipse' | 'custom';
@@ -12,16 +12,22 @@ interface TabletopConfig {
   quantity: number;
 }
 
-export const calculateTabletopPrice = functions
-  .region('australia-southeast1')
-  .https.onCall((data: TabletopConfig, context) => {
+export const calculateTabletopPrice = onCall<TabletopConfig>(
+  {
+    region: 'australia-southeast1',
+    // Enable automatic CORS response headers so local dev (localhost:3001)
+    // and production deployments can call this function directly without
+    // running into a failed OPTIONS preflight.
+    cors: true
+  },
+  (request) => {
     const {
       lengthMm,
       widthMm,
       thicknessMm,
       material,
       quantity
-    } = data;
+    } = request.data;
 
     const areaM2 = (lengthMm / 1000) * (widthMm / 1000);
     const thicknessFactor = thicknessMm / 25;
@@ -43,4 +49,5 @@ export const calculateTabletopPrice = functions
       areaM2,
       material
     };
-  });
+  }
+);
