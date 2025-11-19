@@ -15,15 +15,20 @@ import { db, storage } from '@auth/firebase';
 import { useAuth } from '@auth/AuthContext';
 import Loader from '@/components/ui/Loader';
 
+// Describes the dimensions that apply to each stocked thickness.
+interface ThicknessDimension {
+  thickness: string;
+  maxLength: string;
+  maxWidth: string;
+}
+
 interface MaterialInput {
   name: string;
   materialType: string;
   finish: string;
   hexCode: string;
   supplierSku: string;
-  maxLength: string;
-  maxWidth: string;
-  availableThicknesses: string[];
+  thicknessDimensions: ThicknessDimension[];
   imageUrl: string;
   notes: string;
 }
@@ -37,9 +42,9 @@ type FilterKeys =
   | 'materialType'
   | 'finish'
   | 'supplierSku'
-  | 'maxLength'
-  | 'maxWidth'
-  | 'availableThicknesses';
+  | 'thicknessDimensions'
+  | 'lengthDetails'
+  | 'widthDetails';
 
 const emptyMaterial: MaterialInput = {
   name: '',
@@ -47,9 +52,7 @@ const emptyMaterial: MaterialInput = {
   finish: '',
   hexCode: '#ffffff',
   supplierSku: '',
-  maxLength: '',
-  maxWidth: '',
-  availableThicknesses: [],
+  thicknessDimensions: [],
   imageUrl: '',
   notes: ''
 };
@@ -61,9 +64,9 @@ const initialFilters: Record<FilterKeys, string> = {
   materialType: '',
   finish: '',
   supplierSku: '',
-  maxLength: '',
-  maxWidth: '',
-  availableThicknesses: ''
+  thicknessDimensions: '',
+  lengthDetails: '',
+  widthDetails: ''
 };
 
 const buildSearchKeywords = (material: MaterialInput): string[] => {
@@ -73,9 +76,9 @@ const buildSearchKeywords = (material: MaterialInput): string[] => {
     material.finish,
     material.hexCode,
     material.supplierSku,
-    material.maxLength,
-    material.maxWidth,
-    material.availableThicknesses.join(' '),
+    material.thicknessDimensions
+      .map(dimension => `${dimension.thickness} ${dimension.maxLength} ${dimension.maxWidth}`)
+      .join(' '),
     material.notes
   ];
   const words = combinedValues
@@ -106,12 +109,47 @@ const MaterialsPage: React.FC = () => {
     const materialsQuery = query(collection(db, 'materials'), orderBy('name'));
     const unsubscribe = onSnapshot(materialsQuery, snapshot => {
       const nextMaterials: MaterialRecord[] = snapshot.docs.map(docSnap => {
-        const data = docSnap.data() as Partial<MaterialInput>;
+        const data = docSnap.data() as Partial<MaterialInput> & {
+          availableThicknesses?: string[];
+          maxLength?: string;
+          maxWidth?: string;
+          thicknessDimensions?: ThicknessDimension[];
+        };
+        // Normalise any legacy single-value fields into the new per-thickness structure.
+        const normalizedDimensions = (() => {
+          if (Array.isArray(data.thicknessDimensions) && data.thicknessDimensions.length) {
+            return data.thicknessDimensions.map(dimension => ({
+              thickness: dimension.thickness || '',
+              maxLength: dimension.maxLength || '',
+              maxWidth: dimension.maxWidth || ''
+            }));
+          }
+
+          if (Array.isArray(data.availableThicknesses) && data.availableThicknesses.length) {
+            return data.availableThicknesses.map(thicknessValue => ({
+              thickness: thicknessValue || '',
+              maxLength: data.maxLength || '',
+              maxWidth: data.maxWidth || ''
+            }));
+          }
+
+          if (data.maxLength || data.maxWidth) {
+            return [
+              {
+                thickness: '',
+                maxLength: data.maxLength || '',
+                maxWidth: data.maxWidth || ''
+              }
+            ];
+          }
+
+          return [];
+        })();
         return {
           id: docSnap.id,
           ...emptyMaterial,
           ...data,
-          availableThicknesses: data.availableThicknesses || [],
+          thicknessDimensions: normalizedDimensions,
           imageUrl: data.imageUrl || ''
         };
       });
@@ -129,7 +167,7 @@ const MaterialsPage: React.FC = () => {
       setFormState({
         ...emptyMaterial,
         ...match,
-        availableThicknesses: match.availableThicknesses || []
+        thicknessDimensions: match.thicknessDimensions.map(dimension => ({ ...dimension }))
       });
       setImagePreview(match.imageUrl || '');
       setPendingImageFile(null);
@@ -152,17 +190,30 @@ const MaterialsPage: React.FC = () => {
 
   const filteredMaterials = useMemo(() => {
     return materials.filter(material =>
-      Object.entries(filters).every(([key, value]) => {
+      (Object.entries(filters) as [FilterKeys, string][]).every(([key, value]) => {
         const filterValue = value.trim().toLowerCase();
         if (!filterValue) return true;
-        const rawValue = material[key as keyof typeof filters];
-        if (Array.isArray(rawValue)) {
-          return rawValue.some(option => option.toLowerCase().includes(filterValue));
+
+        switch (key) {
+          case 'thicknessDimensions':
+            return material.thicknessDimensions.some(dimension =>
+              dimension.thickness.toLowerCase().includes(filterValue)
+            );
+          case 'lengthDetails':
+            return material.thicknessDimensions.some(dimension =>
+              `${dimension.thickness} ${dimension.maxLength}`.toLowerCase().includes(filterValue)
+            );
+          case 'widthDetails':
+            return material.thicknessDimensions.some(dimension =>
+              `${dimension.thickness} ${dimension.maxWidth}`.toLowerCase().includes(filterValue)
+            );
+          default: {
+            const rawValue = material[key as keyof MaterialRecord];
+            return String(rawValue || '')
+              .toLowerCase()
+              .includes(filterValue);
+          }
         }
-        const materialValue = String(rawValue || '')
-          .toLowerCase()
-          .trim();
-        return materialValue.includes(filterValue);
       })
     );
   }, [materials, filters]);
@@ -176,7 +227,7 @@ const MaterialsPage: React.FC = () => {
     setFormState({
       ...emptyMaterial,
       ...material,
-      availableThicknesses: material.availableThicknesses || []
+      thicknessDimensions: material.thicknessDimensions.map(dimension => ({ ...dimension }))
     });
     setImagePreview(material.imageUrl || '');
     setPendingImageFile(null);
@@ -189,13 +240,36 @@ const MaterialsPage: React.FC = () => {
     setImagePreview('');
   };
 
-  const handleFormChange = (field: keyof MaterialInput, value: string | string[]) => {
+  const handleFormChange = <K extends keyof MaterialInput>(field: K, value: MaterialInput[K]) => {
     setFormState(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleThicknessChange = (options: HTMLSelectElement) => {
-    const values = Array.from(options.selectedOptions).map(option => option.value);
-    handleFormChange('availableThicknesses', values);
+  // Helpers that manage the variable thickness rows.
+  const addThicknessDimension = () => {
+    handleFormChange('thicknessDimensions', [
+      ...formState.thicknessDimensions,
+      { thickness: '', maxLength: '', maxWidth: '' }
+    ]);
+  };
+
+  const updateThicknessDimension = (
+    index: number,
+    field: keyof ThicknessDimension,
+    value: string
+  ) => {
+    handleFormChange(
+      'thicknessDimensions',
+      formState.thicknessDimensions.map((dimension, currentIndex) =>
+        currentIndex === index ? { ...dimension, [field]: value } : dimension
+      )
+    );
+  };
+
+  const removeThicknessDimension = (index: number) => {
+    handleFormChange(
+      'thicknessDimensions',
+      formState.thicknessDimensions.filter((_, currentIndex) => currentIndex !== index)
+    );
   };
 
   const handleImageSelection = (file: File | null) => {
@@ -264,16 +338,18 @@ const MaterialsPage: React.FC = () => {
         : `#${formState.hexCode}`;
       const trimmedNotes = formState.notes.trim();
       const sanitizedSupplierSku = formState.supplierSku.trim();
-      const sanitizedMaxLength = formState.maxLength.trim();
-      const sanitizedMaxWidth = formState.maxWidth.trim();
-      const sanitizedThicknesses = formState.availableThicknesses.filter(Boolean);
+      const sanitizedDimensions = formState.thicknessDimensions
+        .map(dimension => ({
+          thickness: dimension.thickness.trim(),
+          maxLength: dimension.maxLength.trim(),
+          maxWidth: dimension.maxWidth.trim()
+        }))
+        .filter(dimension => dimension.thickness || dimension.maxLength || dimension.maxWidth);
       const baseMaterial: MaterialInput = {
         ...formState,
         hexCode: sanitizedHex.toUpperCase(),
         supplierSku: sanitizedSupplierSku,
-        maxLength: sanitizedMaxLength,
-        maxWidth: sanitizedMaxWidth,
-        availableThicknesses: sanitizedThicknesses,
+        thicknessDimensions: sanitizedDimensions,
         imageUrl,
         notes: trimmedNotes
       };
@@ -354,19 +430,19 @@ const MaterialsPage: React.FC = () => {
       helper: 'Search by catalogue or supplier code when ordering replacements.'
     },
     {
-      key: 'maxLength',
+      key: 'lengthDetails',
       label: 'Maximum length',
-      placeholder: 'e.g. 3600mm',
-      helper: 'Filter by blank length to match island and benchtop spans.'
+      placeholder: 'e.g. 16mm 3600',
+      helper: 'Include a thickness or measurement to narrow the rows.'
     },
     {
-      key: 'maxWidth',
+      key: 'widthDetails',
       label: 'Maximum width',
-      placeholder: 'e.g. 1350mm',
-      helper: 'Quickly find sheets wide enough for your design.'
+      placeholder: 'e.g. 18mm 1500',
+      helper: 'Search by thickness or span to find wide enough sheets.'
     },
     {
-      key: 'availableThicknesses',
+      key: 'thicknessDimensions',
       label: 'Thicknesses',
       placeholder: '12, 16, 18…',
       helper: 'Enter a number to see all finishes stocked in that thickness.'
@@ -391,14 +467,45 @@ const MaterialsPage: React.FC = () => {
             <p className="text-xs text-slate-400">Tap a name to edit the record.</p>
           </div>
         );
-      case 'availableThicknesses':
+      case 'thicknessDimensions':
         return (
           <div className={sharedClass}>
-            {material.availableThicknesses.length
-              ? `${material.availableThicknesses.join(', ')} mm`
-              : '—'}
+            {material.thicknessDimensions.length ? (
+              <ul className="space-y-1 text-xs text-slate-300">
+                {material.thicknessDimensions.map((dimension, index) => (
+                  <li key={`${material.id}-thickness-${index}`}>
+                    {dimension.thickness ? `${dimension.thickness} mm` : 'Unspecified thickness'}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              '—'
+            )}
           </div>
         );
+      case 'lengthDetails':
+      case 'widthDetails': {
+        const measurementKey = key === 'lengthDetails' ? 'maxLength' : 'maxWidth';
+        return (
+          <div className={sharedClass}>
+            {material.thicknessDimensions.length ? (
+              <ul className="space-y-1 text-xs text-slate-300">
+                {material.thicknessDimensions.map((dimension, index) => (
+                  <li key={`${material.id}-${measurementKey}-${index}`}>
+                    <span className="font-semibold text-slate-100">
+                      {dimension.thickness ? `${dimension.thickness} mm` : 'Unspecified thickness'}
+                    </span>
+                    <span className="text-slate-500"> · </span>
+                    <span>{dimension[measurementKey] || '—'}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              '—'
+            )}
+          </div>
+        );
+      }
       default: {
         const value = material[key];
         return <span className={sharedClass}>{value ? value : '—'}</span>;
@@ -654,64 +761,114 @@ const MaterialsPage: React.FC = () => {
                 </p>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="text-sm font-semibold text-slate-100" htmlFor="material-max-length">
-                    Maximum length
-                  </label>
-                  <input
-                    id="material-max-length"
-                    type="text"
-                    className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
-                    value={formState.maxLength}
-                    onChange={event => handleFormChange('maxLength', event.target.value)}
-                    placeholder="e.g. 3600mm"
-                    aria-describedby="material-max-length-help"
-                  />
-                  <p id="material-max-length-help" className="mt-1 text-xs text-slate-400">
-                    Note the maximum blank length so designers know which spans need joins.
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-semibold text-slate-100" htmlFor="material-max-width">
-                    Maximum width
-                  </label>
-                  <input
-                    id="material-max-width"
-                    type="text"
-                    className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
-                    value={formState.maxWidth}
-                    onChange={event => handleFormChange('maxWidth', event.target.value)}
-                    placeholder="e.g. 1350mm"
-                    aria-describedby="material-max-width-help"
-                  />
-                  <p id="material-max-width-help" className="mt-1 text-xs text-slate-400">
-                    Capture the usable sheet width so quoting knows when a benchtop needs to be laminated up.
-                  </p>
-                </div>
-              </div>
-
               <div>
-                <label className="text-sm font-semibold text-slate-100" htmlFor="material-thicknesses">
-                  Available thicknesses
-                </label>
-                <select
-                  id="material-thicknesses"
-                  multiple
-                  className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
-                  value={formState.availableThicknesses}
-                  onChange={event => handleThicknessChange(event.currentTarget)}
-                  aria-describedby="material-thicknesses-help"
-                >
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <label className="text-sm font-semibold text-slate-100">
+                      Thickness-specific sheet sizes
+                    </label>
+                    <p className="text-xs text-slate-400">
+                      Add as many rows as needed so each thickness has the correct maximum length and width recorded.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addThicknessDimension}
+                    className="rounded-lg border border-slate-700 px-3 py-1 text-xs font-semibold text-slate-100 transition hover:border-emerald-400 hover:text-emerald-300"
+                  >
+                    Add thickness
+                  </button>
+                </div>
+
+                <div className="mt-4 space-y-4" aria-live="polite">
+                  {formState.thicknessDimensions.length ? (
+                    formState.thicknessDimensions.map((dimension, index) => {
+                      const thicknessId = `thickness-${index}`;
+                      const lengthId = `length-${index}`;
+                      const widthId = `width-${index}`;
+                      return (
+                        <div
+                          key={`${thicknessId}-${lengthId}-${widthId}`}
+                          className="rounded-xl border border-slate-800 bg-slate-950/40 p-4"
+                        >
+                          <div className="flex flex-col gap-4 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end sm:gap-3">
+                            <div>
+                              <label className="text-sm font-semibold text-slate-100" htmlFor={thicknessId}>
+                                Thickness (mm)
+                              </label>
+                              <input
+                                id={thicknessId}
+                                type="text"
+                                list="thickness-suggestions"
+                                className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                                value={dimension.thickness}
+                                onChange={event => updateThicknessDimension(index, 'thickness', event.target.value)}
+                                placeholder="e.g. 16"
+                                aria-describedby={`${thicknessId}-help`}
+                              />
+                              <p id={`${thicknessId}-help`} className="mt-1 text-[0.7rem] text-slate-400">
+                                Type the stocked thickness so estimators know which board size applies.
+                              </p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-semibold text-slate-100" htmlFor={lengthId}>
+                                Maximum length
+                              </label>
+                              <input
+                                id={lengthId}
+                                type="text"
+                                className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                                value={dimension.maxLength}
+                                onChange={event => updateThicknessDimension(index, 'maxLength', event.target.value)}
+                                placeholder="e.g. 3600mm"
+                                aria-describedby={`${lengthId}-help`}
+                              />
+                              <p id={`${lengthId}-help`} className="mt-1 text-[0.7rem] text-slate-400">
+                                Share the longest blank available for this thickness so drafters can plan joins.
+                              </p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-semibold text-slate-100" htmlFor={widthId}>
+                                Maximum width
+                              </label>
+                              <input
+                                id={widthId}
+                                type="text"
+                                className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                                value={dimension.maxWidth}
+                                onChange={event => updateThicknessDimension(index, 'maxWidth', event.target.value)}
+                                placeholder="e.g. 1500mm"
+                                aria-describedby={`${widthId}-help`}
+                              />
+                              <p id={`${widthId}-help`} className="mt-1 text-[0.7rem] text-slate-400">
+                                Record the widest sheet stocked in this thickness so wide tops are quoted correctly.
+                              </p>
+                            </div>
+                            <div className="sm:text-right">
+                              <button
+                                type="button"
+                                onClick={() => removeThicknessDimension(index)}
+                                className="mt-6 text-xs text-rose-300 hover:text-rose-200"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="rounded-lg border border-dashed border-slate-800 bg-slate-950/30 px-4 py-6 text-center text-sm text-slate-400">
+                      No thickness rows yet. Add one so the colour saves with accurate sheet sizes.
+                    </p>
+                  )}
+                </div>
+
+                <datalist id="thickness-suggestions">
                   {thicknessOptions.map(option => (
-                    <option key={option} value={option}>
-                      {option} mm
-                    </option>
+                    <option value={option} key={option} />
                   ))}
-                </select>
-                <p id="material-thicknesses-help" className="mt-1 text-xs text-slate-400">
-                  Hold Ctrl (Windows) or Command (Mac) while clicking to select every stocked thickness that applies.
-                </p>
+                </datalist>
               </div>
 
               <div>
