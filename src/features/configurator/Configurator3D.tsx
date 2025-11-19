@@ -34,9 +34,15 @@ export interface TabletopConfig {
   quantity: number;
 }
 
+interface SurfaceSwatch {
+  hexCode?: string;
+  imageUrl?: string | null;
+}
+
 interface Props {
   config: TabletopConfig;
   customOutline?: ParsedCustomOutline | null;
+  swatch?: SurfaceSwatch | null;
 }
 
 const MM_TO_M = 0.001;
@@ -46,6 +52,7 @@ const TABLETOP_STANDING_HEIGHT_M = 0.72;
 interface TabletopGeometryOptions {
   config: TabletopConfig;
   customOutline?: ParsedCustomOutline | null;
+  swatch?: SurfaceSwatch | null;
 }
 
 // Build an extruded mesh from the uploaded DXF outline so it can share the same
@@ -204,23 +211,71 @@ const createTabletopGeometry = ({ config, customOutline }: TabletopGeometryOptio
   return new THREE.ExtrudeGeometry(shape2d, extrudeSettings);
 };
 
-const TabletopMesh: React.FC<TabletopGeometryOptions> = ({ config, customOutline }) => {
+const TabletopMesh: React.FC<TabletopGeometryOptions> = ({ config, customOutline, swatch }) => {
   const geometry = useMemo(
     () => createTabletopGeometry({ config, customOutline }),
     [config, customOutline]
   );
+  const [swatchTexture, setSwatchTexture] = useState<THREE.Texture | null>(null);
 
-  const materialColor =
-    config.material === 'linoleum'
+  // Load the supplier swatch image (if provided) so the 3D preview mirrors the catalogue selection.
+  useEffect(() => {
+    if (!swatch?.imageUrl) {
+      setSwatchTexture(null);
+      return;
+    }
+
+    let isMounted = true;
+    let loadedTexture: THREE.Texture | null = null;
+    const loader = new THREE.TextureLoader();
+    loader.load(
+      swatch.imageUrl,
+      texture => {
+        if (!isMounted) {
+          texture.dispose();
+          return;
+        }
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(2, 2);
+        texture.anisotropy = 8;
+        texture.colorSpace = THREE.SRGBColorSpace;
+        loadedTexture = texture;
+        setSwatchTexture(texture);
+      },
+      undefined,
+      () => {
+        if (isMounted) {
+          setSwatchTexture(null);
+        }
+      }
+    );
+
+    return () => {
+      isMounted = false;
+      setSwatchTexture(null);
+      if (loadedTexture) {
+        loadedTexture.dispose();
+      }
+    };
+  }, [swatch?.imageUrl]);
+
+  const fallbackMaterialColor =
+    swatch?.hexCode?.trim() ||
+    (config.material === 'linoleum'
       ? '#3f5c5c'
       : config.material === 'timber'
       ? '#b3825a'
-      : '#d0d4da';
+      : '#d0d4da');
+
+  const appliedMaterialColor = swatchTexture ? '#ffffff' : fallbackMaterialColor;
 
   return (
     <mesh geometry={geometry} castShadow receiveShadow>
       <meshStandardMaterial
-        color={materialColor}
+        // Apply the supplier texture when available, otherwise fall back to the HEX swatch.
+        color={appliedMaterialColor}
+        map={swatchTexture ?? undefined}
         metalness={0.1}
         roughness={config.finish === 'matte' ? 0.9 : 0.6}
       />
@@ -602,10 +657,7 @@ const formatLabels: Record<ExportFormat, string> = {
   obj: 'OBJ'
 };
 
-const Configurator3D: React.FC<{ config: TabletopConfig; customOutline?: ParsedCustomOutline | null }> = ({
-  config,
-  customOutline
-}) => {
+const Configurator3D: React.FC<Props> = ({ config, customOutline, swatch }) => {
   // Convert the tabletop thickness to meters so we can offset the mesh when
   // we rotate it. Without the offset, half the tabletop would sink below the
   // origin once we lay it flat.
@@ -762,7 +814,7 @@ const Configurator3D: React.FC<{ config: TabletopConfig; customOutline?: ParsedC
         <TableBase config={config} />
         <group rotation={[-Math.PI / 2, 0, 0]} position={[0, TABLETOP_STANDING_HEIGHT_M + tabletopThickness / 2, 0]}>
           {/* Rotate the tabletop so it lays horizontally in the viewport. */}
-          <TabletopMesh config={config} customOutline={customOutline} />
+          <TabletopMesh config={config} customOutline={customOutline} swatch={swatch} />
         </group>
         <WorldSpaceDimensions config={config} visible={dimensionsVisible} view={activeView} />
         <OrbitControls ref={controlsRef} enablePan={is3DView} enableRotate={is3DView} enableZoom />
