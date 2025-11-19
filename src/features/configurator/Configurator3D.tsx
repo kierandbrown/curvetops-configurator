@@ -10,7 +10,13 @@ import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { ParsedCustomOutline } from './customShapeTypes';
 
 
-export type TableShape = 'rect' | 'rounded-rect' | 'ellipse' | 'super-ellipse' | 'custom';
+export type TableShape =
+  | 'rect'
+  | 'rounded-rect'
+  | 'round-top'
+  | 'ellipse'
+  | 'super-ellipse'
+  | 'custom';
 
 export interface TabletopConfig {
   shape: TableShape;
@@ -154,6 +160,19 @@ const createTabletopGeometry = ({ config, customOutline }: TabletopGeometryOptio
     shape2d.quadraticCurveTo(x, y + width, x, y + width - r);
     shape2d.lineTo(x, y + r);
     shape2d.quadraticCurveTo(x, y, x + r, y);
+  } else if (shape === 'round-top') {
+    // Model a D-shaped top: one straight side and a fully rounded meeting end.
+    const hw = width / 2;
+    const hl = length / 2;
+    const radius = hw;
+    const straightEndX = hl - radius;
+    const flatStartX = -hl;
+    shape2d.moveTo(flatStartX, -hw);
+    shape2d.lineTo(straightEndX, -hw);
+    // Draw a semicircle that turns the end cap into a smooth round meeting space.
+    shape2d.absarc(straightEndX, 0, radius, -Math.PI / 2, Math.PI / 2, false);
+    shape2d.lineTo(flatStartX, hw);
+    shape2d.lineTo(flatStartX, -hw);
   } else {
     const hw = width / 2;
     const hl = length / 2;
