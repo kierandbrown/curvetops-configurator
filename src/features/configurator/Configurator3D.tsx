@@ -7,13 +7,14 @@ import { STLExporter } from 'three/examples/jsm/exporters/STLExporter';
 import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter';
 
 import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
-import { ParsedCustomOutline } from './customShapeTypes';
+import { ParsedCustomOutline, OutlinePoint } from './customShapeTypes';
 
 
 export type TableShape =
   | 'rect'
   | 'rounded-rect'
   | 'round-top'
+  | 'round'
   | 'ellipse'
   | 'super-ellipse'
   | 'custom';
@@ -173,6 +174,12 @@ const createTabletopGeometry = ({ config, customOutline }: TabletopGeometryOptio
     shape2d.absarc(straightEndX, 0, radius, -Math.PI / 2, Math.PI / 2, false);
     shape2d.lineTo(flatStartX, hw);
     shape2d.lineTo(flatStartX, -hw);
+  } else if (shape === 'round') {
+    // Use the smaller of the two sliders as the diameter so the profile stays circular.
+    const diameter = Math.min(length, width);
+    const radius = diameter / 2;
+    shape2d.moveTo(radius, 0);
+    shape2d.absarc(0, 0, radius, 0, Math.PI * 2, false);
   } else {
     const hw = width / 2;
     const hl = length / 2;

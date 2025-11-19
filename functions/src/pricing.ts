@@ -1,7 +1,7 @@
 import * as functions from 'firebase-functions';
 
 interface TabletopConfig {
-  shape: 'rect' | 'rounded-rect' | 'ellipse' | 'super-ellipse' | 'custom';
+  shape: 'rect' | 'rounded-rect' | 'round-top' | 'round' | 'ellipse' | 'super-ellipse' | 'custom';
   lengthMm: number;
   widthMm: number;
   thicknessMm: number;
