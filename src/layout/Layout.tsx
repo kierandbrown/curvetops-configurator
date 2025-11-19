@@ -106,10 +106,12 @@ const Layout: React.FC = () => {
         {/*
           Feature pages such as the configurator can still portal controls into this region.
           On large screens it docks to the right, while on mobile it stacks after the content.
+          Making the aside sticky with its own overflow lets long parameter panels scroll
+          independently without moving the rest of the page.
         */}
         <aside
           id="configurator-sidebar"
-          className="border-t border-slate-800 bg-slate-900/40 p-4 lg:w-80 lg:border-t-0 lg:border-l"
+          className="border-t border-slate-800 bg-slate-900/40 p-4 lg:w-80 lg:border-t-0 lg:border-l lg:sticky lg:top-0 lg:max-h-screen lg:overflow-y-auto"
         />
       </div>
     </div>
