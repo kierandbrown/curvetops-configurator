@@ -9,5 +9,7 @@ export const defaultTabletopConfig: TabletopConfig = {
   superEllipseExponent: 2.5,
   material: 'laminate',
   finish: 'matte',
+  // Default to the edged profile so pricing + renders match the majority of jobs.
+  edgeProfile: 'edged',
   quantity: 1
 };

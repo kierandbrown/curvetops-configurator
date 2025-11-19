@@ -84,10 +84,16 @@ const AdminPage: React.FC = () => {
     // Keep a live list of profiles ordered alphabetically so admins see changes instantly.
     const usersQuery = query(collection(db, 'users'), orderBy('displayName'));
     const unsubscribe = onSnapshot(usersQuery, snapshot => {
-      const nextPeople: UserRecord[] = snapshot.docs.map(docSnap => ({
-        id: docSnap.id,
-        ...(docSnap.data() as UserRecord)
-      }));
+      const nextPeople: UserRecord[] = snapshot.docs.map(docSnap => {
+        const data = docSnap.data() as UserRecord;
+        // Some records still persist the "id" field, so strip it to avoid
+        // React complaining about duplicate props when we reassign the Firestore id.
+        const { id: _ignoredId, ...rest } = data;
+        return {
+          ...rest,
+          id: docSnap.id
+        };
+      });
       setPeople(nextPeople);
       setLoading(false);
     });
