@@ -46,6 +46,26 @@ const shapeOptions: { shape: TableShape; label: string; icon: JSX.Element }[] = 
     )
   },
   {
+    shape: 'round-top',
+    label: 'Round top',
+    icon: (
+      <svg
+        aria-hidden
+        viewBox="0 0 100 60"
+        className="h-10 w-16 text-emerald-300"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={4}
+      >
+        {/* Visualize the D-shaped profile. */}
+        <path
+          d="M20 10 H55 A20 20 0 0 1 55 50 H20 Z"
+          className="fill-emerald-400/20 stroke-emerald-300"
+        />
+      </svg>
+    )
+  },
+  {
     shape: 'ellipse',
     label: 'Ellipse',
     icon: (
