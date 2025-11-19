@@ -92,6 +92,8 @@ const buildSearchKeywords = (order: SearchableOrderFields) => {
 const OrdersPage = () => {
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
+  // Normal customers are only allowed to review their past orders, not create or edit new ones on this page.
+  const showOrderForm = isAdmin;
 
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -144,6 +146,7 @@ const OrdersPage = () => {
 
   // Whenever the selected order changes, sync the form state with the Firestore record for easy editing.
   useEffect(() => {
+    if (!showOrderForm) return;
     if (!activeOrderId) {
       if (!profile) return;
       const defaultEmail = profile.email || '';
@@ -169,7 +172,7 @@ const OrdersPage = () => {
         totalValue: match.totalValue ? String(match.totalValue) : ''
       });
     }
-  }, [activeOrderId, orders, profile]);
+  }, [activeOrderId, orders, profile, showOrderForm]);
 
   const handleFilterChange = (field: keyof OrderFilters, value: string) => {
     setFilters(prev => ({ ...prev, [field]: value }));
@@ -180,6 +183,7 @@ const OrdersPage = () => {
   };
 
   const startCreateFlow = () => {
+    if (!showOrderForm) return;
     setActiveOrderId(null);
     if (!profile) return;
     const defaultEmail = profile.email || '';
@@ -220,7 +224,7 @@ const OrdersPage = () => {
   // Handle both create and update flows with a single submit handler.
   const persistOrder = async (event: FormEvent) => {
     event.preventDefault();
-    if (!profile) return;
+    if (!profile || !showOrderForm) return;
 
     setIsSubmitting(true);
     try {
@@ -271,6 +275,7 @@ const OrdersPage = () => {
 
   // Quickly duplicate an order so estimators can re-use pricing frameworks.
   const cloneOrder = async (order: OrderRecord) => {
+    if (!showOrderForm) return;
     const clonedName = `${order.projectName} copy`;
     const { id: _id, ...orderData } = order;
     await addDoc(collection(db, 'orders'), {
@@ -290,6 +295,7 @@ const OrdersPage = () => {
 
   // Remove orders that were created by mistake or merged into another record.
   const deleteOrder = async (orderId: string) => {
+    if (!showOrderForm) return;
     await deleteDoc(doc(db, 'orders', orderId));
     if (activeOrderId === orderId) {
       startCreateFlow();
@@ -349,16 +355,30 @@ const OrdersPage = () => {
               : 'Track the orders you have placed and monitor their status updates in real time.'}
           </p>
         </div>
-        <button
-          onClick={startCreateFlow}
-          className="h-11 rounded-lg bg-blue-500 px-6 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 transition hover:bg-blue-400"
-        >
-          Create order
-        </button>
+        {showOrderForm ? (
+          <button
+            onClick={startCreateFlow}
+            className="h-11 rounded-lg bg-blue-500 px-6 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 transition hover:bg-blue-400"
+          >
+            Create order
+          </button>
+        ) : (
+          <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4 text-sm text-slate-300">
+            <p className="font-semibold text-slate-100">Viewing past orders</p>
+            <p className="mt-1 text-xs text-slate-400">
+              This page lists the orders you have placed. Reach out through the configurator when you are ready to submit a new
+              request.
+            </p>
+          </div>
+        )}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.9fr)_minmax(0,1fr)] min-h-[calc(100vh-220px)]">
-        <section className="flex min-h-full flex-col rounded-2xl border border-slate-800 bg-slate-950/40">
+      <div
+        className={`min-h-[calc(100vh-220px)] gap-6 ${
+          showOrderForm ? 'grid lg:grid-cols-[minmax(0,1.9fr)_minmax(0,1fr)]' : 'flex flex-col'
+        }`}
+      >
+        <section className="flex min-h-full flex-1 flex-col rounded-2xl border border-slate-800 bg-slate-950/40">
           <header className="border-b border-slate-800 px-4 py-3">
             <p className="text-sm font-semibold">Saved orders</p>
             <p className="text-xs text-slate-400">The table stays locked to the viewport height so it is easy to scan long lists of orders.</p>
@@ -407,7 +427,9 @@ const OrdersPage = () => {
                           </div>
                         </div>
                       </th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-400">Actions</th>
+                      {showOrderForm && (
+                        <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-400">Actions</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -418,12 +440,17 @@ const OrdersPage = () => {
                             className="text-left font-semibold text-emerald-300 hover:underline"
                             onClick={event => {
                               event.stopPropagation();
+                              if (!showOrderForm) return;
                               setActiveOrderId(order.id);
                             }}
                           >
                             {order.projectName || 'Untitled order'}
                           </button>
-                          <p className="text-xs text-slate-400">Tap a name to open the order form.</p>
+                          <p className="text-xs text-slate-400">
+                            {showOrderForm
+                              ? 'Tap a name to open the order form.'
+                              : 'Order records are view-only here so you can reference past work.'}
+                          </p>
                         </td>
                         <td className="px-4 py-3">
                           <span className="inline-flex items-center rounded-full bg-slate-800/80 px-2 py-0.5 text-xs font-medium text-slate-200">
@@ -437,41 +464,46 @@ const OrdersPage = () => {
                         <td className="px-4 py-3 text-slate-200">
                           {order.totalValue ? currencyFormatter.format(order.totalValue) : '—'}
                         </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="relative inline-block text-left" onClick={event => event.stopPropagation()}>
-                            <button
-                              className="rounded-full p-2 text-slate-300 hover:bg-slate-800"
-                              onClick={event => {
-                                event.stopPropagation();
-                                setMenuOpenId(prev => (prev === order.id ? null : order.id));
-                              }}
-                              aria-label="More options"
-                            >
-                              ⋮
-                            </button>
-                            {menuOpenId === order.id && (
-                              <div className="absolute right-0 mt-2 w-36 rounded-md border border-slate-800 bg-slate-900 p-1 text-sm shadow-xl">
-                                <button
-                                  className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-slate-200 hover:bg-slate-800"
-                                  onClick={() => cloneOrder(order)}
-                                >
-                                  Clone
-                                </button>
-                                <button
-                                  className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-rose-300 hover:bg-rose-500/10"
-                                  onClick={() => deleteOrder(order.id)}
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </td>
+                        {showOrderForm && (
+                          <td className="px-4 py-3 text-right">
+                            <div className="relative inline-block text-left" onClick={event => event.stopPropagation()}>
+                              <button
+                                className="rounded-full p-2 text-slate-300 hover:bg-slate-800"
+                                onClick={event => {
+                                  event.stopPropagation();
+                                  setMenuOpenId(prev => (prev === order.id ? null : order.id));
+                                }}
+                                aria-label="More options"
+                              >
+                                ⋮
+                              </button>
+                              {menuOpenId === order.id && (
+                                <div className="absolute right-0 mt-2 w-36 rounded-md border border-slate-800 bg-slate-900 p-1 text-sm shadow-xl">
+                                  <button
+                                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-slate-200 hover:bg-slate-800"
+                                    onClick={() => cloneOrder(order)}
+                                  >
+                                    Clone
+                                  </button>
+                                  <button
+                                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-rose-300 hover:bg-rose-500/10"
+                                    onClick={() => deleteOrder(order.id)}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     ))}
                     {!filteredOrders.length && (
                       <tr>
-                        <td className="px-4 py-6 text-center text-sm text-slate-400" colSpan={tableColumns.length + 2}>
+                        <td
+                          className="px-4 py-6 text-center text-sm text-slate-400"
+                          colSpan={tableColumns.length + 2 + (showOrderForm ? 1 : 0)}
+                        >
                           No orders matched your filters. Clear the search boxes to see everything.
                         </td>
                       </tr>
@@ -483,14 +515,15 @@ const OrdersPage = () => {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-800 bg-slate-950/30 p-4">
-          <header className="mb-4">
-            <h2 className="text-lg font-semibold">{activeOrderId ? 'Edit order' : 'Create order'}</h2>
-            <p className="text-xs text-slate-400">
-              Provide enough detail for teammates and manufacturing to understand where the order currently sits.
-            </p>
-          </header>
-          <form className="space-y-4" onSubmit={persistOrder}>
+        {showOrderForm && (
+          <section className="rounded-2xl border border-slate-800 bg-slate-950/30 p-4">
+            <header className="mb-4">
+              <h2 className="text-lg font-semibold">{activeOrderId ? 'Edit order' : 'Create order'}</h2>
+              <p className="text-xs text-slate-400">
+                Provide enough detail for teammates and manufacturing to understand where the order currently sits.
+              </p>
+            </header>
+            <form className="space-y-4" onSubmit={persistOrder}>
             <div>
               <label className="text-sm font-semibold text-slate-100" htmlFor="order-project-name">
                 Order name
@@ -605,15 +638,16 @@ const OrdersPage = () => {
               </p>
             </div>
 
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {isSubmitting ? 'Saving…' : activeOrderId ? 'Save changes' : 'Create order'}
-            </button>
-          </form>
-        </section>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isSubmitting ? 'Saving…' : activeOrderId ? 'Save changes' : 'Create order'}
+              </button>
+            </form>
+          </section>
+        )}
       </div>
     </div>
   );
