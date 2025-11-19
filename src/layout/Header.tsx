@@ -2,7 +2,8 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@auth/AuthContext';
 
 const Header: React.FC = () => {
-  const { user, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth();
+  const isAdmin = profile?.role === 'admin';
 
   return (
     <header className="border-b border-slate-800 bg-slate-900/70 backdrop-blur">
@@ -19,9 +20,11 @@ const Header: React.FC = () => {
           <Link to="/configurator" className="hover:text-emerald-300">
             Configure
           </Link>
-          <Link to="/materials" className="hover:text-emerald-300">
-            Materials
-          </Link>
+          {isAdmin && (
+            <Link to="/materials" className="hover:text-emerald-300">
+              Materials
+            </Link>
+          )}
           {user ? (
             <>
               <Link to="/account" className="text-slate-300 hover:text-emerald-300">
