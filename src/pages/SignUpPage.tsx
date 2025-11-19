@@ -1,8 +1,9 @@
 import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth, SignUpPayload } from '@auth/AuthContext';
+import { useAuth, SignUpPayload, DEFAULT_COUNTRY } from '@auth/AuthContext';
 
 // Capture every onboarding field in a single object so it can be forwarded to Firebase as-is.
+// Always register Australian customers since the platform only serves that region.
 const initialForm: SignUpPayload = {
   email: '',
   password: '',
@@ -15,7 +16,7 @@ const initialForm: SignUpPayload = {
   city: '',
   stateProvince: '',
   postalCode: '',
-  country: ''
+  country: DEFAULT_COUNTRY
 };
 
 const SignUpPage: React.FC = () => {
@@ -35,7 +36,7 @@ const SignUpPage: React.FC = () => {
     setError(null);
     setSubmitting(true);
     try {
-      await signUp(form);
+      await signUp({ ...form, country: DEFAULT_COUNTRY });
       navigate('/configurator', { replace: true });
     } catch (err: any) {
       setError(err.message ?? 'Failed to sign up');
@@ -209,21 +210,6 @@ const SignUpPage: React.FC = () => {
             required
           />
           <p className="mt-1 text-xs text-slate-400">Ensures accurate carrier quotes.</p>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-200" htmlFor="country">
-            Country
-          </label>
-          <input
-            id="country"
-            type="text"
-            className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-            placeholder="United States"
-            value={form.country}
-            onChange={e => handleChange('country', e.target.value)}
-            required
-          />
-          <p className="mt-1 text-xs text-slate-400">Used to determine currency and compliance needs.</p>
         </div>
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-slate-200" htmlFor="password">

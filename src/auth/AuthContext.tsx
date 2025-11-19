@@ -23,6 +23,8 @@ import { auth, db } from './firebase';
 
 type UserRole = 'admin' | 'customer';
 
+export const DEFAULT_COUNTRY = 'Australia';
+
 export interface ContactProfileFields {
   firstName: string;
   lastName: string;
@@ -83,7 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       city: '',
       stateProvince: '',
       postalCode: '',
-      country: '',
+      country: DEFAULT_COUNTRY,
       displayName: fbUser.email || '',
       searchKeywords: [(fbUser.email || '').toLowerCase()].filter(Boolean),
       createdAt: serverTimestamp()
@@ -186,6 +188,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         role: 'customer',
         email,
         ...profileFields,
+        country: DEFAULT_COUNTRY,
         displayName,
         searchKeywords: buildSearchKeywords(email, profileFields),
         createdAt: serverTimestamp(),
@@ -203,6 +206,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       const ref = doc(db, 'users', auth.currentUser.uid);
       await updateDoc(ref, {
         ...payload,
+        country: DEFAULT_COUNTRY,
         displayName: buildDisplayName(payload.firstName, payload.lastName, email),
         searchKeywords: buildSearchKeywords(email, payload),
         updatedAt: serverTimestamp()

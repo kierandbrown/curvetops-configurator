@@ -1,7 +1,8 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { useAuth, ContactProfileFields } from '@auth/AuthContext';
+import { useAuth, ContactProfileFields, DEFAULT_COUNTRY } from '@auth/AuthContext';
 import Loader from '../components/ui/Loader';
 
+// Default every profile to Australia because that's the only serviced region.
 const emptyProfile: ContactProfileFields = {
   firstName: '',
   lastName: '',
@@ -12,7 +13,7 @@ const emptyProfile: ContactProfileFields = {
   city: '',
   stateProvince: '',
   postalCode: '',
-  country: ''
+  country: DEFAULT_COUNTRY
 };
 
 const AccountPage: React.FC = () => {
@@ -34,7 +35,7 @@ const AccountPage: React.FC = () => {
         city: profile.city || '',
         stateProvince: profile.stateProvince || '',
         postalCode: profile.postalCode || '',
-        country: profile.country || ''
+        country: profile.country || DEFAULT_COUNTRY
       });
     }
   }, [profile]);
@@ -48,7 +49,7 @@ const AccountPage: React.FC = () => {
     setSaving(true);
     setStatus(null);
     try {
-      await updateProfile(form);
+      await updateProfile({ ...form, country: DEFAULT_COUNTRY });
       setStatus({ type: 'success', message: 'Profile updated successfully.' });
     } catch (error: any) {
       setStatus({ type: 'error', message: error?.message ?? 'Failed to update profile.' });
@@ -87,7 +88,6 @@ const AccountPage: React.FC = () => {
             readOnly
             className="mt-1 w-full rounded border border-dashed border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-400"
           />
-          <p className="mt-1 text-xs text-slate-400">Contact support if you need to change the login email.</p>
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-200" htmlFor="account-firstName">
@@ -100,7 +100,6 @@ const AccountPage: React.FC = () => {
             className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
             required
           />
-          <p className="mt-1 text-xs text-slate-400">Used on quotes, invoices, and production notes.</p>
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-200" htmlFor="account-lastName">
@@ -113,7 +112,6 @@ const AccountPage: React.FC = () => {
             className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
             required
           />
-          <p className="mt-1 text-xs text-slate-400">Appears anywhere a full legal name is required.</p>
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-200" htmlFor="account-companyName">
@@ -126,7 +124,6 @@ const AccountPage: React.FC = () => {
             className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
             required
           />
-          <p className="mt-1 text-xs text-slate-400">This label shows up on every proposal and shipment.</p>
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-200" htmlFor="account-jobTitle">
@@ -139,7 +136,6 @@ const AccountPage: React.FC = () => {
             className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
             required
           />
-          <p className="mt-1 text-xs text-slate-400">Helps our team reach the right stakeholder.</p>
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-200" htmlFor="account-phoneNumber">
@@ -153,7 +149,6 @@ const AccountPage: React.FC = () => {
             className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
             required
           />
-          <p className="mt-1 text-xs text-slate-400">We only call for urgent build questions.</p>
         </div>
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-slate-200" htmlFor="account-streetAddress">
@@ -166,7 +161,6 @@ const AccountPage: React.FC = () => {
             className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
             required
           />
-          <p className="mt-1 text-xs text-slate-400">Used for freight quotes and white-glove deliveries.</p>
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-200" htmlFor="account-city">
@@ -179,7 +173,6 @@ const AccountPage: React.FC = () => {
             className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
             required
           />
-          <p className="mt-1 text-xs text-slate-400">We lean on this for local fabricator introductions.</p>
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-200" htmlFor="account-stateProvince">
@@ -192,7 +185,6 @@ const AccountPage: React.FC = () => {
             className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
             required
           />
-          <p className="mt-1 text-xs text-slate-400">Ensures your tax paperwork is accurate.</p>
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-200" htmlFor="account-postalCode">
@@ -205,20 +197,6 @@ const AccountPage: React.FC = () => {
             className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
             required
           />
-          <p className="mt-1 text-xs text-slate-400">We pass this directly to shipping partners.</p>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-200" htmlFor="account-country">
-            Country
-          </label>
-          <input
-            id="account-country"
-            value={form.country}
-            onChange={e => handleChange('country', e.target.value)}
-            className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-            required
-          />
-          <p className="mt-1 text-xs text-slate-400">We use this to determine currency and compliance needs.</p>
         </div>
         {status && (
           <p
