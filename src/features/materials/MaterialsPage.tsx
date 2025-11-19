@@ -251,6 +251,20 @@ const MaterialsPage: React.FC = () => {
     setFormState(prev => ({ ...prev, [field]: value }));
   };
 
+  // Ensures any user supplied HEX value stays uppercase, prefixed with # and clipped to six characters.
+  const normalizeHexInput = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    const stripped = trimmed.replace(/^#/, '').replace(/[^0-9a-fA-F]/g, '').slice(0, 6).toUpperCase();
+    return `#${stripped}`;
+  };
+
+  const handleHexChange = (value: string) => {
+    handleFormChange('hexCode', normalizeHexInput(value));
+  };
+
+  const colorPickerValue = /^#[0-9A-F]{6}$/i.test(formState.hexCode) ? formState.hexCode : '#ffffff';
+
   // Helpers that manage the variable thickness rows.
   const addThicknessDimension = () => {
     handleFormChange('thicknessDimensions', [
@@ -914,18 +928,38 @@ const MaterialsPage: React.FC = () => {
                 <label className="text-sm font-semibold text-slate-100" htmlFor="material-hex">
                   HEX colour code
                 </label>
-                <input
-                  id="material-hex"
-                  type="text"
-                  className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
-                  value={formState.hexCode}
-                  onChange={event => handleFormChange('hexCode', event.target.value)}
-                  placeholder="#AABBCC"
-                  aria-describedby="material-hex-help"
-                />
-                <p id="material-hex-help" className="mt-1 text-xs text-slate-400">
-                  Paste a valid HEX value so we can render the swatch preview accurately across the app.
-                </p>
+                <div className="mt-2 flex flex-col gap-4 rounded-xl border border-slate-800/80 bg-slate-950/40 p-4 sm:flex-row sm:items-center">
+                  <div className="flex-1">
+                    <input
+                      id="material-hex"
+                      type="text"
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                      value={formState.hexCode}
+                      onChange={event => handleHexChange(event.target.value)}
+                      placeholder="#AABBCC"
+                      aria-describedby="material-hex-help"
+                    />
+                    <p id="material-hex-help" className="mt-1 text-xs text-slate-400">
+                      Paste or type a valid HEX value so we can render the swatch preview accurately across the app.
+                    </p>
+                  </div>
+                  {/* The native colour input gives users a touch-friendly wheel to find the exact HEX. */}
+                  <div className="flex flex-col items-start gap-2">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Colour wheel</span>
+                    <input
+                      id="material-hex-picker"
+                      type="color"
+                      className="h-16 w-16 cursor-pointer rounded-full border border-white/30 bg-transparent p-0 shadow-inner"
+                      value={colorPickerValue}
+                      onChange={event => handleHexChange(event.target.value)}
+                      aria-label="Pick a colour from the wheel"
+                      title="Pick a colour from the wheel"
+                    />
+                    <p className="text-[0.65rem] text-slate-500">
+                      Use the wheel to sample shades visually—the HEX above updates instantly.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div>
