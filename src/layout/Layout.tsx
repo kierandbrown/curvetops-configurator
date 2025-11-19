@@ -43,6 +43,18 @@ const Layout: React.FC = () => {
                 My Orders
               </NavLink>
             )}
+            {user && (
+              <NavLink
+                to="/account"
+                className={({ isActive }) =>
+                  `block rounded px-3 py-2 hover:bg-slate-800 ${
+                    isActive ? 'bg-slate-800 font-medium' : ''
+                  }`
+                }
+              >
+                Account
+              </NavLink>
+            )}
           </nav>
         </aside>
         <main className="flex-1 p-4 md:p-6">

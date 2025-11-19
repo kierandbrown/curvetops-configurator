@@ -21,6 +21,12 @@ const Header: React.FC = () => {
           </Link>
           {user ? (
             <>
+              <Link to="/account" className="text-slate-300 hover:text-emerald-300">
+                Manage account
+              </Link>
+              <span className="hidden sm:inline text-slate-500" aria-hidden>
+                •
+              </span>
               <span className="hidden sm:inline text-slate-300">
                 {user.email}
               </span>
