@@ -47,10 +47,12 @@ const SignUpPage: React.FC = () => {
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 pt-10">
-      <h1 className="text-2xl font-semibold">Create account</h1>
+      <h1 className="text-2xl font-semibold">Create your Australian account</h1>
+      {/* Reinforce that onboarding is targeted to Australian studios so expectations are clear. */}
       <p className="text-sm text-slate-300">
-        Share a few company and contact details so we can personalize your experience
-        and proactively support your projects.
+        We currently onboard Australian studios and fabrication partners across every state
+        and territory. Share your local contact details so we can tailor freight, tax, and
+        compliance information for the Australian market.
       </p>
       <form className="grid gap-4 md:grid-cols-2" onSubmit={onSubmit}>
         <div className="md:col-span-2">
@@ -61,14 +63,11 @@ const SignUpPage: React.FC = () => {
             id="email"
             type="email"
             className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-            placeholder="name@studio.com"
+            placeholder="name@studio.com.au"
             value={form.email}
             onChange={e => handleChange('email', e.target.value)}
             required
           />
-          <p className="mt-1 text-xs text-slate-400">
-            We will send order confirmations and important notices to this inbox.
-          </p>
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-200" htmlFor="firstName">
@@ -78,14 +77,11 @@ const SignUpPage: React.FC = () => {
             id="firstName"
             type="text"
             className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-            placeholder="Ada"
+            placeholder="Matilda"
             value={form.firstName}
             onChange={e => handleChange('firstName', e.target.value)}
             required
           />
-          <p className="mt-1 text-xs text-slate-400">
-            Let us know how to address you in future conversations.
-          </p>
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-200" htmlFor="lastName">
@@ -95,12 +91,11 @@ const SignUpPage: React.FC = () => {
             id="lastName"
             type="text"
             className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-            placeholder="Lovelace"
+            placeholder="Nguyen"
             value={form.lastName}
             onChange={e => handleChange('lastName', e.target.value)}
             required
           />
-          <p className="mt-1 text-xs text-slate-400">We include your surname on quotes and invoices.</p>
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-200" htmlFor="companyName">
@@ -110,12 +105,11 @@ const SignUpPage: React.FC = () => {
             id="companyName"
             type="text"
             className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-            placeholder="Curve Collective"
+            placeholder="Harbour Design Studio"
             value={form.companyName}
             onChange={e => handleChange('companyName', e.target.value)}
             required
           />
-          <p className="mt-1 text-xs text-slate-400">Used on proposals, invoices, and search.</p>
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-200" htmlFor="jobTitle">
@@ -125,12 +119,11 @@ const SignUpPage: React.FC = () => {
             id="jobTitle"
             type="text"
             className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-            placeholder="Senior Designer"
+            placeholder="Principal Designer"
             value={form.jobTitle}
             onChange={e => handleChange('jobTitle', e.target.value)}
             required
           />
-          <p className="mt-1 text-xs text-slate-400">Helps our team connect you with the right specialist.</p>
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-200" htmlFor="phoneNumber">
@@ -140,14 +133,11 @@ const SignUpPage: React.FC = () => {
             id="phoneNumber"
             type="tel"
             className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-            placeholder="+1 415 555 0123"
+            placeholder="+61 2 5550 1234"
             value={form.phoneNumber}
             onChange={e => handleChange('phoneNumber', e.target.value)}
             required
           />
-          <p className="mt-1 text-xs text-slate-400">
-            We will only call for urgent fabrication questions.
-          </p>
         </div>
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-slate-200" htmlFor="streetAddress">
@@ -157,14 +147,11 @@ const SignUpPage: React.FC = () => {
             id="streetAddress"
             type="text"
             className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-            placeholder="125 Market Street"
+            placeholder="48 Bridge Road"
             value={form.streetAddress}
             onChange={e => handleChange('streetAddress', e.target.value)}
             required
           />
-          <p className="mt-1 text-xs text-slate-400">
-            Used for logistics planning and freight estimates.
-          </p>
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-200" htmlFor="city">
@@ -174,12 +161,11 @@ const SignUpPage: React.FC = () => {
             id="city"
             type="text"
             className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-            placeholder="San Francisco"
+            placeholder="Sydney"
             value={form.city}
             onChange={e => handleChange('city', e.target.value)}
             required
           />
-          <p className="mt-1 text-xs text-slate-400">Helps us surface nearby fabrication partners.</p>
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-200" htmlFor="stateProvince">
@@ -189,12 +175,11 @@ const SignUpPage: React.FC = () => {
             id="stateProvince"
             type="text"
             className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-            placeholder="CA"
+            placeholder="NSW"
             value={form.stateProvince}
             onChange={e => handleChange('stateProvince', e.target.value)}
             required
           />
-          <p className="mt-1 text-xs text-slate-400">Needed for tax and shipping paperwork.</p>
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-200" htmlFor="postalCode">
@@ -204,12 +189,11 @@ const SignUpPage: React.FC = () => {
             id="postalCode"
             type="text"
             className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
-            placeholder="94105"
+            placeholder="2000"
             value={form.postalCode}
             onChange={e => handleChange('postalCode', e.target.value)}
             required
           />
-          <p className="mt-1 text-xs text-slate-400">Ensures accurate carrier quotes.</p>
         </div>
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-slate-200" htmlFor="password">
@@ -225,9 +209,6 @@ const SignUpPage: React.FC = () => {
             required
             minLength={8}
           />
-          <p className="mt-1 text-xs text-slate-400">
-            Minimum 8 characters. Avoid reusing passwords from other services.
-          </p>
         </div>
         {error && (
           <p className="md:col-span-2 text-sm text-red-400" role="alert">
