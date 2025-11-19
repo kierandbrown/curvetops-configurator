@@ -9,7 +9,9 @@ import {
   doc,
   getDoc,
   setDoc,
-  serverTimestamp
+  serverTimestamp,
+  onSnapshot,
+  updateDoc
 } from 'firebase/firestore';
 import React, {
   createContext,
@@ -22,11 +24,30 @@ import { auth, db } from './firebase';
 
 type UserRole = 'admin' | 'customer';
 
-export interface UserProfile {
+export interface ContactProfileFields {
+  firstName: string;
+  lastName: string;
+  companyName: string;
+  jobTitle: string;
+  phoneNumber: string;
+  streetAddress: string;
+  city: string;
+  stateProvince: string;
+  postalCode: string;
+  country: string;
+}
+
+export interface UserProfile extends ContactProfileFields {
   id: string;
   role: UserRole;
-  companyName?: string;
+  email: string;
   displayName?: string;
+  searchKeywords?: string[];
+}
+
+export interface SignUpPayload extends ContactProfileFields {
+  email: string;
+  password: string;
 }
 
 interface AuthContextValue {
@@ -34,7 +55,8 @@ interface AuthContextValue {
   profile: UserProfile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
+  signUp: (payload: SignUpPayload) => Promise<void>;
+  updateProfile: (payload: ContactProfileFields) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -47,8 +69,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Listen for Firebase auth changes and keep a real-time snapshot of the profile document.
   useEffect(() => {
+    let unsubProfile: (() => void) | null = null;
     const unsub = onAuthStateChanged(auth, async fbUser => {
+      if (unsubProfile) {
+        unsubProfile();
+        unsubProfile = null;
+      }
+
       setUser(fbUser);
       if (!fbUser) {
         setProfile(null);
@@ -57,40 +86,111 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       const ref = doc(db, 'users', fbUser.uid);
+
       const snap = await getDoc(ref);
-      if (snap.exists()) {
-        setProfile({ id: snap.id, ...(snap.data() as any) });
-      } else {
-        const initialProfile: UserProfile = {
-          id: fbUser.uid,
-          role: 'customer',
-          displayName: fbUser.email || ''
-        };
+      if (!snap.exists()) {
         await setDoc(ref, {
-          ...initialProfile,
+          role: 'customer',
+          email: fbUser.email || '',
+          firstName: '',
+          lastName: '',
+          companyName: '',
+          jobTitle: '',
+          phoneNumber: '',
+          streetAddress: '',
+          city: '',
+          stateProvince: '',
+          postalCode: '',
+          country: '',
+          displayName: fbUser.email || '',
+          searchKeywords: [(fbUser.email || '').toLowerCase()],
           createdAt: serverTimestamp()
         });
-        setProfile(initialProfile);
       }
-      setLoading(false);
+
+      unsubProfile = onSnapshot(ref, snapshot => {
+        if (snapshot.exists()) {
+          setProfile({ id: snapshot.id, ...(snapshot.data() as UserProfile) });
+        }
+        setLoading(false);
+      });
     });
 
-    return () => unsub();
+    return () => {
+      if (unsubProfile) unsubProfile();
+      unsub();
+    };
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);
   }, []);
 
-  const signUp = useCallback(async (email: string, password: string) => {
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
-    const ref = doc(db, 'users', cred.user.uid);
-    await setDoc(ref, {
-      role: 'customer',
-      displayName: email,
-      createdAt: serverTimestamp()
-    });
-  }, []);
+  // Helper to prefer the contact's name while falling back to their email.
+  const buildDisplayName = (firstName: string, lastName: string, fallback: string) => {
+    const name = `${firstName} ${lastName}`.trim();
+    return name || fallback;
+  };
+
+  // Build lower-case keywords so the user can be located via the global search bar.
+  const buildSearchKeywords = (
+    email: string,
+    fields: ContactProfileFields
+  ): string[] => {
+    return Array.from(
+      new Set(
+        [
+          email,
+          fields.firstName,
+          fields.lastName,
+          fields.companyName,
+          fields.phoneNumber,
+          fields.city,
+          fields.stateProvince
+        ]
+          .filter(Boolean)
+          .map(value => value.trim().toLowerCase())
+      )
+    );
+  };
+
+  const signUp = useCallback(
+    async ({ email, password, ...profileFields }: SignUpPayload) => {
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      const ref = doc(db, 'users', cred.user.uid);
+      const displayName = buildDisplayName(
+        profileFields.firstName,
+        profileFields.lastName,
+        email
+      );
+      await setDoc(ref, {
+        role: 'customer',
+        email,
+        ...profileFields,
+        displayName,
+        searchKeywords: buildSearchKeywords(email, profileFields),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    },
+    []
+  );
+
+  // Allow the UI to push profile updates back to Firestore.
+  const updateProfile = useCallback(
+    async (payload: ContactProfileFields) => {
+      if (!auth.currentUser) throw new Error('Not authenticated');
+      const email = auth.currentUser.email || profile?.email || '';
+      const ref = doc(db, 'users', auth.currentUser.uid);
+      await updateDoc(ref, {
+        ...payload,
+        displayName: buildDisplayName(payload.firstName, payload.lastName, email),
+        searchKeywords: buildSearchKeywords(email, payload),
+        updatedAt: serverTimestamp()
+      });
+    },
+    [profile]
+  );
 
   const signOut = useCallback(async () => {
     await fbSignOut(auth);
@@ -102,6 +202,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     loading,
     signIn,
     signUp,
+    updateProfile,
     signOut
   };
 

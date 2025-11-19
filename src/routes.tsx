@@ -25,6 +25,14 @@ export const routes: RouteObject[] = [
         )
       },
       {
+        path: 'account',
+        element: (
+          <ProtectedRoute>
+            <AccountPage />
+          </ProtectedRoute>
+        )
+      },
+      {
         path: 'admin',
         element: (
           <ProtectedRoute requiredRole="admin">
