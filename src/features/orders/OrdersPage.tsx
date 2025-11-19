@@ -208,7 +208,7 @@ const OrdersPage = () => {
         const rawValue =
           key === 'totalValue'
             ? String(order.totalValue ?? '')
-            : String((order as Record<string, unknown>)[key] ?? '');
+            : String((order as unknown as Record<string, unknown>)[key] ?? '');
         const orderValue = rawValue.trim().toLowerCase();
         return orderValue.includes(filterValue);
       })

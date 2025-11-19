@@ -48,7 +48,7 @@ const shapeOptions: { shape: TableShape; label: string; icon: JSX.Element }[] = 
   },
   {
     shape: 'round-top',
-    label: 'Round top',
+    label: 'D End Top',
     icon: (
       <svg
         aria-hidden
@@ -64,6 +64,18 @@ const shapeOptions: { shape: TableShape; label: string; icon: JSX.Element }[] = 
           className="fill-emerald-400/20 stroke-emerald-300"
         />
       </svg>
+    )
+  },
+  {
+    shape: 'round',
+    label: 'Round',
+    icon: (
+      <div
+        aria-hidden
+        className="flex h-10 w-16 items-center justify-center"
+      >
+        <div className="h-12 w-12 rounded-full border-2 border-emerald-300/50 bg-emerald-400/20" />
+      </div>
     )
   },
   {
@@ -127,7 +139,19 @@ const ConfiguratorPage: React.FC = () => {
   const [sidebarContainer, setSidebarContainer] = useState<HTMLElement | null>(null);
 
   const updateField = (field: keyof TabletopConfig, value: number | string) => {
-    setConfig(prev => ({ ...prev, [field]: value }));
+    setConfig(prev => {
+      // Keep circular tops perfectly round by mirroring the length/width values.
+      if (prev.shape === 'round' && (field === 'lengthMm' || field === 'widthMm')) {
+        const numericValue = typeof value === 'number' ? value : Number(value);
+        return {
+          ...prev,
+          lengthMm: numericValue,
+          widthMm: numericValue
+        };
+      }
+
+      return { ...prev, [field]: value };
+    });
   };
 
   const handleShapeChange = (shape: TableShape) => {
@@ -276,10 +300,19 @@ const ConfiguratorPage: React.FC = () => {
             className={`accent-emerald-400 ${dimensionLocked ? 'cursor-not-allowed opacity-50' : ''}`}
             disabled={dimensionLocked}
           />
-          <p className="text-[0.7rem] text-slate-400">Choose a width from 300&nbsp;mm to 1800&nbsp;mm.</p>
+          <p className="text-[0.7rem] text-slate-400">
+            {config.shape === 'round'
+              ? 'Width mirrors the length so the new round top stays perfectly circular.'
+              : 'Choose a width from 300 mm to 1800 mm.'}
+          </p>
           {dimensionLocked && (
             <p className="text-[0.7rem] text-amber-300">
               Width is locked to your DXF outline so the preview and pricing stay accurate.
+            </p>
+          )}
+          {config.shape === 'round' && (
+            <p className="text-[0.7rem] text-emerald-300">
+              Adjust either slider to set the diameter—both measurements update together to keep a circle.
             </p>
           )}
         </label>
