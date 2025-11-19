@@ -235,6 +235,27 @@ const AdminPage: React.FC = () => {
     }
   };
 
+  const changeRoleQuickly = async (record: UserRecord, nextRole: UserRole) => {
+    // Provide a shortcut to toggle roles without visiting the side form so admins keep focus on the table.
+    setStatusMessage(null);
+    try {
+      const keywords = buildUserSearchKeywords(record.email, record, nextRole);
+      await updateDoc(doc(db, 'users', record.id), {
+        role: nextRole,
+        searchKeywords: keywords,
+        updatedAt: serverTimestamp()
+      });
+      setStatusMessage(
+        nextRole === 'admin'
+          ? `${record.displayName || record.email || 'Contact'} is now an admin.`
+          : `${record.displayName || record.email || 'Contact'} is now a customer.`
+      );
+    } catch (error) {
+      console.error('Failed to change role quickly', error);
+      setStatusMessage('Could not update that role. Try again shortly.');
+    }
+  };
+
   const tableColumns: {
     key: keyof UserFilters;
     label: string;
@@ -391,6 +412,16 @@ const AdminPage: React.FC = () => {
                               </button>
                               {menuOpenId === person.id && (
                                 <div className="absolute right-0 mt-2 w-36 rounded-md border border-slate-800 bg-slate-900 p-1 text-sm shadow-xl">
+                                  <button
+                                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-slate-200 hover:bg-slate-800"
+                                    onClick={() => {
+                                      setMenuOpenId(null);
+                                      const nextRole = person.role === 'admin' ? 'customer' : 'admin';
+                                      void changeRoleQuickly(person, nextRole);
+                                    }}
+                                  >
+                                    {person.role === 'admin' ? 'Make customer' : 'Make admin'}
+                                  </button>
                                   <button
                                     className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-slate-200 hover:bg-slate-800"
                                     onClick={() => {
