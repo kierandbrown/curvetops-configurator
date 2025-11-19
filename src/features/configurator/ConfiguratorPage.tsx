@@ -26,6 +26,7 @@ interface CatalogueMaterial {
   finish: string;
   supplierSku: string;
   hexCode?: string;
+  imageUrl?: string;
   maxLength: string;
   maxWidth: string;
   availableThicknesses: string[];
@@ -312,6 +313,7 @@ const ConfiguratorPage: React.FC = () => {
             finish: data.finish ?? '',
             supplierSku: data.supplierSku ?? '',
             hexCode: data.hexCode,
+            imageUrl: data.imageUrl,
             maxLength: data.maxLength ?? '',
             maxWidth: data.maxWidth ?? '',
             availableThicknesses: data.availableThicknesses ?? []
@@ -627,6 +629,8 @@ const ConfiguratorPage: React.FC = () => {
             materialType: selectedCatalogueMaterial.materialType,
             finish: selectedCatalogueMaterial.finish,
             supplierSku: selectedCatalogueMaterial.supplierSku,
+            hexCode: selectedCatalogueMaterial.hexCode ?? null,
+            imageUrl: selectedCatalogueMaterial.imageUrl ?? null,
             maxLength: selectedCatalogueMaterial.maxLength,
             maxWidth: selectedCatalogueMaterial.maxWidth,
             availableThicknesses: selectedCatalogueMaterial.availableThicknesses
@@ -1177,7 +1181,18 @@ const ConfiguratorPage: React.FC = () => {
           preview updates in real time.
         </p>
         <div className="relative h-[420px] overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
-          <Configurator3D config={config} customOutline={customShape?.outline ?? null} />
+          <Configurator3D
+            config={config}
+            customOutline={customShape?.outline ?? null}
+            swatch={
+              selectedCatalogueMaterial
+                ? {
+                    hexCode: selectedCatalogueMaterial.hexCode,
+                    imageUrl: selectedCatalogueMaterial.imageUrl
+                  }
+                : null
+            }
+          />
           <ViewportMouseGuide />
           {config.shape === 'custom' && !customShape?.outline && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/70 px-6 text-center text-sm text-slate-200">
