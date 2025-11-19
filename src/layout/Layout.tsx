@@ -31,6 +31,16 @@ const Layout: React.FC = () => {
             >
               Configurator
             </NavLink>
+            <NavLink
+              to="/materials"
+              className={({ isActive }) =>
+                `block rounded px-3 py-2 hover:bg-slate-800 ${
+                  isActive ? 'bg-slate-800 font-medium' : ''
+                }`
+              }
+            >
+              Materials
+            </NavLink>
             {user && (
               <NavLink
                 to="/orders"

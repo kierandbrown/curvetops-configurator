@@ -19,6 +19,9 @@ const Header: React.FC = () => {
           <Link to="/configurator" className="hover:text-emerald-300">
             Configure
           </Link>
+          <Link to="/materials" className="hover:text-emerald-300">
+            Materials
+          </Link>
           {user ? (
             <>
               <span className="hidden sm:inline text-slate-300">
