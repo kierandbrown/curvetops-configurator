@@ -199,6 +199,101 @@ const TabletopMesh: React.FC<TabletopGeometryOptions> = ({ config, customOutline
   );
 };
 
+interface TableBaseProps {
+  config: TabletopConfig;
+}
+
+// Adds a stylized meeting table base so every configuration feels grounded in the scene.
+const TableBase: React.FC<TableBaseProps> = ({ config }) => {
+  const length = config.lengthMm * MM_TO_M;
+  const width = config.widthMm * MM_TO_M;
+  const footThickness = 0.05;
+  const columnHeight = TABLETOP_STANDING_HEIGHT_M - footThickness;
+  // Keep the pedestals tucked under the overhang but spread wide enough for stability.
+  const pedestalOffset = Math.max(Math.min(length * 0.35, 0.9), 0.45);
+  const footWidth = Math.max(width * 0.6, 0.7);
+  const footLength = 0.28;
+
+  return (
+    <group>
+      {/* Tie both pedestals together with a slim support spine. */}
+      <mesh
+        position={[0, columnHeight - 0.1, 0]}
+        castShadow
+        receiveShadow
+        rotation={[0, 0, 0]}
+      >
+        <boxGeometry args={[length * 0.5, 0.05, 0.12]} />
+        <meshStandardMaterial color="#4b5563" metalness={0.6} roughness={0.35} />
+      </mesh>
+      {[-1, 1].map(direction => (
+        <group key={direction} position={[direction * pedestalOffset, 0, 0]}>
+          {/* Floor plate keeps the columns visually attached to the room. */}
+          <mesh position={[0, footThickness / 2, 0]} receiveShadow castShadow>
+            <boxGeometry args={[footLength, footThickness, footWidth]} />
+            <meshStandardMaterial color="#1f2937" roughness={0.8} metalness={0.1} />
+          </mesh>
+          {/* Cylindrical column rises to the underside of the tabletop. */}
+          <mesh position={[0, footThickness + columnHeight / 2, 0]} castShadow>
+            <cylinderGeometry args={[0.06, 0.07, columnHeight, 24]} />
+            <meshStandardMaterial color="#9ca3af" roughness={0.4} metalness={0.7} />
+          </mesh>
+          {/* Small cap presses against the tabletop so gaps never appear. */}
+          <mesh position={[0, TABLETOP_STANDING_HEIGHT_M - 0.01, 0]} castShadow>
+            <cylinderGeometry args={[0.12, 0.12, 0.02, 32]} />
+            <meshStandardMaterial color="#475569" roughness={0.5} metalness={0.5} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  );
+};
+
+interface MeetingRoomShellProps {
+  config: TabletopConfig;
+}
+
+// Lightweight geometry that frames the table inside a recognizable meeting room.
+const MeetingRoomShell: React.FC<MeetingRoomShellProps> = ({ config }) => {
+  const length = config.lengthMm * MM_TO_M;
+  const width = config.widthMm * MM_TO_M;
+  const padding = 1.2;
+  const roomLength = Math.max(5, length + padding * 2);
+  const roomWidth = Math.max(4, width + padding * 2);
+  const wallHeight = 2.8;
+
+  return (
+    <group>
+      {/* Warm floor plane doubles as a rug to anchor the table. */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.001, 0]} receiveShadow>
+        <planeGeometry args={[roomLength, roomWidth]} />
+        <meshStandardMaterial color="#3a2f2b" roughness={0.9} metalness={0.05} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.002, 0]} receiveShadow>
+        <circleGeometry args={[Math.max(length, width) / 2 + 0.5, 64]} />
+        <meshStandardMaterial color="#4a5568" roughness={0.85} metalness={0.1} />
+      </mesh>
+      {/* Back wall */}
+      <mesh position={[0, wallHeight / 2, -roomWidth / 2]} receiveShadow>
+        <planeGeometry args={[roomLength, wallHeight]} />
+        <meshStandardMaterial color="#1f2937" roughness={0.8} metalness={0.2} />
+      </mesh>
+      {/* Left + right walls stay short so the camera can orbit freely. */}
+      {[-1, 1].map(direction => (
+        <mesh key={direction} position={[direction * roomLength / 2, wallHeight / 2, 0]} rotation={[0, Math.PI / 2 * direction, 0]}>
+          <planeGeometry args={[roomWidth, wallHeight]} />
+          <meshStandardMaterial color="#111827" roughness={0.85} metalness={0.15} />
+        </mesh>
+      ))}
+      {/* Diffused "window" casts a glow to hint at an exterior opening. */}
+      <mesh position={[0, 1.6, -roomWidth / 2 + 0.01]}>
+        <planeGeometry args={[roomLength * 0.5, 1]} />
+        <meshStandardMaterial color="#93c5fd" emissive="#60a5fa" emissiveIntensity={0.5} transparent opacity={0.8} />
+      </mesh>
+    </group>
+  );
+};
+
 type ViewPreset = 'top' | 'front' | 'side' | '3d';
 
 // Simple SVG helpers so each view button has a recognizable icon.
@@ -616,26 +711,32 @@ const Configurator3D: React.FC<{ config: TabletopConfig; customOutline?: ParsedC
   return (
     <div className="relative h-full w-full">
       <Canvas camera={{ position: [1.5, 1.3, 1.5], fov: 40 }} shadows dpr={[1, 2]}>
-        <color attach="background" args={['#020617']} />
-        <ambientLight intensity={0.5} />
+        <color attach="background" args={['#0b1220']} />
+        <ambientLight intensity={0.55} />
+        {/* Soft indoor lighting for the meeting room shell. */}
         <directionalLight
           position={[4, 6, 3]}
-          intensity={1.2}
+          intensity={1.1}
           castShadow
           shadow-mapSize-width={1024}
           shadow-mapSize-height={1024}
         />
+        <spotLight
+          position={[-3, 5, 2]}
+          angle={0.7}
+          penumbra={0.5}
+          intensity={0.6}
+          castShadow
+        />
+        <MeetingRoomShell config={config} />
+        <TableBase config={config} />
         <group rotation={[-Math.PI / 2, 0, 0]} position={[0, TABLETOP_STANDING_HEIGHT_M + tabletopThickness / 2, 0]}>
           {/* Rotate the tabletop so it lays horizontally in the viewport. */}
           <TabletopMesh config={config} customOutline={customOutline} />
         </group>
         <WorldSpaceDimensions config={config} visible={dimensionsVisible} view={activeView} />
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
-          <planeGeometry args={[5, 5]} />
-          <meshStandardMaterial color="#020617" />
-        </mesh>
         <OrbitControls ref={controlsRef} enablePan={is3DView} enableRotate={is3DView} enableZoom />
-        <Environment preset="warehouse" />
+        <Environment preset="lobby" />
         <CameraViewUpdater preset={activeView} controlsRef={controlsRef} viewTargets={viewTargets} />
       </Canvas>
 
