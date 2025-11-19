@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@auth/AuthContext';
@@ -30,6 +30,18 @@ const defaultConfig: TabletopConfig = {
 
 // Supported board thickness increments for the slider.
 const thicknessOptions = [12, 16, 18, 25, 33];
+
+// Simple utility for clamping manual numeric input so values never exceed the
+// existing slider limits.
+const clampNumber = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value));
+
+const snapToNearestThickness = (value: number) =>
+  thicknessOptions.reduce(
+    (closest, option) =>
+      Math.abs(option - value) < Math.abs(closest - value) ? option : closest,
+    thicknessOptions[0]
+  );
 
 // Edge styles that shop floor teams can filter against in the search UI.
 const edgeProfileOptions: {
@@ -217,6 +229,33 @@ const ConfiguratorPage: React.FC = () => {
     });
   };
 
+  // Allow designers to type in exact measurements while still clamping the
+  // value to the slider's valid range.
+  const handleManualNumberInput = (
+    field: keyof TabletopConfig,
+    min: number,
+    max: number
+  ) => (event: ChangeEvent<HTMLInputElement>) => {
+    const numericValue = event.target.valueAsNumber;
+    if (Number.isNaN(numericValue)) return;
+    updateField(field, clampNumber(numericValue, min, max));
+  };
+
+  // Snap any typed thickness back to the nearest supported board option so we
+  // keep pricing aligned with the discrete material schedule.
+  const handleManualThicknessInput = (event: ChangeEvent<HTMLInputElement>) => {
+    const numericValue = event.target.valueAsNumber;
+    if (Number.isNaN(numericValue)) return;
+    const snappedValue = snapToNearestThickness(
+      clampNumber(
+        numericValue,
+        thicknessOptions[0],
+        thicknessOptions[thicknessOptions.length - 1]
+      )
+    );
+    updateField('thicknessMm', snappedValue);
+  };
+
   const handleShapeChange = (shape: TableShape) => {
     setConfig(prev => {
       if (shape === 'round') {
@@ -271,6 +310,7 @@ const ConfiguratorPage: React.FC = () => {
   }, [config.shape, config.widthMm, config.edgeRadiusMm]);
 
   const maxCornerRadius = useMemo(() => Math.floor(config.widthMm / 2), [config.widthMm]);
+  const maxLength = config.shape === 'round' ? ROUND_DIAMETER_LIMIT_MM : 3600;
   // Translate the saved thickness back to the slider position.
   const thicknessIndex = useMemo(
     () => Math.max(thicknessOptions.indexOf(config.thicknessMm), 0),
@@ -395,14 +435,32 @@ const ConfiguratorPage: React.FC = () => {
         )}
 
         <label className="flex flex-col gap-1">
-          <div className="flex items-center justify-between text-[0.75rem] font-medium">
+          <div className="flex items-start justify-between gap-3 text-[0.75rem] font-medium">
             <span>Length (mm)</span>
-            <span className="text-slate-400">{config.lengthMm} mm</span>
+            <div className="flex flex-col items-end text-right">
+              <input
+                type="number"
+                min={500}
+                max={maxLength}
+                step={10}
+                value={config.lengthMm}
+                onChange={handleManualNumberInput('lengthMm', 500, maxLength)}
+                className={`w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-right text-sm text-slate-100 focus:border-emerald-400 focus:outline-none ${
+                  dimensionLocked ? 'cursor-not-allowed opacity-50' : ''
+                }`}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                disabled={dimensionLocked}
+              />
+              <p className="text-[0.6rem] font-normal text-slate-500">
+                Type an exact length between 500&nbsp;mm and {maxLength}&nbsp;mm.
+              </p>
+            </div>
           </div>
           <input
             type="range"
             min={500}
-            max={config.shape === 'round' ? ROUND_DIAMETER_LIMIT_MM : 3600}
+            max={maxLength}
             step={10}
             value={config.lengthMm}
             onChange={e => updateField('lengthMm', Number(e.target.value))}
@@ -422,9 +480,27 @@ const ConfiguratorPage: React.FC = () => {
         </label>
 
         <label className="flex flex-col gap-1">
-          <div className="flex items-center justify-between text-[0.75rem] font-medium">
+          <div className="flex items-start justify-between gap-3 text-[0.75rem] font-medium">
             <span>Width (mm)</span>
-            <span className="text-slate-400">{config.widthMm} mm</span>
+            <div className="flex flex-col items-end text-right">
+              <input
+                type="number"
+                min={300}
+                max={1800}
+                step={10}
+                value={config.widthMm}
+                onChange={handleManualNumberInput('widthMm', 300, 1800)}
+                className={`w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-right text-sm text-slate-100 focus:border-emerald-400 focus:outline-none ${
+                  dimensionLocked ? 'cursor-not-allowed opacity-50' : ''
+                }`}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                disabled={dimensionLocked}
+              />
+              <p className="text-[0.6rem] font-normal text-slate-500">
+                Enter a width between 300&nbsp;mm and 1800&nbsp;mm.
+              </p>
+            </div>
           </div>
           <input
             type="range"
@@ -455,9 +531,24 @@ const ConfiguratorPage: React.FC = () => {
 
         {config.shape === 'rounded-rect' && (
           <label className="flex flex-col gap-1">
-            <div className="flex items-center justify-between text-[0.75rem] font-medium">
+            <div className="flex items-start justify-between gap-3 text-[0.75rem] font-medium">
               <span>Corner radius (mm)</span>
-              <span className="text-slate-400">{config.edgeRadiusMm} mm</span>
+              <div className="flex flex-col items-end text-right">
+                <input
+                  type="number"
+                  min={50}
+                  max={maxCornerRadius}
+                  step={5}
+                  value={config.edgeRadiusMm}
+                  onChange={handleManualNumberInput('edgeRadiusMm', 50, maxCornerRadius)}
+                  className="w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-right text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                />
+                <p className="text-[0.6rem] font-normal text-slate-500">
+                  Enter a corner radius between 50&nbsp;mm and {maxCornerRadius}&nbsp;mm.
+                </p>
+              </div>
             </div>
             <input
               type="range"
@@ -475,9 +566,23 @@ const ConfiguratorPage: React.FC = () => {
         {config.shape === 'super-ellipse' && (
           <label className="flex flex-col gap-1">
             {/* Allow designers to blend between a pure ellipse and a squarer super ellipse. */}
-            <div className="flex items-center justify-between text-[0.75rem] font-medium">
+            <div className="flex items-start justify-between gap-3 text-[0.75rem] font-medium">
               <span>Softness exponent</span>
-              <span className="text-slate-400">n = {config.superEllipseExponent.toFixed(1)}</span>
+              <div className="flex flex-col items-end text-right">
+                <input
+                  type="number"
+                  min={1.5}
+                  max={6}
+                  step={0.1}
+                  value={config.superEllipseExponent}
+                  onChange={handleManualNumberInput('superEllipseExponent', 1.5, 6)}
+                  className="w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-right text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                  inputMode="decimal"
+                />
+                <p className="text-[0.6rem] font-normal text-slate-500">
+                  Type an exponent between 1.5 and 6 to fine tune the softness.
+                </p>
+              </div>
             </div>
             <input
               type="range"
@@ -496,9 +601,24 @@ const ConfiguratorPage: React.FC = () => {
         )}
 
         <label className="flex flex-col gap-1">
-          <div className="flex items-center justify-between text-[0.75rem] font-medium">
+          <div className="flex items-start justify-between gap-3 text-[0.75rem] font-medium">
             <span>Thickness (mm)</span>
-            <span className="text-slate-400">{config.thicknessMm} mm</span>
+            <div className="flex flex-col items-end text-right">
+              <input
+                type="number"
+                min={thicknessOptions[0]}
+                max={thicknessOptions[thicknessOptions.length - 1]}
+                step={1}
+                value={config.thicknessMm}
+                onChange={handleManualThicknessInput}
+                className="w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-right text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                inputMode="numeric"
+                pattern="[0-9]*"
+              />
+              <p className="text-[0.6rem] font-normal text-slate-500">
+                Enter any supported board size (12, 16, 18, 25 or 33&nbsp;mm).
+              </p>
+            </div>
           </div>
           <input
             type="range"
