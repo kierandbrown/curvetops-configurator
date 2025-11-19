@@ -13,7 +13,7 @@ const Header: React.FC = () => {
             BETA
           </span>
           <span className="text-lg font-semibold tracking-tight">
-            CurveTops
+            Top Store
           </span>
         </Link>
         <div className="flex items-center gap-3 text-sm">
