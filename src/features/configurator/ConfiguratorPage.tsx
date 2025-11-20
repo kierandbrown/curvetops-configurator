@@ -3,10 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@auth/AuthContext';
 import { db } from '@auth/firebase';
-import Configurator3D, {
-  TableShape,
-  TabletopConfig
-} from './Configurator3D';
+import Configurator3D, { ConfiguratorSnapshot, TableShape, TabletopConfig } from './Configurator3D';
 import { usePricing } from './usePricing';
 import CustomShapeUpload from './CustomShapeUpload';
 import { CustomShapeDetails } from './customShapeTypes';
@@ -47,75 +44,20 @@ const IsometricPreview = ({
   subtitle: string;
   selectedColour: ColourSnapshot;
 }) => {
-  const viewBoxWidth = 200;
-  const viewBoxHeight = 140;
-  const padding = 22;
-  const scale = Math.min(
-    (viewBoxWidth - padding * 2) / Math.max(config.lengthMm + config.widthMm * 0.6, 1),
-    (viewBoxHeight - padding * 2) / Math.max(config.widthMm + config.thicknessMm * 1.5, 1)
-  );
-
-  const length = Math.max(config.lengthMm * scale, 12);
-  const width = Math.max(config.widthMm * scale, 10);
-  const thickness = Math.max(config.thicknessMm * scale, 8);
-
-  const startX = (viewBoxWidth - length) / 2 + width * 0.25;
-  const startY = padding;
-
-  const top = `M${startX} ${startY} L${startX + length} ${startY} L${startX + length - width * 0.5} ${
-    startY + width * 0.35
-  } L${startX - width * 0.5} ${startY + width * 0.35} Z`;
-  const side = `M${startX + length} ${startY} L${startX + length - width * 0.5} ${
-    startY + width * 0.35
-  } L${startX + length - width * 0.5} ${startY + width * 0.35 + thickness} L${startX + length} ${startY + thickness} Z`;
-  const front = `M${startX - width * 0.5} ${startY + width * 0.35} L${startX + length - width * 0.5} ${
-    startY + width * 0.35
-  } L${startX + length - width * 0.5} ${startY + width * 0.35 + thickness} L${startX - width * 0.5} ${
-    startY + width * 0.35 + thickness
-  } Z`;
-
-  const baseColour = selectedColour?.hexCode || '#22c55e';
-  const lightenColour = (hex: string, delta: number) => {
-    const normalized = hex.replace('#', '');
-    const num = Number.parseInt(normalized.length === 3 ? normalized.repeat(2) : normalized, 16);
-    const clamp = (value: number) => Math.min(255, Math.max(0, value));
-    const r = clamp(((num >> 16) & 0xff) + delta);
-    const g = clamp(((num >> 8) & 0xff) + delta);
-    const b = clamp((num & 0xff) + delta);
-    return `rgb(${r}, ${g}, ${b})`;
-  };
-
-  const edgeColour = lightenColour(baseColour, -18);
-  const highlightColour = lightenColour(baseColour, 22);
-  const patternId = `materialPattern-${selectedColour?.id ?? 'default'}`;
-
   return (
     <PreviewCard title="3D" subtitle={subtitle}>
-      <svg viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`} role="img" aria-label="3D view" className="h-24 w-36">
-        <title>3D view</title>
-        <defs>
-          {selectedColour?.imageUrl && (
-            <pattern id={patternId} patternUnits="userSpaceOnUse" width={160} height={100} x={10} y={8}>
-              <image href={selectedColour.imageUrl} width={160} height={100} preserveAspectRatio="xMidYMid slice" />
-            </pattern>
-          )}
-          <linearGradient id="tabletopShine" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="rgba(255,255,255,0.16)" />
-            <stop offset="50%" stopColor="rgba(255,255,255,0.08)" />
-            <stop offset="100%" stopColor="rgba(0,0,0,0.08)" />
-          </linearGradient>
-        </defs>
-        <path
-          d={top}
-          fill={selectedColour?.imageUrl ? `url(#${patternId})` : highlightColour}
-          stroke={highlightColour}
-          strokeWidth={1.5}
-          opacity={selectedColour?.imageUrl ? 1 : 0.9}
-        />
-        <path d={side} fill={edgeColour} opacity={0.85} stroke={highlightColour} strokeWidth={1.5} />
-        <path d={front} fill={baseColour} opacity={0.95} stroke={highlightColour} strokeWidth={1.5} />
-        <path d={top} fill="url(#tabletopShine)" opacity={0.7} />
-      </svg>
+      <ConfiguratorSnapshot
+        config={config}
+        customOutline={null}
+        swatch={
+          selectedColour
+            ? {
+                hexCode: selectedColour.hexCode ?? undefined,
+                imageUrl: selectedColour.imageUrl ?? null
+              }
+            : null
+        }
+      />
     </PreviewCard>
   );
 };
@@ -1747,6 +1689,7 @@ const ConfiguratorPage: React.FC = () => {
               const modalColour = cartModalDetails.colourSnapshot;
               const planSubtitle = `${modalConfig.lengthMm} x ${modalConfig.widthMm} mm`;
               const isoSubtitle = `${modalConfig.lengthMm} x ${modalConfig.widthMm} x ${modalConfig.thicknessMm} mm`;
+              const modalEdgeProfile = edgeProfileOptions.find(option => option.value === modalConfig.edgeProfile);
               const swatchStyle = modalColour?.imageUrl
                 ? { backgroundImage: `url(${modalColour.imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
                 : { backgroundColor: modalColour?.hexCode ?? '#0f172a' };
@@ -1816,17 +1759,22 @@ const ConfiguratorPage: React.FC = () => {
                         </div>
                       </div>
                       <div className="rounded-lg border border-slate-800/80 bg-slate-900/70 p-3 text-sm text-slate-200">
-                        <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-slate-400">Edge profile</p>
-                        <p className="mt-1 font-semibold">
-                          {edgeProfileOptions.find(option => option.value === modalConfig.edgeProfile)?.label ||
-                            'Edge to be selected'}
-                        </p>
-                        <p className="text-xs text-slate-400">
-                          {
-                            edgeProfileOptions.find(option => option.value === modalConfig.edgeProfile)?.description ||
-                              'Choose an edge finish to complete this top.'
-                          }
-                        </p>
+                        <div className="flex items-center justify-between text-[0.65rem] uppercase tracking-wide text-slate-400">
+                          <p className="font-semibold">Edge profile</p>
+                          <span className="text-[0.6rem] text-slate-500">Visual preview</span>
+                        </div>
+                        <div className="mt-2 flex items-center justify-center rounded-lg border border-slate-800 bg-slate-950/70 p-3 text-emerald-300">
+                          {modalEdgeProfile?.preview ? (
+                            <div className="w-full max-w-[260px] [&>svg]:h-20 [&>svg]:w-full">
+                              {modalEdgeProfile.preview}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-slate-500">Edge to be selected</p>
+                          )}
+                          <span className="sr-only">
+                            {modalEdgeProfile?.label || 'Edge to be selected'}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
