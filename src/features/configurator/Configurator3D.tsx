@@ -792,35 +792,43 @@ const Configurator3D: React.FC<Props> = ({ config, customOutline, swatch }) => {
 
   return (
     <div className="relative h-full w-full">
-      <Canvas camera={{ position: [1.5, 1.3, 1.5], fov: 40 }} shadows dpr={[1, 2]}>
-        <color attach="background" args={['#0b1220']} />
-        <ambientLight intensity={0.55} />
-        {/* Soft indoor lighting for the meeting room shell. */}
-        <directionalLight
-          position={[4, 6, 3]}
-          intensity={1.1}
-          castShadow
-          shadow-mapSize-width={1024}
-          shadow-mapSize-height={1024}
-        />
-        <spotLight
-          position={[-3, 5, 2]}
-          angle={0.7}
-          penumbra={0.5}
-          intensity={0.6}
-          castShadow
-        />
-        <MeetingRoomShell config={config} />
-        <TableBase config={config} />
-        <group rotation={[-Math.PI / 2, 0, 0]} position={[0, TABLETOP_STANDING_HEIGHT_M + tabletopThickness / 2, 0]}>
-          {/* Rotate the tabletop so it lays horizontally in the viewport. */}
-          <TabletopMesh config={config} customOutline={customOutline} swatch={swatch} />
-        </group>
-        <WorldSpaceDimensions config={config} visible={dimensionsVisible} view={activeView} />
-        <OrbitControls ref={controlsRef} enablePan={is3DView} enableRotate={is3DView} enableZoom />
-        <Environment preset="lobby" />
-        <CameraViewUpdater preset={activeView} controlsRef={controlsRef} viewTargets={viewTargets} />
-      </Canvas>
+      {/* Keep the canvas pinned to the container so it consumes the entire viewport area reserved for 3D. */}
+      <div className="absolute inset-0">
+        <Canvas
+          className="h-full w-full"
+          camera={{ position: [1.5, 1.3, 1.5], fov: 40 }}
+          shadows
+          dpr={[1, 2]}
+        >
+          <color attach="background" args={['#0b1220']} />
+          <ambientLight intensity={0.55} />
+          {/* Soft indoor lighting for the meeting room shell. */}
+          <directionalLight
+            position={[4, 6, 3]}
+            intensity={1.1}
+            castShadow
+            shadow-mapSize-width={1024}
+            shadow-mapSize-height={1024}
+          />
+          <spotLight
+            position={[-3, 5, 2]}
+            angle={0.7}
+            penumbra={0.5}
+            intensity={0.6}
+            castShadow
+          />
+          <MeetingRoomShell config={config} />
+          <TableBase config={config} />
+          <group rotation={[-Math.PI / 2, 0, 0]} position={[0, TABLETOP_STANDING_HEIGHT_M + tabletopThickness / 2, 0]}>
+            {/* Rotate the tabletop so it lays horizontally in the viewport. */}
+            <TabletopMesh config={config} customOutline={customOutline} swatch={swatch} />
+          </group>
+          <WorldSpaceDimensions config={config} visible={dimensionsVisible} view={activeView} />
+          <OrbitControls ref={controlsRef} enablePan={is3DView} enableRotate={is3DView} enableZoom />
+          <Environment preset="lobby" />
+          <CameraViewUpdater preset={activeView} controlsRef={controlsRef} viewTargets={viewTargets} />
+        </Canvas>
+      </div>
 
       {/* Toolbar overlays keep export + view controls reachable without blocking the canvas. */}
       <div className="pointer-events-none absolute inset-0 flex flex-col gap-2 p-3 sm:flex-row sm:justify-end">
