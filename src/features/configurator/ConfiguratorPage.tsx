@@ -1370,19 +1370,23 @@ const ConfiguratorPage: React.FC = () => {
               onClick={() => updateField('edgeProfile', option.value)}
               role="radio"
               aria-checked={isActive}
-              className={`flex h-full items-center gap-3 rounded-xl border p-3 text-left transition ${
+              aria-label={option.label}
+              className={`group relative flex h-full flex-col items-center justify-center rounded-xl border p-4 text-left transition ${
                 isActive
                   ? 'border-emerald-400 bg-emerald-400/5 shadow-[0_0_20px_rgba(16,185,129,0.15)]'
                   : 'border-slate-700 bg-slate-950/70 hover:border-emerald-300/80'
               }`}
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-900/70 p-2">
-                {/* Inline SVG previews give installers a quick visual cue for the profile. */}
+              {/* Icon-only presentation keeps the tray compact; tooltip reveals context on hover/focus. */}
+              <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-slate-900/70 p-2 text-emerald-300 [&>svg]:h-12 [&>svg]:w-12">
                 {option.preview}
               </div>
-              <div className="flex flex-col">
-                <p className="text-sm font-semibold text-slate-100">{option.label}</p>
-                <p className="text-[0.7rem] text-slate-400">Tap to apply this edge.</p>
+              <span className="sr-only">{option.label}</span>
+              <div className="pointer-events-none absolute inset-x-4 bottom-full z-10 flex translate-y-1 flex-col items-center text-center opacity-0 transition duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100">
+                <div className="rounded-lg border border-emerald-300/60 bg-slate-900 px-3 py-2 shadow-lg shadow-emerald-500/10">
+                  <p className="text-xs font-semibold text-slate-100">{option.label}</p>
+                  <p className="text-[0.7rem] text-slate-400">{option.description}</p>
+                </div>
               </div>
             </button>
           );
