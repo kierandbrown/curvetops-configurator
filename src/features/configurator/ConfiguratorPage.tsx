@@ -1453,7 +1453,7 @@ const ConfiguratorPage: React.FC = () => {
             <div className="flex-1">{edgeProfileSelector}</div>
 
             {/* Place the pricing + cart controls directly under the viewport so the call-to-action is always visible. */}
-            <div className="flex w-full flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4 md:w-[420px] md:flex-none md:flex-row md:items-center md:justify-start md:gap-6">
+            <div className="flex w-full flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4 md:w-[420px] md:flex-none md:flex-row md:items-stretch md:justify-start md:gap-6">
               <div className="space-y-1 text-slate-200 md:w-1/2">
                 <div className="flex items-baseline gap-2 text-xs text-slate-400">
                   <span>Estimated price</span>
@@ -1463,14 +1463,14 @@ const ConfiguratorPage: React.FC = () => {
                 <p className="text-xl font-semibold">{formattedPrice}</p>
               </div>
               {/* Keep the quantity input directly beside the call-to-action so buyers can set multiples before saving. */}
-              <div className="flex w-full flex-col gap-3 md:w-auto md:flex-1 md:flex-row-reverse md:items-start md:gap-4">
+              <div className="flex w/full flex-col gap-3 md:w-auto md:flex-1 md:flex-row-reverse md:items-stretch md:gap-4">
                 {/* Surface the call-to-action first on desktop so the “Add to cart” button sits to the left of the quantity input. */}
-                <div className="flex w-full flex-col items-stretch gap-2 md:w-auto md:flex-none md:items-start md:self-stretch">
+                <div className="flex w-full flex-col items-stretch gap-2 md:w-auto md:flex-none md:items-stretch md:justify-between md:self-stretch">
                   <button
                     type="button"
                     onClick={handleAddToCart}
                     disabled={addingToCart || !profile}
-                    className={`inline-flex w-full items-center justify-center rounded-lg px-5 py-3 text-sm font-semibold transition md:w-auto ${
+                    className={`inline-flex h-full min-h-[52px] w-full items-center justify-center rounded-lg px-5 py-3 text-sm font-semibold transition ${
                       addingToCart || !profile
                         ? 'cursor-not-allowed bg-slate-800 text-slate-400'
                         : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
