@@ -1484,7 +1484,7 @@ const ConfiguratorPage: React.FC = () => {
                     type="button"
                     onClick={handleAddToCart}
                     disabled={addingToCart || !profile}
-                    className={`inline-flex h-full min-h-[52px] w-full items-center justify-center rounded-lg px-5 py-3 text-sm font-semibold transition ${
+                    className={`inline-flex h-full min-h-[52px] w-full items-center justify-center rounded-lg pl-5 pr-3 py-3 text-sm font-semibold transition ${
                       addingToCart || !profile
                         ? 'cursor-not-allowed bg-slate-800 text-slate-400'
                         : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
