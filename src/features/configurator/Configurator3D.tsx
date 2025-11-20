@@ -281,8 +281,11 @@ const TabletopMesh: React.FC<TabletopGeometryOptions> = ({ config, customOutline
   const [swatchTexture, setSwatchTexture] = useState<THREE.Texture | null>(null);
 
   // Load the supplier swatch image (if provided) so the 3D preview mirrors the catalogue selection.
+  // Apply a supplier swatch image to the tabletop whenever one exists. The trimmed check avoids
+  // trying to load accidental whitespace values from Firestore that would silently fail.
   useEffect(() => {
-    if (!swatch?.imageUrl) {
+    const swatchImageUrl = swatch?.imageUrl?.trim();
+    if (!swatchImageUrl) {
       setSwatchTexture(null);
       return;
     }
@@ -291,7 +294,7 @@ const TabletopMesh: React.FC<TabletopGeometryOptions> = ({ config, customOutline
     let loadedTexture: THREE.Texture | null = null;
     const loader = new THREE.TextureLoader();
     loader.load(
-      swatch.imageUrl,
+      swatchImageUrl,
       texture => {
         if (!isMounted) {
           texture.dispose();
