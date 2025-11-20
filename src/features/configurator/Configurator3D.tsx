@@ -1000,10 +1000,6 @@ const Configurator3D: React.FC<Props> = ({ config, customOutline, swatch }) => {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200">Export model</p>
-                <p className="mt-1 text-[0.8rem] text-slate-200">
-                  Choose a CAD-friendly format so estimators, CNC programmers or 3D printers can review this configuration with
-                  dimensions and bevels intact.
-                </p>
               </div>
               <button
                 type="button"
