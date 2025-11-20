@@ -818,10 +818,7 @@ const ConfiguratorPage: React.FC = () => {
         >
           <div className="flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
-              <p className="text-[0.8rem] font-semibold text-slate-100">Tabletop outline</p>
-              <p className="text-[0.7rem] text-slate-400">
-                Hover to expand the tray and preview every outline. Tap the toggle on touch screens to open the selector.
-              </p>
+              <p className="text-[0.8rem] font-semibold text-slate-100">Tabletop Style</p>
             </div>
             <button
               type="button"
