@@ -1348,12 +1348,13 @@ const ConfiguratorPage: React.FC = () => {
                   <span className="text-xs text-slate-400">pcs</span>
                 </div>
               </div>
-              <div className="flex w-full flex-col items-stretch gap-2 md:w-auto md:flex-none md:items-start">
+              {/* Keep the call-to-action comfortably inset inside the card so it lines up with the card padding. */}
+              <div className="flex w-full flex-col items-stretch gap-2 md:w-auto md:flex-none md:items-end md:self-stretch">
                 <button
                   type="button"
                   onClick={handleAddToCart}
                   disabled={addingToCart || !profile}
-                  className={`w-full rounded-lg px-6 py-2 text-sm font-semibold transition md:w-auto ${
+                  className={`inline-flex w-full items-center justify-center rounded-lg px-5 py-3 text-sm font-semibold transition md:w-auto ${
                     addingToCart || !profile
                       ? 'cursor-not-allowed bg-slate-800 text-slate-400'
                       : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
