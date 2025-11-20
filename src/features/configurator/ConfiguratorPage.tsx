@@ -1520,16 +1520,23 @@ const ConfiguratorPage: React.FC = () => {
               {/* Keep the quantity input directly beside the call-to-action so buyers can set multiples before saving. */}
               <div className="flex w-full flex-col gap-3 md:w-auto md:flex-1 md:flex-row-reverse md:items-stretch md:gap-4">
                 {/* Surface the call-to-action first on desktop so the “Add to cart” button sits to the left of the quantity input. */}
-                {hasSelectedColour ? (
-                  <div className="flex w-full flex-col items-stretch gap-2 md:w-auto md:flex-none md:items-stretch md:justify-between md:self-stretch">
-                    <button
-                      type="button"
-                      onClick={handleAddToCart}
-                      disabled={addingToCart || !profile}
-                      className={`inline-flex h-full min-h-[52px] w-full items-center justify-center rounded-lg p-3 text-sm font-semibold transition ${
-                        addingToCart || !profile
-                          ? 'cursor-not-allowed bg-slate-800 text-slate-400'
-                          : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
+                <div className="flex w-full flex-col items-stretch gap-2 md:w-auto md:flex-none md:items-stretch md:justify-between md:self-stretch">
+                  <button
+                    type="button"
+                    onClick={handleAddToCart}
+                    disabled={addingToCart || !profile}
+                    className={`inline-flex min-h-[52px] w-full items-center justify-center rounded-lg p-3 text-sm font-semibold transition ${
+                      addingToCart || !profile
+                        ? 'cursor-not-allowed bg-slate-800 text-slate-400'
+                        : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
+                    }`}
+                  >
+                    {addingToCart ? 'Saving top…' : 'Add to cart'}
+                  </button>
+                  {cartFeedback && (
+                    <p
+                      className={`text-xs ${
+                        cartFeedback.type === 'error' ? 'text-red-300' : 'text-emerald-300'
                       }`}
                     >
                       {addingToCart ? 'Saving top…' : 'Add to cart'}
