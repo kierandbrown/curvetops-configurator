@@ -513,6 +513,30 @@ const ConfiguratorPage: React.FC = () => {
     );
   }, [catalogueMaterials, selectedCatalogueMaterialId]);
 
+  const selectedColourSnapshot = useMemo<ColourSnapshot>(() => {
+    if (!selectedCatalogueMaterial) return null;
+
+    const parsedMaxLength = parseMeasurementToMm(selectedCatalogueMaterial.maxLength);
+    const parsedMaxWidth = parseMeasurementToMm(selectedCatalogueMaterial.maxWidth);
+
+    const parsedThicknesses = selectedCatalogueMaterial.availableThicknesses
+      ?.map(value => parseThicknessToNumber(value))
+      .filter((value): value is number => value !== null);
+
+    return {
+      id: selectedCatalogueMaterial.id,
+      name: selectedCatalogueMaterial.name,
+      materialType: selectedCatalogueMaterial.materialType,
+      finish: selectedCatalogueMaterial.finish,
+      supplierSku: selectedCatalogueMaterial.supplierSku,
+      hexCode: selectedCatalogueMaterial.hexCode ?? null,
+      imageUrl: selectedCatalogueMaterial.imageUrl ?? null,
+      maxLength: parsedMaxLength,
+      maxWidth: parsedMaxWidth,
+      availableThicknesses: parsedThicknesses ?? null
+    };
+  }, [selectedCatalogueMaterial]);
+
   const filteredCatalogueMaterials = useMemo(() => {
     const searchValue = catalogueSearch.trim().toLowerCase();
     if (!searchValue) {
@@ -908,7 +932,7 @@ const ConfiguratorPage: React.FC = () => {
         label: cartItemLabel,
         quantity: config.quantity,
         configSnapshot: { ...config },
-        colourSnapshot: modalColourSnapshot
+        colourSnapshot: selectedColourSnapshot
       });
     } catch (err) {
       console.error('Failed to add cart item', err);
