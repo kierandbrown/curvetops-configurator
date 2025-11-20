@@ -1,4 +1,4 @@
-import { ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@auth/AuthContext';
 import { db } from '@auth/firebase';
@@ -298,6 +298,8 @@ const ConfiguratorPage: React.FC = () => {
   const [selectedCatalogueMaterialId, setSelectedCatalogueMaterialId] = useState<string | null>(null);
   // Keep the tabletop shape picker compact until the user intentionally hovers/taps to expand it.
   const [isShapeTrayExpanded, setIsShapeTrayExpanded] = useState(false);
+  // Track a hide timeout so the tabletop style slideout lingers briefly before collapsing.
+  const shapeTrayHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectedShapeOption = useMemo(
     () => shapeOptions.find(option => option.shape === config.shape),
     [config.shape]
@@ -771,19 +773,49 @@ const ConfiguratorPage: React.FC = () => {
     updateField('quantity', clampedQuantity);
   };
 
+  // Prevent overlapping timers when the user rapidly moves the pointer between the tray and the trigger.
+  const clearShapeTrayHideTimeout = () => {
+    if (shapeTrayHideTimeoutRef.current) {
+      clearTimeout(shapeTrayHideTimeoutRef.current);
+      shapeTrayHideTimeoutRef.current = null;
+    }
+  };
+
+  // Expand immediately on intent and cancel any pending collapse so the tray feels responsive.
+  const openShapeTray = () => {
+    clearShapeTrayHideTimeout();
+    setIsShapeTrayExpanded(true);
+  };
+
+  // Give the slideout a longer grace period before hiding to avoid accidental closes.
+  const scheduleShapeTrayCollapse = () => {
+    clearShapeTrayHideTimeout();
+    shapeTrayHideTimeoutRef.current = setTimeout(() => {
+      setIsShapeTrayExpanded(false);
+    }, 500);
+  };
+
+  useEffect(
+    () => () => {
+      // Clean up any pending timer when the component unmounts.
+      clearShapeTrayHideTimeout();
+    },
+    []
+  );
+
   const parametersPanel = (
     <section className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900 p-4">
       <h2 className="text-sm font-semibold text-slate-200">Parameters</h2>
       <div className="grid gap-3 text-xs text-slate-200">
         <div
           className="relative z-30 rounded-xl border border-slate-800 bg-slate-950/70"
-          onMouseEnter={() => setIsShapeTrayExpanded(true)}
-          onMouseLeave={() => setIsShapeTrayExpanded(false)}
-          onFocus={() => setIsShapeTrayExpanded(true)}
+          onMouseEnter={openShapeTray}
+          onMouseLeave={scheduleShapeTrayCollapse}
+          onFocus={openShapeTray}
           onBlur={event => {
             // Collapse when the focus leaves the shape controls entirely.
             if (!event.currentTarget.contains(event.relatedTarget)) {
-              setIsShapeTrayExpanded(false);
+              scheduleShapeTrayCollapse();
             }
           }}
         >
