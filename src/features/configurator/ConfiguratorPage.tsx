@@ -1346,21 +1346,24 @@ const ConfiguratorPage: React.FC = () => {
                 >
                   {addingToCart ? 'Saving top…' : 'Add to cart'}
                 </button>
-                {!profile && (
-                  <p className="text-[0.7rem] text-amber-300">
-                    You need to sign in before saving items to the cart. This keeps your configurations private.
-                  </p>
-                )}
-                {cartFeedback && (
-                  <p
-                    role="status"
-                    className={`text-[0.7rem] ${
-                      cartFeedback.type === 'success' ? 'text-emerald-300' : 'text-red-300'
-                    }`}
-                  >
-                    {cartFeedback.message}
-                  </p>
-                )}
+                {/* Reserve a consistent status height so the button and quantity never shift when feedback appears. */}
+                <div className="min-h-[40px] space-y-1 text-[0.7rem] leading-snug">
+                  {!profile && (
+                    <p className="text-amber-300">
+                      You need to sign in before saving items to the cart. This keeps your configurations private.
+                    </p>
+                  )}
+                  {cartFeedback && (
+                    <p
+                      role="status"
+                      className={cartFeedback.type === 'success' ? 'text-emerald-300' : 'text-red-300'}
+                    >
+                      {cartFeedback.message}
+                    </p>
+                  )}
+                  {/* Invisible placeholder keeps the container height fixed when there is no messaging. */}
+                  {!cartFeedback && profile && <p className="invisible">Cart status placeholder</p>}
+                </div>
               </div>
               <div className="flex w-full flex-col gap-1 md:w-52">
                 <label htmlFor="cart-quantity" className="text-sm font-medium text-slate-200">
