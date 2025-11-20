@@ -38,56 +38,14 @@ const PreviewCard = ({
   </div>
 );
 
-const ElevationPreview = ({
-  primaryDimension,
-  secondaryDimension,
-  label,
-  subtitle
-}: {
-  primaryDimension: number;
-  secondaryDimension: number;
-  label: string;
-  subtitle: string;
-}) => {
-  const viewBoxWidth = 200;
-  const viewBoxHeight = 110;
-  const padding = 18;
-  const scale = Math.min(
-    (viewBoxWidth - padding * 2) / Math.max(primaryDimension, 1),
-    (viewBoxHeight - padding * 2) / Math.max(secondaryDimension, 1)
-  );
-
-  const rectWidth = Math.max(primaryDimension * scale, 8);
-  const rectHeight = Math.max(secondaryDimension * scale, 10);
-  const originX = (viewBoxWidth - rectWidth) / 2;
-  const originY = (viewBoxHeight - rectHeight) / 2;
-
-  return (
-    <PreviewCard title={label} subtitle={subtitle}>
-      <svg viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`} role="img" aria-label={`${label} view`} className="h-24 w-36">
-        <title>{`${label} view`}</title>
-        <rect
-          x={originX}
-          y={originY}
-          width={rectWidth}
-          height={rectHeight}
-          rx={6}
-          fill="#0f172a"
-          stroke="#22c55e"
-          strokeWidth={3}
-          className="drop-shadow-[0_10px_25px_rgba(16,185,129,0.2)]"
-        />
-      </svg>
-    </PreviewCard>
-  );
-};
-
 const IsometricPreview = ({
   config,
-  subtitle
+  subtitle,
+  selectedColour
 }: {
   config: TabletopConfig;
   subtitle: string;
+  selectedColour: ColourSnapshot;
 }) => {
   const viewBoxWidth = 200;
   const viewBoxHeight = 140;
@@ -116,13 +74,47 @@ const IsometricPreview = ({
     startY + width * 0.35 + thickness
   } Z`;
 
+  const baseColour = selectedColour?.hexCode || '#22c55e';
+  const lightenColour = (hex: string, delta: number) => {
+    const normalized = hex.replace('#', '');
+    const num = Number.parseInt(normalized.length === 3 ? normalized.repeat(2) : normalized, 16);
+    const clamp = (value: number) => Math.min(255, Math.max(0, value));
+    const r = clamp(((num >> 16) & 0xff) + delta);
+    const g = clamp(((num >> 8) & 0xff) + delta);
+    const b = clamp((num & 0xff) + delta);
+    return `rgb(${r}, ${g}, ${b})`;
+  };
+
+  const edgeColour = lightenColour(baseColour, -18);
+  const highlightColour = lightenColour(baseColour, 22);
+  const patternId = `materialPattern-${selectedColour?.id ?? 'default'}`;
+
   return (
     <PreviewCard title="3D" subtitle={subtitle}>
       <svg viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`} role="img" aria-label="3D view" className="h-24 w-36">
         <title>3D view</title>
-        <path d={top} fill="#22c55e" opacity={0.25} stroke="#22c55e" strokeWidth={1.5} />
-        <path d={side} fill="#16a34a" opacity={0.4} stroke="#22c55e" strokeWidth={1.5} />
-        <path d={front} fill="#22c55e" opacity={0.35} stroke="#22c55e" strokeWidth={1.5} />
+        <defs>
+          {selectedColour?.imageUrl && (
+            <pattern id={patternId} patternUnits="userSpaceOnUse" width={160} height={100} x={10} y={8}>
+              <image href={selectedColour.imageUrl} width={160} height={100} preserveAspectRatio="xMidYMid slice" />
+            </pattern>
+          )}
+          <linearGradient id="tabletopShine" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="rgba(255,255,255,0.16)" />
+            <stop offset="50%" stopColor="rgba(255,255,255,0.08)" />
+            <stop offset="100%" stopColor="rgba(0,0,0,0.08)" />
+          </linearGradient>
+        </defs>
+        <path
+          d={top}
+          fill={selectedColour?.imageUrl ? `url(#${patternId})` : highlightColour}
+          stroke={highlightColour}
+          strokeWidth={1.5}
+          opacity={selectedColour?.imageUrl ? 1 : 0.9}
+        />
+        <path d={side} fill={edgeColour} opacity={0.85} stroke={highlightColour} strokeWidth={1.5} />
+        <path d={front} fill={baseColour} opacity={0.95} stroke={highlightColour} strokeWidth={1.5} />
+        <path d={top} fill="url(#tabletopShine)" opacity={0.7} />
       </svg>
     </PreviewCard>
   );
@@ -1750,12 +1742,10 @@ const ConfiguratorPage: React.FC = () => {
             aria-labelledby="cart-modal-heading"
             className="w-full max-w-lg rounded-2xl border border-emerald-500/40 bg-slate-900 p-6 shadow-2xl"
           >
-            {(() => {
+              {(() => {
               const modalConfig = cartModalDetails.configSnapshot;
               const modalColour = cartModalDetails.colourSnapshot;
               const planSubtitle = `${modalConfig.lengthMm} x ${modalConfig.widthMm} mm`;
-              const frontSubtitle = `${modalConfig.lengthMm} x ${modalConfig.thicknessMm} mm`;
-              const sideSubtitle = `${modalConfig.widthMm} x ${modalConfig.thicknessMm} mm`;
               const isoSubtitle = `${modalConfig.lengthMm} x ${modalConfig.widthMm} x ${modalConfig.thicknessMm} mm`;
               const swatchStyle = modalColour?.imageUrl
                 ? { backgroundImage: `url(${modalColour.imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
@@ -1791,25 +1781,13 @@ const ConfiguratorPage: React.FC = () => {
                     <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/70 p-4">
                       <div className="flex items-center justify-between text-xs font-semibold text-slate-200">
                         <span>Tabletop previews</span>
-                        <span className="text-[0.7rem] text-slate-500">Plan, elevations & 3D</span>
+                        <span className="text-[0.7rem] text-slate-500">Plan & 3D</span>
                       </div>
                       <div className="grid gap-3 sm:grid-cols-2">
                         <PreviewCard title="Plan" subtitle={planSubtitle}>
                           <CartTopPreview config={modalConfig} label="Plan preview" selectedColour={modalColour} />
                         </PreviewCard>
-                        <ElevationPreview
-                          primaryDimension={modalConfig.lengthMm}
-                          secondaryDimension={modalConfig.thicknessMm}
-                          label="Front elevation"
-                          subtitle={frontSubtitle}
-                        />
-                        <ElevationPreview
-                          primaryDimension={modalConfig.widthMm}
-                          secondaryDimension={modalConfig.thicknessMm}
-                          label="Side elevation"
-                          subtitle={sideSubtitle}
-                        />
-                        <IsometricPreview config={modalConfig} subtitle={isoSubtitle} />
+                        <IsometricPreview config={modalConfig} subtitle={isoSubtitle} selectedColour={modalColour} />
                       </div>
                     </div>
 
@@ -1840,6 +1818,19 @@ const ConfiguratorPage: React.FC = () => {
                             <p className="text-xs text-slate-500">Supplier details pending</p>
                           )}
                         </div>
+                      </div>
+                      <div className="rounded-lg border border-slate-800/80 bg-slate-900/70 p-3 text-sm text-slate-200">
+                        <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-slate-400">Edge profile</p>
+                        <p className="mt-1 font-semibold">
+                          {edgeProfileOptions.find(option => option.value === modalConfig.edgeProfile)?.label ||
+                            'Edge to be selected'}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {
+                            edgeProfileOptions.find(option => option.value === modalConfig.edgeProfile)?.description ||
+                              'Choose an edge finish to complete this top.'
+                          }
+                        </p>
                       </div>
                     </div>
                   </div>
