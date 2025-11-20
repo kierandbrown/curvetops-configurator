@@ -105,17 +105,19 @@ const buildCustomGeometry = (
   });
 
   const thickness = thicknessMm * MM_TO_M;
-  // Sharknose: 8mm of crisp vertical edge, then a 45° run for the remaining thickness.
+  // Sharknose: keep an 8mm vertical reveal on the top face, then drop away at 45° underneath.
   const sharknoseStraightEdge = 8 * MM_TO_M;
   const sharknoseBevelDepth = edgeProfile === 'painted-sharknose' ? Math.max(thickness - sharknoseStraightEdge, 0) : 0;
   const extrudeSettings: THREE.ExtrudeGeometryOptions = {
     depth: thickness,
     bevelEnabled: edgeProfile === 'painted-sharknose',
+    // Equal bevel thickness + size produces a 45° taper.
     bevelThickness: sharknoseBevelDepth,
     bevelSize: sharknoseBevelDepth,
-    bevelSegments: edgeProfile === 'painted-sharknose' ? 2 : 0,
-    // Pull the bevel underneath so the top retains its 8mm straight run before tapering back.
-    bevelOffset: edgeProfile === 'painted-sharknose' ? -sharknoseBevelDepth * 0.6 : 0
+    // A single segment keeps the break crisp where the 8mm reveal meets the 45° run.
+    bevelSegments: edgeProfile === 'painted-sharknose' ? 1 : 0,
+    // Pull the bevel fully underneath so the top 8mm stays square before the underside tucks in.
+    bevelOffset: edgeProfile === 'painted-sharknose' ? -sharknoseBevelDepth : 0
   };
 
   return new THREE.ExtrudeGeometry(shape2d, extrudeSettings);
@@ -215,11 +217,13 @@ const createTabletopGeometry = ({ config, customOutline }: TabletopGeometryOptio
   const extrudeSettings: THREE.ExtrudeGeometryOptions = {
     depth: thickness,
     bevelEnabled: edgeProfile === 'painted-sharknose',
+    // Equal bevel thickness + size produces a 45° taper.
     bevelThickness: sharknoseBevelDepth,
     bevelSize: sharknoseBevelDepth,
-    bevelSegments: edgeProfile === 'painted-sharknose' ? 2 : 0,
-    // Pull the bevel slightly underneath so the top face stays wide while the underside tucks in after the 8mm reveal.
-    bevelOffset: edgeProfile === 'painted-sharknose' ? -sharknoseBevelDepth * 0.6 : 0
+    // A single segment keeps the break crisp where the 8mm reveal meets the 45° run.
+    bevelSegments: edgeProfile === 'painted-sharknose' ? 1 : 0,
+    // Pull the bevel fully underneath so the top 8mm stays square before the underside tucks in.
+    bevelOffset: edgeProfile === 'painted-sharknose' ? -sharknoseBevelDepth : 0
   };
 
   return new THREE.ExtrudeGeometry(shape2d, extrudeSettings);

@@ -136,6 +136,10 @@ const edgeProfileOptions: {
             <stop offset="0%" stopColor="#f472b6" stopOpacity={0.9} />
             <stop offset="100%" stopColor="#ec4899" stopOpacity={0.5} />
           </linearGradient>
+          <linearGradient id="sharknoseReveal" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0%" stopColor="#a5b4fc" stopOpacity={0.9} />
+            <stop offset="100%" stopColor="#818cf8" stopOpacity={0.6} />
+          </linearGradient>
         </defs>
         <path
           d="M20 25 H140 V33 L103 70 H20 Z"
@@ -144,6 +148,8 @@ const edgeProfileOptions: {
           strokeWidth={3}
           strokeLinejoin="round"
         />
+        {/* Highlight the 8mm straight reveal before the 45° underside taper. */}
+        <rect x="134" y="25" width="12" height="8" fill="url(#sharknoseReveal)" rx={2} />
         <path d="M140 33 L103 70" stroke="url(#sharknosePaint)" strokeWidth={5} strokeLinecap="round" />
         <text x="115" y="20" className="fill-emerald-200 text-[10px]" textAnchor="middle">
           Hand-painted bevel
