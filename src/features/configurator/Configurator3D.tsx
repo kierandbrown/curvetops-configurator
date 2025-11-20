@@ -305,6 +305,13 @@ const TabletopMesh: React.FC<TabletopGeometryOptions> = ({ config, customOutline
     let isMounted = true;
     let loadedTexture: THREE.Texture | null = null;
     const loader = new THREE.TextureLoader();
+    // Firebase Storage and other CDN URLs require an explicit anonymous CORS
+    // request for WebGL textures. Without this the swatch image renders fine in
+    // plain <img> tags but fails silently in WebGL, leaving the tabletop flat
+    // coloured. The explicit flag ensures the image can be sampled by the GPU
+    // and avoids the cross-origin security error that was swallowing swatch
+    // previews for textured colours.
+    loader.setCrossOrigin('anonymous');
     loader.load(
       swatchImageUrl,
       texture => {
@@ -317,11 +324,13 @@ const TabletopMesh: React.FC<TabletopGeometryOptions> = ({ config, customOutline
         texture.repeat.set(2, 2);
         texture.anisotropy = 8;
         texture.colorSpace = THREE.SRGBColorSpace;
+        texture.needsUpdate = true;
         loadedTexture = texture;
         setSwatchTexture(texture);
       },
       undefined,
       () => {
+        console.error('Failed to load swatch texture', swatchImageUrl);
         if (isMounted) {
           setSwatchTexture(null);
         }
