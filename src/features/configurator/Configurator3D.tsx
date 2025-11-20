@@ -105,14 +105,17 @@ const buildCustomGeometry = (
   });
 
   const thickness = thicknessMm * MM_TO_M;
-  const bevelThickness = edgeProfile === 'painted-sharknose' ? Math.min(thickness * 0.45, 0.012) : 0;
+  // Sharknose: 8mm of crisp vertical edge, then a 45° run for the remaining thickness.
+  const sharknoseStraightEdge = 8 * MM_TO_M;
+  const sharknoseBevelDepth = edgeProfile === 'painted-sharknose' ? Math.max(thickness - sharknoseStraightEdge, 0) : 0;
   const extrudeSettings: THREE.ExtrudeGeometryOptions = {
     depth: thickness,
     bevelEnabled: edgeProfile === 'painted-sharknose',
-    bevelThickness,
-    bevelSize: edgeProfile === 'painted-sharknose' ? bevelThickness * 0.9 : 0,
-    bevelSegments: edgeProfile === 'painted-sharknose' ? 6 : 0,
-    bevelOffset: edgeProfile === 'painted-sharknose' ? -bevelThickness * 0.35 : 0
+    bevelThickness: sharknoseBevelDepth,
+    bevelSize: sharknoseBevelDepth,
+    bevelSegments: edgeProfile === 'painted-sharknose' ? 2 : 0,
+    // Pull the bevel underneath so the top retains its 8mm straight run before tapering back.
+    bevelOffset: edgeProfile === 'painted-sharknose' ? -sharknoseBevelDepth * 0.6 : 0
   };
 
   return new THREE.ExtrudeGeometry(shape2d, extrudeSettings);
@@ -206,16 +209,17 @@ const createTabletopGeometry = ({ config, customOutline }: TabletopGeometryOptio
 
   // Edge profiles alter the bevel to mirror the selected fabrication style.
   //  - "edged" keeps the square ABS banding with crisp corners.
-  //  - "painted-sharknose" applies a deeper, smoother underside chamfer to fake the floating look.
-  const bevelThickness = edgeProfile === 'painted-sharknose' ? Math.min(thickness * 0.45, 0.012) : 0;
+  //  - "painted-sharknose" keeps an 8mm vertical reveal before tapering underneath at 45°.
+  const sharknoseStraightEdge = 8 * MM_TO_M;
+  const sharknoseBevelDepth = edgeProfile === 'painted-sharknose' ? Math.max(thickness - sharknoseStraightEdge, 0) : 0;
   const extrudeSettings: THREE.ExtrudeGeometryOptions = {
     depth: thickness,
     bevelEnabled: edgeProfile === 'painted-sharknose',
-    bevelThickness,
-    bevelSize: edgeProfile === 'painted-sharknose' ? bevelThickness * 0.9 : 0,
-    bevelSegments: edgeProfile === 'painted-sharknose' ? 6 : 0,
-    // Pull the bevel slightly underneath so the top face stays wide while the underside tucks in.
-    bevelOffset: edgeProfile === 'painted-sharknose' ? -bevelThickness * 0.35 : 0
+    bevelThickness: sharknoseBevelDepth,
+    bevelSize: sharknoseBevelDepth,
+    bevelSegments: edgeProfile === 'painted-sharknose' ? 2 : 0,
+    // Pull the bevel slightly underneath so the top face stays wide while the underside tucks in after the 8mm reveal.
+    bevelOffset: edgeProfile === 'painted-sharknose' ? -sharknoseBevelDepth * 0.6 : 0
   };
 
   return new THREE.ExtrudeGeometry(shape2d, extrudeSettings);
