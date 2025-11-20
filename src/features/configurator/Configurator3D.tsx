@@ -59,7 +59,8 @@ interface TabletopGeometryOptions {
 // lighting + material pipeline as the procedural shapes.
 const buildCustomGeometry = (
   outline: ParsedCustomOutline,
-  thicknessMm: number
+  thicknessMm: number,
+  edgeProfile: EdgeProfile
 ): THREE.ExtrudeGeometry | null => {
   if (!outline.bounds || !outline.paths.length) {
     return null;
@@ -103,22 +104,25 @@ const buildCustomGeometry = (
     shape2d.holes.push(hole);
   });
 
+  const thickness = thicknessMm * MM_TO_M;
+  const bevelThickness = edgeProfile === 'painted-sharknose' ? Math.min(thickness * 0.45, 0.012) : 0;
   const extrudeSettings: THREE.ExtrudeGeometryOptions = {
-    depth: thicknessMm * MM_TO_M,
-    bevelEnabled: true,
-    bevelThickness: 0.003,
-    bevelSize: 0.003,
-    bevelSegments: 2
+    depth: thickness,
+    bevelEnabled: edgeProfile === 'painted-sharknose',
+    bevelThickness,
+    bevelSize: edgeProfile === 'painted-sharknose' ? bevelThickness * 0.9 : 0,
+    bevelSegments: edgeProfile === 'painted-sharknose' ? 6 : 0,
+    bevelOffset: edgeProfile === 'painted-sharknose' ? -bevelThickness * 0.35 : 0
   };
 
   return new THREE.ExtrudeGeometry(shape2d, extrudeSettings);
 };
 
 const createTabletopGeometry = ({ config, customOutline }: TabletopGeometryOptions) => {
-  const { shape, lengthMm, widthMm, thicknessMm, edgeRadiusMm, superEllipseExponent } = config;
+  const { shape, lengthMm, widthMm, thicknessMm, edgeRadiusMm, superEllipseExponent, edgeProfile } = config;
 
   if (shape === 'custom' && customOutline?.paths.length && customOutline.bounds) {
-    const customGeometry = buildCustomGeometry(customOutline, thicknessMm);
+    const customGeometry = buildCustomGeometry(customOutline, thicknessMm, edgeProfile);
     if (customGeometry) {
       return customGeometry;
     }
@@ -200,22 +204,27 @@ const createTabletopGeometry = ({ config, customOutline }: TabletopGeometryOptio
     shape2d.lineTo(-hl, -hw);
   }
 
+  // Edge profiles alter the bevel to mirror the selected fabrication style.
+  //  - "edged" keeps the square ABS banding with crisp corners.
+  //  - "painted-sharknose" applies a deeper, smoother underside chamfer to fake the floating look.
+  const bevelThickness = edgeProfile === 'painted-sharknose' ? Math.min(thickness * 0.45, 0.012) : 0;
   const extrudeSettings: THREE.ExtrudeGeometryOptions = {
     depth: thickness,
-    bevelEnabled: true,
-    bevelThickness: 0.003,
-    bevelSize: 0.003,
-    bevelSegments: 2
+    bevelEnabled: edgeProfile === 'painted-sharknose',
+    bevelThickness,
+    bevelSize: edgeProfile === 'painted-sharknose' ? bevelThickness * 0.9 : 0,
+    bevelSegments: edgeProfile === 'painted-sharknose' ? 6 : 0,
+    // Pull the bevel slightly underneath so the top face stays wide while the underside tucks in.
+    bevelOffset: edgeProfile === 'painted-sharknose' ? -bevelThickness * 0.35 : 0
   };
 
   return new THREE.ExtrudeGeometry(shape2d, extrudeSettings);
 };
 
 const TabletopMesh: React.FC<TabletopGeometryOptions> = ({ config, customOutline, swatch }) => {
-  const geometry = useMemo(
-    () => createTabletopGeometry({ config, customOutline }),
-    [config, customOutline]
-  );
+  const geometry = useMemo(() => {
+    return createTabletopGeometry({ config, customOutline });
+  }, [config, customOutline]);
   const [swatchTexture, setSwatchTexture] = useState<THREE.Texture | null>(null);
 
   // Load the supplier swatch image (if provided) so the 3D preview mirrors the catalogue selection.
