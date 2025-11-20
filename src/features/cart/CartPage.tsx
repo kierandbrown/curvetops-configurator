@@ -66,6 +66,7 @@ const CartPage = () => {
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<CartFilters>(emptyFilters);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
 
   // Sync the cart list for the authenticated user. Every entry is normalised with
   // the default table config so the UI can always render complete rows.
@@ -98,6 +99,11 @@ const CartPage = () => {
 
     return () => unsubscribe();
   }, [profile]);
+
+  // Make sure the selection list never holds stale cart IDs after Firestore updates.
+  useEffect(() => {
+    setSelectedItemIds(prev => prev.filter(id => cartItems.some(item => item.id === id)));
+  }, [cartItems]);
 
   useEffect(() => {
     const closeMenu = () => setMenuOpenId(null);
@@ -147,6 +153,37 @@ const CartPage = () => {
     }
   };
 
+  const handleBulkDelete = async () => {
+    // Delete each selected item in parallel, then reset the selection so the UI stays tidy.
+    const deletions = selectedItemIds.map(id => deleteDoc(doc(db, 'cartItems', id)));
+    try {
+      await Promise.all(deletions);
+      setSelectedItemIds([]);
+    } catch (error) {
+      console.error('Failed to delete selected cart items', error);
+    }
+  };
+
+  const toggleSelection = (itemId: string) => {
+    setSelectedItemIds(prev =>
+      prev.includes(itemId) ? prev.filter(id => id !== itemId) : [...prev, itemId]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    const filteredIds = filteredItems.map(item => item.id);
+    const everyFilteredSelected = filteredIds.every(id => selectedItemIds.includes(id));
+    setSelectedItemIds(prev => {
+      if (everyFilteredSelected) {
+        // Unselect only the filtered rows, leaving any hidden selections untouched for clarity.
+        return prev.filter(id => !filteredIds.includes(id));
+      }
+      // Merge the filtered IDs with any existing selections without creating duplicates.
+      const merged = new Set([...prev, ...filteredIds]);
+      return Array.from(merged);
+    });
+  };
+
   const handleNameClick = (itemId: string) => {
     // Send the user back to the configurator so they can edit or duplicate the
     // selection there. Passing the cartId lets the downstream page load context
@@ -182,12 +219,33 @@ const CartPage = () => {
       <section className="flex min-h-[calc(100vh-200px)] flex-col overflow-hidden rounded-3xl border border-slate-800 bg-slate-950">
         <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
           <h2 className="text-sm font-semibold text-slate-200">Cart items</h2>
-          {loading && <Loader />}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleBulkDelete}
+              disabled={selectedItemIds.length === 0}
+              className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-red-200 transition hover:border-red-400 hover:text-red-100 disabled:cursor-not-allowed disabled:border-slate-800 disabled:text-slate-600"
+            >
+              Delete selected ({selectedItemIds.length})
+            </button>
+            {loading && <Loader />}
+          </div>
         </div>
         <div className="flex-1 overflow-auto">
           <table className="min-w-full divide-y divide-slate-800 text-sm">
             <thead className="bg-slate-900/80 text-left text-xs uppercase tracking-wider text-slate-400">
               <tr>
+                <th className="w-10 p-4 align-bottom">
+                  <label className="flex items-center gap-2 text-slate-300">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all visible cart items"
+                      checked={filteredItems.length > 0 && filteredItems.every(item => selectedItemIds.includes(item.id))}
+                      onChange={toggleSelectAll}
+                      className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-400 focus:ring-emerald-400"
+                    />
+                  </label>
+                </th>
                 <th className="p-4 align-bottom text-slate-300">Preview</th>
                 <th className="p-4 align-bottom">
                   <div className="flex flex-col gap-1">
@@ -276,6 +334,12 @@ const CartPage = () => {
                 </th>
                 <th className="p-4 align-bottom">
                   <div className="flex flex-col gap-1">
+                    <span className="text-[0.65rem] font-semibold tracking-wide text-slate-400">Qty</span>
+                    <p className="text-[0.65rem] text-slate-500">Quantity saved with each configuration.</p>
+                  </div>
+                </th>
+                <th className="p-4 align-bottom">
+                  <div className="flex flex-col gap-1">
                     <span className="text-[0.65rem] font-semibold tracking-wide text-slate-400">DXF / notes</span>
                     <input
                       id="cart-filter-file"
@@ -297,7 +361,7 @@ const CartPage = () => {
             <tbody className="divide-y divide-slate-900/70 bg-slate-950">
               {filteredItems.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="p-6 text-center text-sm text-slate-400">
+                  <td colSpan={10} className="p-6 text-center text-sm text-slate-400">
                     No cart items matched your filters. Clear the search inputs to show everything again.
                   </td>
                 </tr>
@@ -306,6 +370,15 @@ const CartPage = () => {
                 const materialLabel = MATERIAL_LABELS[item.config.material];
                 return (
                   <tr key={item.id} className="hover:bg-slate-900/30">
+                    <td className="p-4 align-middle">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${item.label}`}
+                        checked={selectedItemIds.includes(item.id)}
+                        onChange={() => toggleSelection(item.id)}
+                        className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-emerald-400 focus:ring-emerald-400"
+                      />
+                    </td>
                     <td className="p-4 align-middle">
                       {/* Inline previews provide a quick visual of each top without reopening the 3D scene. */}
                       <CartTopPreview
@@ -342,6 +415,7 @@ const CartPage = () => {
                           })
                         : '—'}
                     </td>
+                    <td className="p-4 text-slate-200">{item.config.quantity ?? 1}</td>
                     <td className="p-4 text-slate-200">
                       {item.customShape?.fileName ? (
                         <>
