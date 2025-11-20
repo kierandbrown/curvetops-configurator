@@ -127,6 +127,14 @@ const CartPage = () => {
     });
   }, [cartItems, filters]);
 
+  // Calculate a running total based on the filtered list so the summary always
+  // mirrors what the user sees on screen.
+  const { pricedCount, totalEstimatedValue } = useMemo(() => {
+    const pricedItems = filteredItems.filter(item => typeof item.estimatedPrice === 'number');
+    const total = pricedItems.reduce((sum, item) => sum + (item.estimatedPrice ?? 0), 0);
+    return { pricedCount: pricedItems.length, totalEstimatedValue: total };
+  }, [filteredItems]);
+
   const handleFilterChange = (field: keyof CartFilters, value: string) => {
     setFilters(prev => ({ ...prev, [field]: value }));
   };
@@ -385,6 +393,29 @@ const CartPage = () => {
               })}
             </tbody>
           </table>
+        </div>
+        <div className="border-t border-slate-800 bg-slate-900/50 px-6 py-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-[0.65rem] uppercase tracking-[0.2em] text-slate-500">Summary</p>
+              <p className="text-sm text-slate-300">
+                Showing {filteredItems.length} {filteredItems.length === 1 ? 'item' : 'items'}
+                {pricedCount > 0 ? ` with ${pricedCount} priced` : ''}.
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-[0.65rem] uppercase tracking-[0.2em] text-slate-500">Estimated total</p>
+              <p className="text-xl font-semibold text-emerald-300">
+                {pricedCount > 0
+                  ? totalEstimatedValue.toLocaleString('en-AU', {
+                      style: 'currency',
+                      currency: 'AUD'
+                    })
+                  : 'Awaiting prices'}
+              </p>
+              <p className="text-xs text-slate-500">Only items with an estimated price are counted.</p>
+            </div>
+          </div>
         </div>
       </section>
     </div>
