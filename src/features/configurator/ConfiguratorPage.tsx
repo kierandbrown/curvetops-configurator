@@ -1,5 +1,4 @@
 import { ChangeEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@auth/AuthContext';
 import { db } from '@auth/firebase';
@@ -287,10 +286,6 @@ const ConfiguratorPage: React.FC = () => {
   const [customShape, setCustomShape] = useState<CustomShapeDetails | null>(null);
   const { price, loading, error } = usePricing(config);
   const { profile } = useAuth();
-  // Track whether the viewport is wide enough to expose the desktop sidebar so we
-  // know when to portal the parameter controls into the left menu area.
-  const [isDesktopSidebar, setIsDesktopSidebar] = useState(false);
-  const [sidebarContainer, setSidebarContainer] = useState<HTMLElement | null>(null);
   const [addingToCart, setAddingToCart] = useState(false);
   const [cartFeedback, setCartFeedback] = useState<
     | { type: 'success'; message: string }
@@ -774,37 +769,6 @@ const ConfiguratorPage: React.FC = () => {
     const clampedQuantity = clampNumber(Math.round(parsedValue), 1, 999);
     updateField('quantity', clampedQuantity);
   };
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(min-width: 768px)');
-    const handleChange = (event: MediaQueryListEvent) => setIsDesktopSidebar(event.matches);
-
-    setIsDesktopSidebar(mediaQuery.matches);
-
-    if (typeof mediaQuery.addEventListener === 'function') {
-      mediaQuery.addEventListener('change', handleChange);
-    } else {
-      mediaQuery.addListener(handleChange);
-    }
-
-    return () => {
-      if (typeof mediaQuery.removeEventListener === 'function') {
-        mediaQuery.removeEventListener('change', handleChange);
-      } else {
-        mediaQuery.removeListener(handleChange);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isDesktopSidebar) {
-      setSidebarContainer(null);
-      return;
-    }
-
-    const container = document.getElementById('configurator-sidebar');
-    setSidebarContainer(container);
-  }, [isDesktopSidebar]);
 
   const parametersPanel = (
     <section className="space-y-4 rounded-2xl border border-slate-800 bg-slate-900 p-4">
@@ -1290,108 +1254,106 @@ const ConfiguratorPage: React.FC = () => {
   );
 
   return (
-    // Stretch the configurator to fill the viewport beneath the sticky header + nav so
-    // the 3D preview can occupy as much space as possible without forcing the page to scroll.
-    // The height is slightly reduced to give breathing room for the new action bar beneath the viewport.
-    <div className="flex h-[calc(100dvh-260px)] flex-col space-y-6 overflow-x-visible overflow-y-hidden">
-      <section className="flex flex-1 min-h-0 flex-col space-y-4">
-        <div className="relative flex-1 min-h-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
-          <Configurator3D
-            config={config}
-            customOutline={customShape?.outline ?? null}
-            swatch={
-              selectedCatalogueMaterial
-                ? {
-                    hexCode: selectedCatalogueMaterial.hexCode,
-                    imageUrl: selectedCatalogueMaterial.imageUrl
-                  }
-                : null
-            }
-          />
-          <ViewportMouseGuide />
-          {config.shape === 'custom' && !customShape?.outline && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/70 px-6 text-center text-sm text-slate-200">
-              Upload a DXF file to see the custom outline in the preview window.
-            </div>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-4 md:flex-row md:items-stretch">
-          {/* Surface edge profile controls beside pricing so the call-to-action stays aligned. */}
-          <div className="flex-1">{edgeProfileSelector}</div>
-
-          {/* Place the pricing + cart controls directly under the viewport so the call-to-action is always visible. */}
-          <div className="flex w-full flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4 md:w-[420px] md:flex-none md:flex-row md:items-center md:justify-start md:gap-6">
-            <div className="space-y-1 text-slate-200 md:w-1/2">
-              <div className="flex items-baseline gap-2 text-xs text-slate-400">
-                <span>Estimated price</span>
-                {loading && <span className="text-[0.65rem] text-slate-400">Recalculating…</span>}
-                {error && <span className="text-[0.65rem] text-red-300">Pricing error: {error}</span>}
+    // Keep everything inside the main viewport so customers are never juggling multiple scroll areas.
+    <div className="flex flex-col gap-6 lg:gap-8">
+      <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[1.6fr_1fr] lg:items-start lg:gap-8">
+        <section className="flex flex-col space-y-4">
+          <div className="relative min-h-[360px] overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 lg:h-[60vh]">
+            <Configurator3D
+              config={config}
+              customOutline={customShape?.outline ?? null}
+              swatch={
+                selectedCatalogueMaterial
+                  ? {
+                      hexCode: selectedCatalogueMaterial.hexCode,
+                      imageUrl: selectedCatalogueMaterial.imageUrl
+                    }
+                  : null
+              }
+            />
+            <ViewportMouseGuide />
+            {config.shape === 'custom' && !customShape?.outline && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-slate-950/70 px-6 text-center text-sm text-slate-200">
+                Upload a DXF file to see the custom outline in the preview window.
               </div>
-              <p className="text-xl font-semibold">{formattedPrice}</p>
-            </div>
-            {/* Keep the quantity input directly beside the call-to-action so buyers can set multiples before saving. */}
-            <div className="flex w-full flex-col gap-3 md:w-auto md:flex-1 md:flex-row-reverse md:items-start md:gap-4">
-              {/* Surface the call-to-action first on desktop so the “Add to cart” button sits to the left of the quantity input. */}
-              <div className="flex w-full flex-col items-stretch gap-2 md:w-auto md:flex-none md:items-start md:self-stretch">
-                <button
-                  type="button"
-                  onClick={handleAddToCart}
-                  disabled={addingToCart || !profile}
-                  className={`inline-flex w-full items-center justify-center rounded-lg px-5 py-3 text-sm font-semibold transition md:w-auto ${
-                    addingToCart || !profile
-                      ? 'cursor-not-allowed bg-slate-800 text-slate-400'
-                      : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
-                  }`}
-                >
-                  {addingToCart ? 'Saving top…' : 'Add to cart'}
-                </button>
-                {/* Reserve space for status messaging so the button/quantity alignment never shifts after clicking. */}
-                <div className="min-h-[36px] space-y-1">
-                  {!profile && (
-                    <p className="text-[0.7rem] text-amber-300">
-                      You need to sign in before saving items to the cart. This keeps your configurations private.
-                    </p>
-                  )}
-                  {cartFeedback && (
-                    <p
-                      role="status"
-                      className={`text-[0.7rem] ${
-                        cartFeedback.type === 'success' ? 'text-emerald-300' : 'text-red-300'
-                      }`}
-                    >
-                      {cartFeedback.message}
-                    </p>
-                  )}
+            )}
+          </div>
+
+          <div className="flex flex-col gap-4 md:flex-row md:items-stretch">
+            {/* Surface edge profile controls beside pricing so the call-to-action stays aligned. */}
+            <div className="flex-1">{edgeProfileSelector}</div>
+
+            {/* Place the pricing + cart controls directly under the viewport so the call-to-action is always visible. */}
+            <div className="flex w-full flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4 md:w-[420px] md:flex-none md:flex-row md:items-center md:justify-start md:gap-6">
+              <div className="space-y-1 text-slate-200 md:w-1/2">
+                <div className="flex items-baseline gap-2 text-xs text-slate-400">
+                  <span>Estimated price</span>
+                  {loading && <span className="text-[0.65rem] text-slate-400">Recalculating…</span>}
+                  {error && <span className="text-[0.65rem] text-red-300">Pricing error: {error}</span>}
                 </div>
+                <p className="text-xl font-semibold">{formattedPrice}</p>
               </div>
-              <div className="flex w-full flex-col gap-1 md:w-52">
-                <label htmlFor="cart-quantity" className="text-sm font-medium text-slate-200">
-                  Quantity
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    id="cart-quantity"
-                    type="number"
-                    min={1}
-                    max={999}
-                    inputMode="numeric"
-                    value={config.quantity}
-                    onChange={handleQuantityChange}
-                    className="w-24 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 shadow-inner focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-                  />
-                  <span className="text-xs text-slate-400">pcs</span>
+              {/* Keep the quantity input directly beside the call-to-action so buyers can set multiples before saving. */}
+              <div className="flex w-full flex-col gap-3 md:w-auto md:flex-1 md:flex-row-reverse md:items-start md:gap-4">
+                {/* Surface the call-to-action first on desktop so the “Add to cart” button sits to the left of the quantity input. */}
+                <div className="flex w-full flex-col items-stretch gap-2 md:w-auto md:flex-none md:items-start md:self-stretch">
+                  <button
+                    type="button"
+                    onClick={handleAddToCart}
+                    disabled={addingToCart || !profile}
+                    className={`inline-flex w-full items-center justify-center rounded-lg px-5 py-3 text-sm font-semibold transition md:w-auto ${
+                      addingToCart || !profile
+                        ? 'cursor-not-allowed bg-slate-800 text-slate-400'
+                        : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
+                    }`}
+                  >
+                    {addingToCart ? 'Saving top…' : 'Add to cart'}
+                  </button>
+                  {/* Reserve space for status messaging so the button/quantity alignment never shifts after clicking. */}
+                  <div className="min-h-[36px] space-y-1">
+                    {!profile && (
+                      <p className="text-[0.7rem] text-amber-300">
+                        You need to sign in before saving items to the cart. This keeps your configurations private.
+                      </p>
+                    )}
+                    {cartFeedback && (
+                      <p
+                        role="status"
+                        className={`text-[0.7rem] ${
+                          cartFeedback.type === 'success' ? 'text-emerald-300' : 'text-red-300'
+                        }`}
+                      >
+                        {cartFeedback.message}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex w-full flex-col gap-1 md:w-52">
+                  <label htmlFor="cart-quantity" className="text-sm font-medium text-slate-200">
+                    Quantity
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="cart-quantity"
+                      type="number"
+                      min={1}
+                      max={999}
+                      inputMode="numeric"
+                      value={config.quantity}
+                      onChange={handleQuantityChange}
+                      className="w-24 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 shadow-inner focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                    />
+                    <span className="text-xs text-slate-400">pcs</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* On smaller screens the sidebar is hidden, so keep an inline copy of the parameters. */}
-      <div className="md:hidden">{parametersPanel}</div>
-      {/* When the desktop sidebar is visible, mount the parameters inside it via a portal. */}
-      {sidebarContainer && isDesktopSidebar && createPortal(parametersPanel, sidebarContainer)}
+        {/* Keep the parameter tray alongside the main viewport on large screens so there are no nested scrollbars. */}
+        <section className="w-full space-y-4">{parametersPanel}</section>
+      </div>
     </div>
   );
 };
