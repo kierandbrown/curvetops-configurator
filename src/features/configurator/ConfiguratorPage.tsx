@@ -298,6 +298,8 @@ const ConfiguratorPage: React.FC = () => {
   const [selectedCatalogueMaterialId, setSelectedCatalogueMaterialId] = useState<string | null>(null);
   // Keep the tabletop shape picker compact until the user intentionally hovers/taps to expand it.
   const [isShapeTrayExpanded, setIsShapeTrayExpanded] = useState(false);
+  // Mirror the tabletop slide-out pattern for the colour catalogue so the UI feels consistent.
+  const [isColourTrayExpanded, setIsColourTrayExpanded] = useState(false);
   const selectedShapeOption = useMemo(
     () => shapeOptions.find(option => option.shape === config.shape),
     [config.shape]
@@ -572,6 +574,8 @@ const ConfiguratorPage: React.FC = () => {
   const handleCatalogueSelection = (material: CatalogueMaterial) => {
     setSelectedCatalogueMaterialId(material.id);
     setCatalogueSearch(material.name);
+    // Collapse the slide-out once a colour is chosen so the summary row stays tidy on mobile.
+    setIsColourTrayExpanded(false);
     setConfig(prev => {
       const mappedMaterial = materialTypeToConfigMaterial(material.materialType);
       const finishLabel = (material.finish || '').toLowerCase();
@@ -853,167 +857,240 @@ const ConfiguratorPage: React.FC = () => {
         </div>
 
         {/* Colour search surfaces live catalogue data so operators pick real-world blanks. */}
-        <div className="space-y-2">
-          <label className="flex flex-col gap-1 text-[0.75rem] font-medium text-slate-200" htmlFor="catalogue-search">
-            <span>Colour catalogue search</span>
-            <input
-              id="catalogue-search"
-              type="text"
-              value={catalogueSearch}
-              onChange={event => {
-                setCatalogueSearch(event.target.value);
-                if (!event.target.value) {
-                  setSelectedCatalogueMaterialId(null);
-                }
-              }}
-              placeholder="Search saved colours, finishes or SKU codes…"
-              className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
-            />
-          </label>
-          <p className="text-[0.65rem] text-slate-400">
-            Enter the colour name, finish, supplier or SKU. Selecting a result locks the maximum blank size and the available
-            thicknesses so you stay within catalogue limits.
-          </p>
-          <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-            {catalogueLoading ? (
-              <p className="text-[0.7rem] text-slate-400">Loading colour catalogue…</p>
-            ) : catalogueSearch.trim() === '' ? (
-              // When the user has not typed a colour name, highlight quick-pick swatches for popular colours.
-              filteredCatalogueMaterials.length ? (
-                <div className="space-y-3">
-                  <p className="text-[0.7rem] text-slate-300">Popular colours at a glance</p>
-                  <div className="flex flex-wrap gap-3" role="listbox" aria-label="Popular colours">
+        <div
+          className="relative space-y-3 rounded-2xl border border-slate-800 bg-slate-900 p-3"
+          onBlur={event => {
+            if (!event.currentTarget.contains(event.relatedTarget)) {
+              setIsColourTrayExpanded(false);
+            }
+          }}
+        >
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <p className="text-[0.8rem] font-semibold text-slate-100">Colour selection</p>
+              <p className="text-[0.7rem] text-slate-400">
+                Use the slide-out catalogue to lock in a real-world finish, matching the tabletop style tray for a consistent
+                flow.
+              </p>
+            </div>
+            <button
+              type="button"
+              aria-expanded={isColourTrayExpanded}
+              onClick={() => setIsColourTrayExpanded(prev => !prev)}
+              className={`self-start rounded-lg border px-3 py-1 text-[0.75rem] font-semibold transition sm:self-auto ${
+                isColourTrayExpanded
+                  ? 'border-emerald-300/70 bg-emerald-500/10 text-emerald-200 hover:border-emerald-200'
+                  : 'border-slate-700 bg-slate-900 text-slate-100 hover:border-emerald-300'
+              }`}
+            >
+              {isColourTrayExpanded ? 'Hide colours' : 'Show colours'}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-emerald-300/40 bg-emerald-500/5">
+              {selectedCatalogueMaterial ? (
+                selectedCatalogueMaterial.imageUrl ? (
+                  <img
+                    src={selectedCatalogueMaterial.imageUrl}
+                    alt={selectedCatalogueMaterial.name}
+                    className="h-10 w-10 rounded-md object-cover"
+                  />
+                ) : (
+                  <span
+                    aria-label={`Swatch for ${selectedCatalogueMaterial.name}`}
+                    className="h-8 w-8 rounded-md border border-white/10"
+                    style={{ backgroundColor: selectedCatalogueMaterial.hexCode || '#1f2937' }}
+                  />
+                )
+              ) : (
+                <span className="text-xs text-emerald-200">Swatch</span>
+              )}
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-slate-100">
+                {selectedCatalogueMaterial?.name ?? 'No colour selected yet'}
+              </p>
+              <p className="text-[0.7rem] text-slate-400">
+                {selectedCatalogueMaterial
+                  ? 'Tap “Show colours” to adjust the finish or swap to another saved swatch.'
+                  : 'Tap “Show colours” to slide out the catalogue and pick a finish.'}
+              </p>
+            </div>
+          </div>
+
+          <div
+            className={`absolute left-full top-2 z-40 ml-3 w-[min(32rem,78vw)] rounded-xl border border-emerald-400/50 bg-slate-950/95 p-3 shadow-2xl transition-all duration-300 ${
+              isColourTrayExpanded
+                ? 'visible translate-x-0 opacity-100'
+                : 'invisible pointer-events-none translate-x-2 opacity-0'
+            }`}
+          >
+            <div className="space-y-3">
+              <label className="flex flex-col gap-1 text-[0.75rem] font-medium text-slate-200" htmlFor="catalogue-search">
+                <span>Colour catalogue search</span>
+                <input
+                  id="catalogue-search"
+                  type="text"
+                  value={catalogueSearch}
+                  onChange={event => {
+                    setCatalogueSearch(event.target.value);
+                    if (!event.target.value) {
+                      setSelectedCatalogueMaterialId(null);
+                    }
+                  }}
+                  placeholder="Search saved colours, finishes or SKU codes…"
+                  className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                />
+              </label>
+              <p className="text-[0.65rem] text-slate-400">
+                Enter the colour name, finish, supplier or SKU. Selecting a result locks the maximum blank size and the
+                available thicknesses so you stay within catalogue limits.
+              </p>
+
+              <div className="max-h-[60vh] space-y-3 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950/80 p-3">
+                {catalogueLoading ? (
+                  <p className="text-[0.7rem] text-slate-400">Loading colour catalogue…</p>
+                ) : catalogueSearch.trim() === '' ? (
+                  // When the user has not typed a colour name, highlight quick-pick swatches for popular colours.
+                  filteredCatalogueMaterials.length ? (
+                    <div className="space-y-3">
+                      <p className="text-[0.7rem] text-slate-300">Popular colours at a glance</p>
+                      <div className="flex flex-wrap gap-3" role="listbox" aria-label="Popular colours">
+                        {filteredCatalogueMaterials.map(material => {
+                          const isActive = material.id === selectedCatalogueMaterialId;
+                          return (
+                            <button
+                              key={material.id}
+                              type="button"
+                              role="option"
+                              aria-selected={isActive}
+                              onClick={() => handleCatalogueSelection(material)}
+                              title={material.name}
+                              className={`group relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg border transition ${
+                                isActive
+                                  ? 'border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.25)]'
+                                  : 'border-slate-700 hover:border-emerald-300'
+                              }`}
+                            >
+                              {material.imageUrl ? (
+                                <img
+                                  src={material.imageUrl}
+                                  alt={material.name}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <span
+                                  aria-hidden
+                                  className="h-full w-full"
+                                  style={{ backgroundColor: material.hexCode || '#1f2937' }}
+                                />
+                              )}
+                              <span className="pointer-events-none absolute -bottom-7 left-1/2 -translate-x-1/2 rounded bg-slate-900 px-2 py-0.5 text-[0.65rem] text-slate-100 opacity-0 shadow-lg transition group-hover:opacity-100">
+                                {material.name}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-[0.7rem] text-slate-400">We have not marked any colours as popular yet.</p>
+                  )
+                ) : filteredCatalogueMaterials.length ? (
+                  <ul className="space-y-2" role="listbox" aria-label="Colour search results">
                     {filteredCatalogueMaterials.map(material => {
                       const isActive = material.id === selectedCatalogueMaterialId;
                       return (
-                        <button
-                          key={material.id}
-                          type="button"
-                          role="option"
-                          aria-selected={isActive}
-                          onClick={() => handleCatalogueSelection(material)}
-                          title={material.name}
-                          className={`group relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg border transition ${
-                            isActive
-                              ? 'border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.25)]'
-                              : 'border-slate-700 hover:border-emerald-300'
-                          }`}
-                        >
-                          {material.imageUrl ? (
-                            <img
-                              src={material.imageUrl}
-                              alt={material.name}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <span
-                              aria-hidden
-                              className="h-full w-full"
-                              style={{ backgroundColor: material.hexCode || '#1f2937' }}
-                            />
-                          )}
-                          <span className="pointer-events-none absolute -bottom-7 left-1/2 -translate-x-1/2 rounded bg-slate-900 px-2 py-0.5 text-[0.65rem] text-slate-100 opacity-0 shadow-lg transition group-hover:opacity-100">
-                            {material.name}
-                          </span>
-                        </button>
+                        <li key={material.id}>
+                          <button
+                            type="button"
+                            role="option"
+                            aria-selected={isActive}
+                            onClick={() => handleCatalogueSelection(material)}
+                            className={`flex w-full flex-col rounded-lg border p-2 text-left transition ${
+                              isActive
+                                ? 'border-emerald-400 bg-emerald-400/5 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
+                                : 'border-slate-800 hover:border-emerald-300/60'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold text-slate-100">{material.name}</span>
+                              {material.isPopular && (
+                                <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-amber-200">
+                                  Popular
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[0.7rem] text-slate-400">
+                              {(material.materialType || 'Material type TBD') + ' • ' + (material.finish || 'Finish TBD')}
+                            </span>
+                            {material.supplierSku && (
+                              <span className="text-[0.65rem] text-slate-500">Supplier SKU: {material.supplierSku}</span>
+                            )}
+                          </button>
+                        </li>
                       );
                     })}
-                  </div>
-                </div>
-              ) : (
-                <p className="text-[0.7rem] text-slate-400">We have not marked any colours as popular yet.</p>
-              )
-            ) : filteredCatalogueMaterials.length ? (
-              <ul className="space-y-2" role="listbox" aria-label="Colour search results">
-                {filteredCatalogueMaterials.map(material => {
-                  const isActive = material.id === selectedCatalogueMaterialId;
-                  return (
-                    <li key={material.id}>
-                      <button
-                        type="button"
-                        role="option"
-                        aria-selected={isActive}
-                        onClick={() => handleCatalogueSelection(material)}
-                        className={`flex w-full flex-col rounded-lg border p-2 text-left transition ${
-                          isActive
-                            ? 'border-emerald-400 bg-emerald-400/5 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
-                            : 'border-slate-800 hover:border-emerald-300/60'
-                        }`}
-                      >
+                  </ul>
+                ) : (
+                  <p className="text-[0.7rem] text-slate-400">
+                    No colours match that search. Try a different name, finish description or SKU.
+                  </p>
+                )}
+
+                {selectedCatalogueMaterial && (
+                  <div className="space-y-2 rounded-xl border border-emerald-400/40 bg-emerald-400/5 p-3 text-[0.7rem] text-slate-100">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-emerald-200">Selected colour</p>
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-slate-100">{material.name}</span>
-                          {material.isPopular && (
+                          <p className="text-base font-semibold text-slate-100">{selectedCatalogueMaterial.name}</p>
+                          {selectedCatalogueMaterial.isPopular && (
                             <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-amber-200">
                               Popular
                             </span>
                           )}
                         </div>
-                        <span className="text-[0.7rem] text-slate-400">
-                          {(material.materialType || 'Material type TBD') + ' • ' + (material.finish || 'Finish TBD')}
-                        </span>
-                        {material.supplierSku && (
-                          <span className="text-[0.65rem] text-slate-500">Supplier SKU: {material.supplierSku}</span>
+                        <p className="text-slate-300">
+                          {(selectedCatalogueMaterial.materialType || 'Material type TBD') + ' • ' + (selectedCatalogueMaterial.finish || 'Finish TBD')}
+                        </p>
+                        {selectedCatalogueMaterial.supplierSku && (
+                          <p className="text-[0.65rem] text-slate-400">Supplier SKU: {selectedCatalogueMaterial.supplierSku}</p>
                         )}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <p className="text-[0.7rem] text-slate-400">
-                No colours match that search. Try a different name, finish description or SKU.
-              </p>
-            )}
-          </div>
-          {selectedCatalogueMaterial && (
-            <div className="space-y-2 rounded-xl border border-emerald-400/40 bg-emerald-400/5 p-3 text-[0.7rem] text-slate-100">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <p className="text-sm font-semibold text-emerald-200">Selected colour</p>
-                  <div className="flex items-center gap-2">
-                    <p className="text-base font-semibold text-slate-100">{selectedCatalogueMaterial.name}</p>
-                    {selectedCatalogueMaterial.isPopular && (
-                      <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-amber-200">
-                        Popular
-                      </span>
+                      </div>
+                      {selectedCatalogueMaterial.hexCode && (
+                        <span
+                          className="h-12 w-12 rounded-lg border border-white/10"
+                          aria-label={`Swatch for ${selectedCatalogueMaterial.name}`}
+                          style={{ backgroundColor: selectedCatalogueMaterial.hexCode }}
+                        />
+                      )}
+                    </div>
+                    <div className="grid gap-3 text-slate-200 sm:grid-cols-3">
+                      <div>
+                        <p className="text-[0.6rem] uppercase tracking-wide text-slate-400">Max blank length</p>
+                        <p className="text-sm">{catalogueMaxLengthLabel || `${effectiveLengthLimit}mm`}</p>
+                      </div>
+                      <div>
+                        <p className="text-[0.6rem] uppercase tracking-wide text-slate-400">Max blank width</p>
+                        <p className="text-sm">{catalogueMaxWidthLabel || `${effectiveWidthLimit}mm`}</p>
+                      </div>
+                      <div>
+                        <p className="text-[0.6rem] uppercase tracking-wide text-slate-400">Thicknesses stocked</p>
+                        <p className="text-sm">{`${thicknessChoices.join(', ')} mm`}</p>
+                      </div>
+                    </div>
+                    {activeThicknessLabel && (
+                      <p className="text-[0.6rem] uppercase tracking-wide text-slate-400">
+                        Limits shown for {activeThicknessLabel} stock.
+                      </p>
                     )}
                   </div>
-                  <p className="text-slate-300">
-                    {(selectedCatalogueMaterial.materialType || 'Material type TBD') + ' • ' + (selectedCatalogueMaterial.finish || 'Finish TBD')}
-                  </p>
-                  {selectedCatalogueMaterial.supplierSku && (
-                    <p className="text-[0.65rem] text-slate-400">Supplier SKU: {selectedCatalogueMaterial.supplierSku}</p>
-                  )}
-                </div>
-                {selectedCatalogueMaterial.hexCode && (
-                  <span
-                    className="h-12 w-12 rounded-lg border border-white/10"
-                    aria-label={`Swatch for ${selectedCatalogueMaterial.name}`}
-                    style={{ backgroundColor: selectedCatalogueMaterial.hexCode }}
-                  />
                 )}
               </div>
-              <div className="grid gap-3 text-slate-200 sm:grid-cols-3">
-                <div>
-                  <p className="text-[0.6rem] uppercase tracking-wide text-slate-400">Max blank length</p>
-                  <p className="text-sm">{catalogueMaxLengthLabel || `${effectiveLengthLimit}mm`}</p>
-                </div>
-                <div>
-                  <p className="text-[0.6rem] uppercase tracking-wide text-slate-400">Max blank width</p>
-                  <p className="text-sm">{catalogueMaxWidthLabel || `${effectiveWidthLimit}mm`}</p>
-                </div>
-                <div>
-                  <p className="text-[0.6rem] uppercase tracking-wide text-slate-400">Thicknesses stocked</p>
-                  <p className="text-sm">{`${thicknessChoices.join(', ')} mm`}</p>
-                </div>
-              </div>
-              {activeThicknessLabel && (
-                <p className="text-[0.6rem] uppercase tracking-wide text-slate-400">
-                  Limits shown for {activeThicknessLabel} stock.
-                </p>
-              )}
             </div>
-          )}
+          </div>
         </div>
 
         {config.shape === 'custom' && (
