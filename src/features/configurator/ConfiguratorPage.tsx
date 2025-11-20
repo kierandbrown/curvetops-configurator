@@ -1220,52 +1220,14 @@ const ConfiguratorPage: React.FC = () => {
         </label>
       </div>
 
-      <div className="mt-4 space-y-2 rounded-xl border border-slate-700 bg-slate-950 p-3">
-        <div className="flex items-baseline justify-between">
-          <span className="text-xs text-slate-400">Estimated price</span>
-          <span className="text-lg font-semibold">{formattedPrice}</span>
-        </div>
-        {loading && <p className="text-xs text-slate-400">Recalculating price…</p>}
-        {error && <p className="text-xs text-red-400">Pricing error: {error}</p>}
-        <button
-          type="button"
-          onClick={handleAddToCart}
-          disabled={addingToCart || !profile}
-          className={`w-full rounded-lg px-4 py-2 text-sm font-semibold transition ${
-            addingToCart || !profile
-              ? 'cursor-not-allowed bg-slate-800 text-slate-400'
-              : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
-          }`}
-        >
-          {addingToCart ? 'Saving top…' : 'Add to cart'}
-        </button>
-        <p className="text-[0.7rem] text-slate-400">
-          This stores the exact dimensions, material selection and estimated price so you can retrieve the top from the
-          search bar or during checkout later on.
-        </p>
-        {!profile && (
-          <p className="text-[0.7rem] text-amber-300">
-            You need to sign in before saving items to the cart. This keeps your configurations private.
-          </p>
-        )}
-        {cartFeedback && (
-          <p
-            role="status"
-            className={`text-[0.7rem] ${
-              cartFeedback.type === 'success' ? 'text-emerald-300' : 'text-red-300'
-            }`}
-          >
-            {cartFeedback.message}
-          </p>
-        )}
-      </div>
     </section>
   );
 
   return (
     // Stretch the configurator to fill the viewport beneath the sticky header + nav so
     // the 3D preview can occupy as much space as possible without forcing the page to scroll.
-    <div className="flex h-[calc(100dvh-220px)] flex-col space-y-6 overflow-hidden">
+    // The height is slightly reduced to give breathing room for the new action bar beneath the viewport.
+    <div className="flex h-[calc(100dvh-260px)] flex-col space-y-6 overflow-hidden">
       <section className="flex flex-1 min-h-0 flex-col space-y-4">
         <div className="relative flex-1 min-h-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
           <Configurator3D
@@ -1286,6 +1248,50 @@ const ConfiguratorPage: React.FC = () => {
               Upload a DXF file to see the custom outline in the preview window.
             </div>
           )}
+        </div>
+
+        {/* Place the pricing + cart controls directly under the viewport so the call-to-action is always visible. */}
+        <div className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1 text-slate-200">
+            <div className="flex items-baseline gap-2 text-xs text-slate-400">
+              <span>Estimated price</span>
+              {loading && <span className="text-[0.65rem] text-slate-400">Recalculating…</span>}
+              {error && <span className="text-[0.65rem] text-red-300">Pricing error: {error}</span>}
+            </div>
+            <p className="text-xl font-semibold">{formattedPrice}</p>
+            <p className="text-[0.75rem] text-slate-400">
+              Save this configuration to retrieve it later from the search bar or during checkout.
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-2 md:flex-1 md:items-end">
+            <button
+              type="button"
+              onClick={handleAddToCart}
+              disabled={addingToCart || !profile}
+              className={`w-full rounded-lg px-6 py-2 text-sm font-semibold transition md:w-auto ${
+                addingToCart || !profile
+                  ? 'cursor-not-allowed bg-slate-800 text-slate-400'
+                  : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
+              }`}
+            >
+              {addingToCart ? 'Saving top…' : 'Add to cart'}
+            </button>
+            {!profile && (
+              <p className="text-[0.7rem] text-amber-300">
+                You need to sign in before saving items to the cart. This keeps your configurations private.
+              </p>
+            )}
+            {cartFeedback && (
+              <p
+                role="status"
+                className={`text-[0.7rem] ${
+                  cartFeedback.type === 'success' ? 'text-emerald-300' : 'text-red-300'
+                }`}
+              >
+                {cartFeedback.message}
+              </p>
+            )}
+          </div>
         </div>
       </section>
 
