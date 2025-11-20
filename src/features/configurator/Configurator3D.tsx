@@ -49,6 +49,17 @@ const MM_TO_M = 0.001;
 // Keep the tabletop hovering at 720mm (0.72m) to resemble a real table height.
 const TABLETOP_STANDING_HEIGHT_M = 0.72;
 
+const getRoomDimensions = (config: TabletopConfig) => {
+  const length = config.lengthMm * MM_TO_M;
+  const width = config.widthMm * MM_TO_M;
+  const padding = 1.2;
+
+  return {
+    roomLength: Math.max(5, length + padding * 2),
+    roomWidth: Math.max(4, width + padding * 2)
+  };
+};
+
 interface TabletopGeometryOptions {
   config: TabletopConfig;
   customOutline?: ParsedCustomOutline | null;
@@ -404,11 +415,7 @@ interface MeetingRoomShellProps {
 
 // Lightweight geometry that frames the table inside a recognizable meeting room.
 const MeetingRoomShell: React.FC<MeetingRoomShellProps> = ({ config }) => {
-  const length = config.lengthMm * MM_TO_M;
-  const width = config.widthMm * MM_TO_M;
-  const padding = 1.2;
-  const roomLength = Math.max(5, length + padding * 2);
-  const roomWidth = Math.max(4, width + padding * 2);
+  const { roomLength, roomWidth } = useMemo(() => getRoomDimensions(config), [config]);
   const wallHeight = 2.8;
 
   return (
@@ -419,7 +426,7 @@ const MeetingRoomShell: React.FC<MeetingRoomShellProps> = ({ config }) => {
         <meshStandardMaterial color="#3a2f2b" roughness={0.9} metalness={0.05} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.002, 0]} receiveShadow>
-        <circleGeometry args={[Math.max(length, width) / 2 + 0.5, 64]} />
+        <circleGeometry args={[Math.max(config.lengthMm * MM_TO_M, config.widthMm * MM_TO_M) / 2 + 0.5, 64]} />
         <meshStandardMaterial color="#4a5568" roughness={0.85} metalness={0.1} />
       </mesh>
       {/* Back wall */}
@@ -747,6 +754,17 @@ const Configurator3D: React.FC<Props> = ({ config, customOutline, swatch }) => {
     [tabletopThickness]
   );
 
+  // Keep the room sizing logic shared between the shell and the camera presets so
+  // adjustments stay in sync.
+  const { roomLength } = useMemo(() => getRoomDimensions(config), [config]);
+
+  // Pull the side camera just inside the right wall so the view isn't occluded
+  // while still framing the full tabletop width.
+  const sideViewDistance = useMemo(
+    () => Math.max(1.6, Math.min(2.6, roomLength / 2 - 0.35)),
+    [roomLength]
+  );
+
   // Describe the camera position and target for each preset. Using useMemo avoids re-allocating
   // the objects on every render and keeps the camera updates predictable.
   const viewTargets = useMemo(
@@ -754,9 +772,9 @@ const Configurator3D: React.FC<Props> = ({ config, customOutline, swatch }) => {
       '3d': { position: [1.5, 1.3, 1.5] as [number, number, number], target: tableCenter },
       top: { position: [0, tableCenter[1] + 2.5, 0.0001] as [number, number, number], target: tableCenter },
       front: { position: [0, tableCenter[1], 2.6] as [number, number, number], target: tableCenter },
-      side: { position: [2.6, tableCenter[1], 0] as [number, number, number], target: tableCenter }
+      side: { position: [sideViewDistance, tableCenter[1], 0] as [number, number, number], target: tableCenter }
     }),
-    [tableCenter]
+    [sideViewDistance, tableCenter]
   );
 
   const viewButtons: { key: ViewPreset; label: string; icon: JSX.Element; help: string }[] = [
