@@ -387,7 +387,8 @@ const ConfiguratorPage: React.FC = () => {
   const filteredCatalogueMaterials = useMemo(() => {
     const searchValue = catalogueSearch.trim().toLowerCase();
     if (!searchValue) {
-      return catalogueMaterials.slice(0, 5);
+      const popularMaterials = catalogueMaterials.filter(material => material.isPopular);
+      return (popularMaterials.length ? popularMaterials : catalogueMaterials).slice(0, 12);
     }
 
     return catalogueMaterials
@@ -876,6 +877,52 @@ const ConfiguratorPage: React.FC = () => {
           <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
             {catalogueLoading ? (
               <p className="text-[0.7rem] text-slate-400">Loading colour catalogue…</p>
+            ) : catalogueSearch.trim() === '' ? (
+              // When the user has not typed a colour name, highlight quick-pick swatches for popular colours.
+              filteredCatalogueMaterials.length ? (
+                <div className="space-y-3">
+                  <p className="text-[0.7rem] text-slate-300">Popular colours at a glance</p>
+                  <div className="flex flex-wrap gap-3" role="listbox" aria-label="Popular colours">
+                    {filteredCatalogueMaterials.map(material => {
+                      const isActive = material.id === selectedCatalogueMaterialId;
+                      return (
+                        <button
+                          key={material.id}
+                          type="button"
+                          role="option"
+                          aria-selected={isActive}
+                          onClick={() => handleCatalogueSelection(material)}
+                          title={material.name}
+                          className={`group relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg border transition ${
+                            isActive
+                              ? 'border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.25)]'
+                              : 'border-slate-700 hover:border-emerald-300'
+                          }`}
+                        >
+                          {material.imageUrl ? (
+                            <img
+                              src={material.imageUrl}
+                              alt={material.name}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <span
+                              aria-hidden
+                              className="h-full w-full"
+                              style={{ backgroundColor: material.hexCode || '#1f2937' }}
+                            />
+                          )}
+                          <span className="pointer-events-none absolute -bottom-7 left-1/2 -translate-x-1/2 rounded bg-slate-900 px-2 py-0.5 text-[0.65rem] text-slate-100 opacity-0 shadow-lg transition group-hover:opacity-100">
+                            {material.name}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-[0.7rem] text-slate-400">We have not marked any colours as popular yet.</p>
+              )
             ) : filteredCatalogueMaterials.length ? (
               <ul className="space-y-2" role="listbox" aria-label="Colour search results">
                 {filteredCatalogueMaterials.map(material => {
