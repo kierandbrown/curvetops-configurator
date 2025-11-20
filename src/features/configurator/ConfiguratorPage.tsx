@@ -33,6 +33,7 @@ interface CatalogueMaterial {
   supplierSku: string;
   hexCode?: string;
   imageUrl?: string;
+  isPopular: boolean;
   maxLength: string;
   maxWidth: string;
   availableThicknesses: string[];
@@ -348,6 +349,7 @@ const ConfiguratorPage: React.FC = () => {
             supplierSku: data.supplierSku ?? '',
             hexCode: data.hexCode,
             imageUrl: data.imageUrl,
+            isPopular: Boolean(data.isPopular),
             maxLength: data.maxLength ?? '',
             maxWidth: data.maxWidth ?? '',
             availableThicknesses: derivedThicknesses.length
@@ -387,7 +389,8 @@ const ConfiguratorPage: React.FC = () => {
           material.name,
           material.materialType,
           material.finish,
-          material.supplierSku
+          material.supplierSku,
+          material.isPopular ? 'popular favourite top pick' : ''
         ]
           .join(' ')
           .toLowerCase();
@@ -839,7 +842,14 @@ const ConfiguratorPage: React.FC = () => {
                             : 'border-slate-800 hover:border-emerald-300/60'
                         }`}
                       >
-                        <span className="text-sm font-semibold text-slate-100">{material.name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-slate-100">{material.name}</span>
+                          {material.isPopular && (
+                            <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-amber-200">
+                              Popular
+                            </span>
+                          )}
+                        </div>
                         <span className="text-[0.7rem] text-slate-400">
                           {(material.materialType || 'Material type TBD') + ' • ' + (material.finish || 'Finish TBD')}
                         </span>
@@ -862,7 +872,14 @@ const ConfiguratorPage: React.FC = () => {
               <div className="flex items-center justify-between gap-2">
                 <div>
                   <p className="text-sm font-semibold text-emerald-200">Selected colour</p>
-                  <p className="text-base font-semibold text-slate-100">{selectedCatalogueMaterial.name}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-base font-semibold text-slate-100">{selectedCatalogueMaterial.name}</p>
+                    {selectedCatalogueMaterial.isPopular && (
+                      <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-amber-200">
+                        Popular
+                      </span>
+                    )}
+                  </div>
                   <p className="text-slate-300">
                     {(selectedCatalogueMaterial.materialType || 'Material type TBD') + ' • ' + (selectedCatalogueMaterial.finish || 'Finish TBD')}
                   </p>

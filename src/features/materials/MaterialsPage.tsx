@@ -29,6 +29,7 @@ interface MaterialInput {
   finish: string;
   hexCode: string;
   supplierSku: string;
+  isPopular: boolean;
   thicknessDimensions: ThicknessDimension[];
   imageUrl: string;
   notes: string;
@@ -46,7 +47,8 @@ type FilterKeys =
   | 'supplierSku'
   | 'thicknessDimensions'
   | 'lengthDetails'
-  | 'widthDetails';
+  | 'widthDetails'
+  | 'isPopular';
 
 const emptyMaterial: MaterialInput = {
   name: '',
@@ -55,6 +57,7 @@ const emptyMaterial: MaterialInput = {
   finish: '',
   hexCode: '#ffffff',
   supplierSku: '',
+  isPopular: false,
   thicknessDimensions: [],
   imageUrl: '',
   notes: ''
@@ -72,7 +75,8 @@ const initialFilters: Record<FilterKeys, string> = {
   supplierSku: '',
   thicknessDimensions: '',
   lengthDetails: '',
-  widthDetails: ''
+  widthDetails: '',
+  isPopular: ''
 };
 
 const buildSearchKeywords = (material: MaterialInput): string[] => {
@@ -86,7 +90,8 @@ const buildSearchKeywords = (material: MaterialInput): string[] => {
     material.thicknessDimensions
       .map(dimension => `${dimension.thickness} ${dimension.maxLength} ${dimension.maxWidth}`)
       .join(' '),
-    material.notes
+    material.notes,
+    material.isPopular ? 'popular favourite top-pick' : ''
   ];
   const words = combinedValues
     .join(' ')
@@ -156,6 +161,7 @@ const MaterialsPage: React.FC = () => {
           id: docSnap.id,
           ...emptyMaterial,
           ...data,
+          isPopular: Boolean(data.isPopular),
           thicknessDimensions: normalizedDimensions,
           imageUrl: data.imageUrl || ''
         };
@@ -206,6 +212,16 @@ const MaterialsPage: React.FC = () => {
             return material.thicknessDimensions.some(dimension =>
               dimension.thickness.toLowerCase().includes(filterValue)
             );
+          case 'isPopular':
+            return filterValue === 'yes'
+              ? material.isPopular
+              : filterValue === 'no'
+              ? !material.isPopular
+              : material.isPopular
+              ? ['popular', 'favourite', 'yes', 'true'].some(keyword =>
+                  keyword.includes(filterValue)
+                )
+              : !filterValue;
           case 'lengthDetails':
             return material.thicknessDimensions.some(dimension =>
               `${dimension.thickness} ${dimension.maxLength}`.toLowerCase().includes(filterValue)
@@ -453,6 +469,12 @@ const MaterialsPage: React.FC = () => {
       helper: 'Limit the table to a specific sheen or surface treatment.'
     },
     {
+      key: 'isPopular',
+      label: 'Popular',
+      placeholder: 'yes / no',
+      helper: 'Type “yes” to see featured finishes or “no” to hide them.'
+    },
+    {
       key: 'supplierSku',
       label: 'Supplier SKU',
       placeholder: 'SKU, code…',
@@ -511,6 +533,14 @@ const MaterialsPage: React.FC = () => {
               '—'
             )}
           </div>
+        );
+      case 'isPopular':
+        return material.isPopular ? (
+          <span className="inline-flex items-center gap-2 rounded-full bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-200">
+            Popular pick
+          </span>
+        ) : (
+          <span className="text-xs text-slate-500">Not marked</span>
         );
       case 'lengthDetails':
       case 'widthDetails': {
@@ -812,6 +842,25 @@ const MaterialsPage: React.FC = () => {
                   Add the supplier code exactly as it appears on the order sheet so procurement can search and cross
                   check fast.
                 </p>
+              </div>
+
+              <div className="flex items-start gap-3 rounded-lg border border-slate-800/60 bg-slate-950/50 p-3">
+                <input
+                  id="material-popular"
+                  type="checkbox"
+                  className="mt-1 h-5 w-5 rounded border-slate-700 bg-slate-900 text-emerald-400 focus:ring-2 focus:ring-emerald-400"
+                  checked={formState.isPopular}
+                  onChange={event => handleFormChange('isPopular', event.target.checked)}
+                />
+                <div className="space-y-1">
+                  <label className="text-sm font-semibold text-slate-100" htmlFor="material-popular">
+                    Popular colour
+                  </label>
+                  <p className="text-xs text-slate-400">
+                    Tick this if the finish is a go-to option you want highlighted in search results and filters. Use it for
+                    your hero swatches to help teams choose faster.
+                  </p>
+                </div>
               </div>
 
               <div>
