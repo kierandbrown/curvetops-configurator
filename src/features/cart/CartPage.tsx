@@ -12,6 +12,20 @@ interface CartItemRecord {
   id: string;
   label: string;
   config: TabletopConfig;
+  selectedColour:
+    | {
+        id?: string;
+        name?: string;
+        materialType?: string;
+        finish?: string;
+        supplierSku?: string;
+        hexCode?: string | null;
+        imageUrl?: string | null;
+        maxLength?: number | null;
+        maxWidth?: number | null;
+        availableThicknesses?: number[] | null;
+      }
+    | null;
   customShape: {
     fileName?: string | null;
     notes?: string | null;
@@ -71,6 +85,7 @@ const CartPage = () => {
           id: docSnap.id,
           label: data.label || 'Untitled top',
           config,
+          selectedColour: data.selectedColour || null,
           customShape: data.customShape || null,
           estimatedPrice: typeof data.estimatedPrice === 'number' ? data.estimatedPrice : null,
           createdAt: data.createdAt || null,
@@ -285,7 +300,11 @@ const CartPage = () => {
                   <tr key={item.id} className="hover:bg-slate-900/30">
                     <td className="p-4 align-middle">
                       {/* Inline previews provide a quick visual of each top without reopening the 3D scene. */}
-                      <CartTopPreview config={item.config} label={item.label} />
+                      <CartTopPreview
+                        config={item.config}
+                        label={item.label}
+                        selectedColour={item.selectedColour}
+                      />
                     </td>
                     <td className="p-4">
                       <button

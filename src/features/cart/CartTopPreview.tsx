@@ -4,6 +4,18 @@ import { TabletopConfig } from '../configurator/Configurator3D';
 interface CartTopPreviewProps {
   config: TabletopConfig;
   label: string;
+  selectedColour: {
+    id?: string;
+    name?: string;
+    materialType?: string;
+    finish?: string;
+    supplierSku?: string;
+    hexCode?: string | null;
+    imageUrl?: string | null;
+    maxLength?: number | null;
+    maxWidth?: number | null;
+    availableThicknesses?: number[] | null;
+  } | null;
 }
 
 const MATERIAL_FILL: Record<TabletopConfig['material'], string> = {
@@ -44,11 +56,23 @@ const buildSuperEllipsePath = (
   return `${path} Z`;
 };
 
-const CartTopPreview = ({ config, label }: CartTopPreviewProps) => {
+const toAlphaHex = (hex: string, alpha: number) => {
+  const sanitized = hex.replace('#', '');
+  if (![3, 6].includes(sanitized.length)) return null;
+
+  const fullHex = sanitized.length === 3 ? sanitized.split('').map(char => char + char).join('') : sanitized;
+  const [r, g, b] = [0, 2, 4].map(index => parseInt(fullHex.slice(index, index + 2), 16));
+
+  const safeAlpha = Math.min(Math.max(alpha, 0), 1);
+  return `rgba(${r},${g},${b},${safeAlpha})`;
+};
+
+const CartTopPreview = ({ config, label, selectedColour }: CartTopPreviewProps) => {
   const viewBoxWidth = 200;
   const viewBoxHeight = 140;
   const padding = 16;
   const patternId = useId();
+  const swatchPatternId = `${patternId}-swatch`;
 
   const safeLength = Math.max(config.lengthMm, 1);
   const safeWidth = Math.max(config.widthMm, 1);
@@ -64,8 +88,10 @@ const CartTopPreview = ({ config, label }: CartTopPreviewProps) => {
   const centerX = viewBoxWidth / 2;
   const centerY = viewBoxHeight / 2;
 
-  const fill = MATERIAL_FILL[config.material];
-  const stroke = MATERIAL_STROKE[config.material];
+  const selectedHex = selectedColour?.hexCode?.trim();
+  const fillFromHex = selectedHex ? toAlphaHex(selectedHex, 0.35) ?? selectedHex : null;
+  const fill = selectedColour?.imageUrl ? `url(#${swatchPatternId})` : fillFromHex ?? MATERIAL_FILL[config.material];
+  const stroke = selectedHex || MATERIAL_STROKE[config.material];
 
   let shapeElement: JSX.Element;
 
@@ -174,6 +200,19 @@ const CartTopPreview = ({ config, label }: CartTopPreviewProps) => {
             <pattern id={`${patternId}-grid`} width="20" height="20" patternUnits="userSpaceOnUse">
               <path d="M20 0 H0 V20" fill="none" stroke="rgba(15,23,42,0.4)" strokeWidth={1} />
             </pattern>
+            {selectedColour?.imageUrl && (
+              <pattern id={swatchPatternId} width="40" height="40" patternUnits="userSpaceOnUse">
+                {/* Use the supplier swatch image so the preview colour matches the cart selection. */}
+                <image
+                  href={selectedColour.imageUrl}
+                  x="0"
+                  y="0"
+                  width="40"
+                  height="40"
+                  preserveAspectRatio="xMidYMid slice"
+                />
+              </pattern>
+            )}
           </defs>
           <rect width={viewBoxWidth} height={viewBoxHeight} fill={`url(#${patternId}-grid)`} />
           {shapeElement}
