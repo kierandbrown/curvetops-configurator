@@ -496,7 +496,7 @@ interface DimensionLabelProps {
 
 const DIMENSION_COLOR = '#fcd34d';
 const DIMENSION_LABEL_CLASS =
-  'pointer-events-none whitespace-nowrap rounded border border-amber-400/30 bg-slate-950/80 px-1.5 py-0.5 text-[0.55rem] font-semibold text-amber-100 shadow-lg backdrop-blur';
+  'pointer-events-none whitespace-nowrap rounded border border-amber-400/30 bg-slate-950/80 px-1.5 py-0.5 text-[0.7rem] font-semibold text-amber-100 shadow-lg backdrop-blur';
 
 const DimensionLabel: React.FC<DimensionLabelProps> = ({ position, text, rotation }) => (
   <group position={position} rotation={rotation ?? [0, 0, 0]}>
