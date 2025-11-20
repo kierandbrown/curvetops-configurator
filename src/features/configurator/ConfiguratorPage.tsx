@@ -1277,14 +1277,9 @@ const ConfiguratorPage: React.FC = () => {
                   value={config.quantity}
                   onChange={handleQuantityChange}
                   className="w-24 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 shadow-inner focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-                  aria-describedby="cart-quantity-help"
                 />
                 <span className="text-xs text-slate-400">pcs</span>
               </div>
-              <p id="cart-quantity-help" className="text-[0.7rem] text-slate-400">
-                Tell us how many identical tops you need (1–99). Pricing, search keywords and saved cart items will all
-                reflect this quantity.
-              </p>
             </div>
             <div className="flex w-full flex-col items-stretch gap-2 md:w-auto md:flex-none md:items-start">
               <button
