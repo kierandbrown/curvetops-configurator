@@ -875,9 +875,6 @@ const ConfiguratorPage: React.FC = () => {
               <p className="text-sm font-semibold text-slate-100">
                 {selectedShapeOption?.label ?? 'Select a tabletop shape'}
               </p>
-              <p className="text-[0.7rem] text-slate-400">
-                Hover over this row (or tap the toggle) to expand and choose a different outline.
-              </p>
             </div>
           </div>
 
@@ -928,10 +925,6 @@ const ConfiguratorPage: React.FC = () => {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <p className="text-[0.8rem] font-semibold text-slate-100">Colour selection</p>
-              <p className="text-[0.7rem] text-slate-400">
-                Use the slide-out catalogue to lock in a real-world finish, matching the tabletop style tray for a consistent
-                flow.
-              </p>
             </div>
             <button
               type="button"
