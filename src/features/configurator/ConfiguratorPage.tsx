@@ -298,6 +298,8 @@ const ConfiguratorPage: React.FC = () => {
   const [selectedCatalogueMaterialId, setSelectedCatalogueMaterialId] = useState<string | null>(null);
   // Keep the tabletop shape picker compact until the user intentionally hovers/taps to expand it.
   const [isShapeTrayExpanded, setIsShapeTrayExpanded] = useState(false);
+  // Track whether the colour catalogue slide-out is visible so we can toggle and collapse it safely.
+  const [isColourTrayExpanded, setIsColourTrayExpanded] = useState(false);
   // Track a hide timeout so the tabletop style slideout lingers briefly before collapsing.
   const shapeTrayHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectedShapeOption = useMemo(
