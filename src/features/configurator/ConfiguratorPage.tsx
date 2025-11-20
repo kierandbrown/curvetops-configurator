@@ -1,4 +1,5 @@
 import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@auth/AuthContext';
 import { db } from '@auth/firebase';
@@ -290,6 +291,8 @@ const ConfiguratorPage: React.FC = () => {
   const [catalogueLoading, setCatalogueLoading] = useState(true);
   const [catalogueSearch, setCatalogueSearch] = useState('');
   const [selectedCatalogueMaterialId, setSelectedCatalogueMaterialId] = useState<string | null>(null);
+  // Capture the latest cart item details so we can surface them in a confirmation modal immediately after saving.
+  const [cartModalDetails, setCartModalDetails] = useState<{ label: string; quantity: number } | null>(null);
   // Keep the tabletop shape picker compact until the user intentionally hovers/taps to expand it.
   const [isShapeTrayExpanded, setIsShapeTrayExpanded] = useState(false);
   // Track whether the colour catalogue slide-out is visible so we can toggle and collapse it safely.
@@ -302,6 +305,7 @@ const ConfiguratorPage: React.FC = () => {
     () => shapeOptions.find(option => option.shape === config.shape),
     [config.shape]
   );
+  const navigate = useNavigate();
 
   // Keep the manual string inputs aligned whenever a slider or preset updates
   // the underlying config so the two controls never drift apart.
@@ -754,6 +758,10 @@ const ConfiguratorPage: React.FC = () => {
         type: 'success',
         message: 'Top added to your cart. Use the global search to find it by size, material or file name.'
       });
+      setCartModalDetails({
+        label: cartItemLabel,
+        quantity: config.quantity
+      });
     } catch (err) {
       console.error('Failed to add cart item', err);
       setCartFeedback({
@@ -763,6 +771,17 @@ const ConfiguratorPage: React.FC = () => {
     } finally {
       setAddingToCart(false);
     }
+  };
+
+  // Close the post-add modal and clear any transient cart feedback so the UI stays focused on the latest action.
+  const closeCartModal = () => {
+    setCartModalDetails(null);
+  };
+
+  // Guide the user straight to their cart while keeping the configurator state intact for easy return navigation.
+  const handleGoToCart = () => {
+    setCartModalDetails(null);
+    navigate('/cart');
   };
 
   // Keep the cart quantity as a clean integer within a sensible range so pricing,
@@ -1507,6 +1526,16 @@ const ConfiguratorPage: React.FC = () => {
                   >
                     {addingToCart ? 'Saving top…' : 'Add to cart'}
                   </button>
+                  {cartFeedback && (
+                    <p
+                      className={`text-xs ${
+                        cartFeedback.type === 'error' ? 'text-red-300' : 'text-emerald-300'
+                      }`}
+                      aria-live="polite"
+                    >
+                      {cartFeedback.message}
+                    </p>
+                  )}
                 </div>
                 <div className="flex w-full flex-col gap-1 md:w-52">
                   <label htmlFor="cart-quantity" className="text-sm font-medium text-slate-200">
@@ -1531,6 +1560,57 @@ const ConfiguratorPage: React.FC = () => {
           </div>
         </section>
       </div>
+      {/* Lightweight confirmation overlay that keeps shoppers oriented after saving a configuration. */}
+      {cartModalDetails && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cart-modal-heading"
+            className="w-full max-w-lg rounded-2xl border border-emerald-500/40 bg-slate-900 p-6 shadow-2xl"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p id="cart-modal-heading" className="text-sm font-semibold uppercase tracking-wide text-emerald-300">
+                  Added to cart
+                </p>
+                <h3 className="mt-2 text-xl font-semibold text-slate-50">{cartModalDetails.label}</h3>
+                <p className="mt-1 text-sm text-slate-300">Quantity saved: {cartModalDetails.quantity} pcs</p>
+                <p className="mt-3 text-sm text-slate-400">
+                  Keep refining your tabletop measurements or jump straight to the cart to review materials, quantities and
+                  pricing.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeCartModal}
+                className="rounded-full p-2 text-slate-300 transition hover:bg-slate-800 hover:text-emerald-300"
+                aria-label="Close cart confirmation"
+              >
+                <svg aria-hidden viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path d="M5 5 L15 15 M15 5 L5 15" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={closeCartModal}
+                className="inline-flex w-full items-center justify-center rounded-lg border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-50 transition hover:border-emerald-400 hover:text-emerald-200 sm:w-auto"
+              >
+                Return to configurator
+              </button>
+              <button
+                type="button"
+                onClick={handleGoToCart}
+                className="inline-flex w-full items-center justify-center rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 sm:w-auto"
+              >
+                Go to cart
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
