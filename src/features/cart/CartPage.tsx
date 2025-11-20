@@ -299,19 +299,6 @@ const CartPage = () => {
         <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
           <h2 className="text-sm font-semibold text-slate-200">Cart items</h2>
           <div className="flex items-center gap-3">
-            <div className="flex flex-col items-end gap-1 text-right">
-              <button
-                type="button"
-                onClick={handlePlaceOrder}
-                disabled={!hasCartItems}
-                className="rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
-              >
-                Place order
-              </button>
-              <p className="text-[0.65rem] text-slate-500">
-                Jump to orders to submit the saved tops when you are ready.
-              </p>
-            </div>
             <button
               type="button"
               onClick={handleBulkDelete}
@@ -593,7 +580,7 @@ const CartPage = () => {
           </table>
         </div>
         <div className="border-t border-slate-800 bg-slate-900/50 px-6 py-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-[0.65rem] uppercase tracking-[0.2em] text-slate-500">Summary</p>
               <p className="text-sm text-slate-300">
@@ -601,17 +588,33 @@ const CartPage = () => {
                 {pricedCount > 0 ? ` with ${pricedCount} priced` : ''}.
               </p>
             </div>
-            <div className="text-right">
-              <p className="text-[0.65rem] uppercase tracking-[0.2em] text-slate-500">Estimated total</p>
-              <p className="text-xl font-semibold text-emerald-300">
-                {pricedCount > 0
-                  ? totalEstimatedValue.toLocaleString('en-AU', {
-                      style: 'currency',
-                      currency: 'AUD'
-                    })
-                  : 'Awaiting prices'}
-              </p>
-              <p className="text-xs text-slate-500">Only items with an estimated price are counted.</p>
+            <div className="flex flex-col items-end gap-2 text-right sm:w-1/2 sm:items-end">
+              <div>
+                <p className="text-[0.65rem] uppercase tracking-[0.2em] text-slate-500">Estimated total</p>
+                <p className="text-xl font-semibold text-emerald-300">
+                  {pricedCount > 0
+                    ? totalEstimatedValue.toLocaleString('en-AU', {
+                        style: 'currency',
+                        currency: 'AUD'
+                      })
+                    : 'Awaiting prices'}
+                </p>
+                <p className="text-xs text-slate-500">Only items with an estimated price are counted.</p>
+              </div>
+              <div className="flex w-full flex-col items-end gap-1 sm:w-auto">
+                {/* Placing the action near the summary keeps checkout context close to pricing. */}
+                <button
+                  type="button"
+                  onClick={handlePlaceOrder}
+                  disabled={!hasCartItems}
+                  className="w-full rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400 sm:w-auto"
+                >
+                  Place order
+                </button>
+                <p className="text-[0.65rem] text-slate-500">
+                  Jump to orders to submit the saved tops when you are ready.
+                </p>
+              </div>
             </div>
           </div>
         </div>
