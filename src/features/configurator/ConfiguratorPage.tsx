@@ -869,6 +869,20 @@ const ConfiguratorPage: React.FC = () => {
         maxWidth: selectedCatalogueMaterial.maxWidth,
         availableThicknesses: selectedCatalogueMaterial.availableThicknesses
       };
+      const modalColourSnapshot: ColourSnapshot = {
+        id: selectedCatalogueMaterial.id,
+        name: selectedCatalogueMaterial.name,
+        materialType: selectedCatalogueMaterial.materialType,
+        finish: selectedCatalogueMaterial.finish,
+        supplierSku: selectedCatalogueMaterial.supplierSku,
+        hexCode: selectedCatalogueMaterial.hexCode ?? null,
+        imageUrl: selectedCatalogueMaterial.imageUrl ?? null,
+        maxLength: parseMeasurementToMm(selectedCatalogueMaterial.maxLength),
+        maxWidth: parseMeasurementToMm(selectedCatalogueMaterial.maxWidth),
+        availableThicknesses: selectedCatalogueMaterial.availableThicknesses
+          ?.map(value => Number(value))
+          .filter(value => Number.isFinite(value)) ?? null
+      };
       await addDoc(cartCollection, {
         userId: profile.id,
         label: cartItemLabel,

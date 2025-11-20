@@ -85,6 +85,16 @@ const CartPage = () => {
   // recalculating lengths inline for every render.
   const hasCartItems = cartItems.length > 0;
 
+  const clampQuantity = (value: number) => Math.min(Math.max(Math.round(value), 1), 999);
+
+  const normaliseQuantity = (value: unknown) => {
+    const parsed = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(parsed)) {
+      return 1;
+    }
+    return clampQuantity(parsed);
+  };
+
   // Sync the cart list for the authenticated user. Every entry is normalised with
   // the default table config so the UI can always render complete rows.
   useEffect(() => {
@@ -96,9 +106,11 @@ const CartPage = () => {
     const unsubscribe = onSnapshot(cartQuery, snapshot => {
       const nextItems: CartItemRecord[] = snapshot.docs.map(docSnap => {
         const data = docSnap.data() as Partial<CartItemRecord> & { config?: Partial<TabletopConfig> };
+        const rawConfig: Partial<TabletopConfig> = data.config ?? {};
         const config: TabletopConfig = {
           ...defaultTabletopConfig,
-          ...(data.config ?? {})
+          ...rawConfig,
+          quantity: normaliseQuantity(rawConfig.quantity ?? defaultTabletopConfig.quantity)
         } as TabletopConfig;
         return {
           id: docSnap.id,
@@ -183,8 +195,6 @@ const CartPage = () => {
     }
   };
 
-  const clampQuantity = (value: number) => Math.min(Math.max(Math.round(value), 1), 999);
-
   // Build extra search keywords from the stored colour metadata so quantity updates
   // keep the global search bar in sync with the latest item details.
   const buildColourSearchKeywords = (
@@ -201,7 +211,7 @@ const CartPage = () => {
   };
 
   const updateQuantity = async (item: CartItemRecord, nextQuantity: number) => {
-    const clampedQuantity = clampQuantity(nextQuantity);
+    const clampedQuantity = normaliseQuantity(nextQuantity);
     const nextConfig = { ...item.config, quantity: clampedQuantity };
 
     const searchKeywords = buildCartSearchKeywords(
@@ -234,7 +244,7 @@ const CartPage = () => {
   };
 
   const handleQuantityStep = (item: CartItemRecord, delta: number) => {
-    const currentQuantity = item.config.quantity ?? 1;
+    const currentQuantity = normaliseQuantity(item.config.quantity);
     updateQuantity(item, currentQuantity + delta);
   };
 
@@ -441,7 +451,7 @@ const CartPage = () => {
                 </tr>
               )}
               {filteredItems.map(item => {
-                const currentQuantity = item.config.quantity ?? 1;
+                const currentQuantity = normaliseQuantity(item.config.quantity);
                 return (
                   <tr key={item.id} className="hover:bg-slate-900/30">
                     <td className="p-4 align-middle">
