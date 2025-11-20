@@ -151,7 +151,11 @@ const CartPage = () => {
   // mirrors what the user sees on screen.
   const { pricedCount, totalEstimatedValue } = useMemo(() => {
     const pricedItems = filteredItems.filter(item => typeof item.estimatedPrice === 'number');
-    const total = pricedItems.reduce((sum, item) => sum + (item.estimatedPrice ?? 0), 0);
+    // Multiply by quantity so cart totals stay in sync with inline adjustments.
+    const total = pricedItems.reduce((sum, item) => {
+      const quantity = item.config.quantity ?? 1;
+      return sum + (item.estimatedPrice ?? 0) * quantity;
+    }, 0);
     return { pricedCount: pricedItems.length, totalEstimatedValue: total };
   }, [filteredItems]);
 
