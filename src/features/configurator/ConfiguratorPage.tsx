@@ -1,6 +1,16 @@
 import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  updateDoc
+} from 'firebase/firestore';
 import { useAuth } from '@auth/AuthContext';
 import { db } from '@auth/firebase';
 import Configurator3D, { ConfiguratorSnapshot, TableShape, TabletopConfig } from './Configurator3D';
@@ -351,6 +361,7 @@ const ConfiguratorPage: React.FC = () => {
   const [isShapeTrayExpanded, setIsShapeTrayExpanded] = useState(false);
   // Track whether the colour catalogue slide-out is visible so we can toggle and collapse it safely.
   const [isColourTrayExpanded, setIsColourTrayExpanded] = useState(false);
+  const [editingCartId, setEditingCartId] = useState<string | null>(null);
   // Track a hide timeout so the tabletop style slideout lingers briefly before collapsing.
   const shapeTrayHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Track a hide timeout so the colour catalogue slideout mirrors the tabletop hover behaviour.
@@ -360,6 +371,7 @@ const ConfiguratorPage: React.FC = () => {
     [config.shape]
   );
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   // Keep the manual string inputs aligned whenever a slider or preset updates
   // the underlying config so the two controls never drift apart.
@@ -382,6 +394,78 @@ const ConfiguratorPage: React.FC = () => {
   useEffect(() => {
     setManualInputs(prev => ({ ...prev, thicknessMm: config.thicknessMm.toString() }));
   }, [config.thicknessMm]);
+
+  useEffect(() => {
+    const cartIdParam = searchParams.get('cartId');
+    if (!cartIdParam || !profile) {
+      setEditingCartId(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const normaliseQuantity = (value: unknown) => {
+      const parsed = typeof value === 'number' ? value : Number(value);
+      if (!Number.isFinite(parsed)) return 1;
+      return clampNumber(Math.round(parsed), 1, 999);
+    };
+
+    const loadCartItem = async () => {
+      try {
+        const cartRef = doc(db, 'cartItems', cartIdParam);
+        const snap = await getDoc(cartRef);
+        if (!snap.exists()) {
+          setEditingCartId(null);
+          return;
+        }
+        const data = snap.data() as Partial<{
+          userId: string;
+          label: string;
+          config: Partial<TabletopConfig>;
+          customShape: Partial<CustomShapeDetails> | null;
+          selectedColour: (Partial<CatalogueMaterial> & { id: string }) | null;
+        }>;
+
+        if (data.userId && data.userId !== profile.id) return;
+
+        const mergedConfig: TabletopConfig = {
+          ...defaultTabletopConfig,
+          ...data.config,
+          quantity: normaliseQuantity(data.config?.quantity ?? defaultTabletopConfig.quantity)
+        } as TabletopConfig;
+
+        if (cancelled) return;
+
+        setConfig(mergedConfig);
+        setSelectedCatalogueMaterialId(data.selectedColour?.id ?? null);
+        setCatalogueSearch(data.selectedColour?.name ?? '');
+
+        if (data.customShape) {
+          setCustomShape({
+            fileName: data.customShape.fileName ?? 'Custom shape',
+            fileSize: data.customShape.fileSize ?? 0,
+            fileType: (data.customShape.fileType ?? 'dxf') as CustomShapeDetails['fileType'],
+            uploadedAt: data.customShape.uploadedAt ?? new Date().toISOString(),
+            outline: data.customShape.outline ?? null,
+            notes: data.customShape.notes
+          });
+        } else {
+          setCustomShape(null);
+        }
+
+        setEditingCartId(cartIdParam);
+      } catch (error) {
+        console.error('Failed to load cart item for editing', error);
+        if (!cancelled) setEditingCartId(null);
+      }
+    };
+
+    loadCartItem();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profile, searchParams]);
 
   useEffect(() => {
     const materialsQuery = query(collection(db, 'materials'), orderBy('name'));
@@ -786,12 +870,13 @@ const ConfiguratorPage: React.FC = () => {
 
     setAddingToCart(true);
     try {
-      const cartCollection = collection(db, 'cartItems');
       const customShapeMeta = customShape
         ? {
             fileName: customShape.fileName,
             fileSize: customShape.fileSize,
             fileType: customShape.fileType,
+            uploadedAt: customShape.uploadedAt,
+            outline: customShape.outline ?? null,
             notes: customShape.notes ?? null
           }
         : null;
@@ -821,7 +906,7 @@ const ConfiguratorPage: React.FC = () => {
           ?.map(value => Number(value))
           .filter(value => Number.isFinite(value)) ?? null
       };
-      await addDoc(cartCollection, {
+      const basePayload = {
         userId: profile.id,
         label: cartItemLabel,
         config,
@@ -835,9 +920,15 @@ const ConfiguratorPage: React.FC = () => {
           cartItemLabel,
           extraSurfaceKeywords
         ),
-        createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
-      });
+      };
+
+      if (editingCartId) {
+        await updateDoc(doc(db, 'cartItems', editingCartId), basePayload);
+      } else {
+        const cartCollection = collection(db, 'cartItems');
+        await addDoc(cartCollection, { ...basePayload, createdAt: serverTimestamp() });
+      }
       setCartModalDetails({
         label: cartItemLabel,
         quantity: config.quantity,
@@ -1606,7 +1697,7 @@ const ConfiguratorPage: React.FC = () => {
                         : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
                     }`}
                   >
-                    Add to cart
+                    {editingCartId ? 'Update item' : 'Add to cart'}
                   </button>
                 </div>
               </div>
