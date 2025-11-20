@@ -188,6 +188,9 @@ const CartPage = () => {
   };
 
   const handleDelete = async (itemId: string) => {
+    // Optimistically update the UI so removed items disappear immediately while Firestore catches up.
+    setCartItems(prev => prev.filter(item => item.id !== itemId));
+    setSelectedItemIds(prev => prev.filter(id => id !== itemId));
     try {
       await deleteDoc(doc(db, 'cartItems', itemId));
     } catch (error) {
@@ -249,8 +252,11 @@ const CartPage = () => {
   };
 
   const handleBulkDelete = async () => {
+    const idsToDelete = selectedItemIds;
+    // Remove the selected IDs right away so the table refreshes without waiting for Firestore roundtrips.
+    setCartItems(prev => prev.filter(item => !idsToDelete.includes(item.id)));
     // Delete each selected item in parallel, then reset the selection so the UI stays tidy.
-    const deletions = selectedItemIds.map(id => deleteDoc(doc(db, 'cartItems', id)));
+    const deletions = idsToDelete.map(id => deleteDoc(doc(db, 'cartItems', id)));
     try {
       await Promise.all(deletions);
       setSelectedItemIds([]);
