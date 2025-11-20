@@ -302,6 +302,8 @@ const ConfiguratorPage: React.FC = () => {
   const [isColourTrayExpanded, setIsColourTrayExpanded] = useState(false);
   // Track a hide timeout so the tabletop style slideout lingers briefly before collapsing.
   const shapeTrayHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track a hide timeout so the colour catalogue slideout mirrors the tabletop hover behaviour.
+  const colourTrayHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectedShapeOption = useMemo(
     () => shapeOptions.find(option => option.shape === config.shape),
     [config.shape]
@@ -777,6 +779,28 @@ const ConfiguratorPage: React.FC = () => {
     updateField('quantity', clampedQuantity);
   };
 
+  // Prevent overlapping timers when the user rapidly moves the pointer between the colour tray and the trigger.
+  const clearColourTrayHideTimeout = () => {
+    if (colourTrayHideTimeoutRef.current) {
+      clearTimeout(colourTrayHideTimeoutRef.current);
+      colourTrayHideTimeoutRef.current = null;
+    }
+  };
+
+  // Open the colour tray immediately on intent to mirror the tabletop slideout behaviour.
+  const openColourTray = () => {
+    clearColourTrayHideTimeout();
+    setIsColourTrayExpanded(true);
+  };
+
+  // Delay the hide slightly so users can steer into the catalogue without abrupt flicker.
+  const scheduleColourTrayCollapse = () => {
+    clearColourTrayHideTimeout();
+    colourTrayHideTimeoutRef.current = setTimeout(() => {
+      setIsColourTrayExpanded(false);
+    }, 500);
+  };
+
   // Prevent overlapping timers when the user rapidly moves the pointer between the tray and the trigger.
   const clearShapeTrayHideTimeout = () => {
     if (shapeTrayHideTimeoutRef.current) {
@@ -803,6 +827,7 @@ const ConfiguratorPage: React.FC = () => {
     () => () => {
       // Clean up any pending timer when the component unmounts.
       clearShapeTrayHideTimeout();
+      clearColourTrayHideTimeout();
     },
     []
   );
@@ -891,9 +916,12 @@ const ConfiguratorPage: React.FC = () => {
         {/* Colour search surfaces live catalogue data so operators pick real-world blanks. */}
         <div
           className="relative space-y-3 rounded-2xl border border-slate-800 bg-slate-900 p-3"
+          onMouseEnter={openColourTray}
+          onMouseLeave={scheduleColourTrayCollapse}
+          onFocus={openColourTray}
           onBlur={event => {
             if (!event.currentTarget.contains(event.relatedTarget)) {
-              setIsColourTrayExpanded(false);
+              scheduleColourTrayCollapse();
             }
           }}
         >
@@ -908,7 +936,10 @@ const ConfiguratorPage: React.FC = () => {
             <button
               type="button"
               aria-expanded={isColourTrayExpanded}
-              onClick={() => setIsColourTrayExpanded(prev => !prev)}
+              onClick={() => {
+                clearColourTrayHideTimeout();
+                setIsColourTrayExpanded(prev => !prev);
+              }}
               className={`self-start rounded-lg border px-3 py-1 text-[0.75rem] font-semibold transition sm:self-auto ${
                 isColourTrayExpanded
                   ? 'border-emerald-300/70 bg-emerald-500/10 text-emerald-200 hover:border-emerald-200'
