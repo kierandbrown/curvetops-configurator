@@ -138,13 +138,13 @@ const edgeProfileOptions: {
           </linearGradient>
         </defs>
         <path
-          d="M20 25 H140 L120 70 H20 Z"
+          d="M20 25 H140 V33 L103 70 H20 Z"
           fill="#0f172a"
           stroke="#34d399"
           strokeWidth={3}
           strokeLinejoin="round"
         />
-        <path d="M140 25 L120 70" stroke="url(#sharknosePaint)" strokeWidth={5} strokeLinecap="round" />
+        <path d="M140 33 L103 70" stroke="url(#sharknosePaint)" strokeWidth={5} strokeLinecap="round" />
         <text x="115" y="20" className="fill-emerald-200 text-[10px]" textAnchor="middle">
           Hand-painted bevel
         </text>
