@@ -1251,19 +1251,16 @@ const ConfiguratorPage: React.FC = () => {
         </div>
 
         {/* Place the pricing + cart controls directly under the viewport so the call-to-action is always visible. */}
-        <div className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-1 text-slate-200">
+        <div className="flex w-full flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4 md:max-w-3xl md:flex-row md:items-center md:justify-start md:gap-6 md:self-start">
+          <div className="space-y-1 text-slate-200 md:w-1/2">
             <div className="flex items-baseline gap-2 text-xs text-slate-400">
               <span>Estimated price</span>
               {loading && <span className="text-[0.65rem] text-slate-400">Recalculating…</span>}
               {error && <span className="text-[0.65rem] text-red-300">Pricing error: {error}</span>}
             </div>
             <p className="text-xl font-semibold">{formattedPrice}</p>
-            <p className="text-[0.75rem] text-slate-400">
-              Save this configuration to retrieve it later from the search bar or during checkout.
-            </p>
           </div>
-          <div className="flex flex-col items-end gap-2 md:flex-1 md:items-end">
+          <div className="flex w-full flex-col items-stretch gap-2 md:w-auto md:flex-none md:items-start">
             <button
               type="button"
               onClick={handleAddToCart}
@@ -1276,11 +1273,6 @@ const ConfiguratorPage: React.FC = () => {
             >
               {addingToCart ? 'Saving top…' : 'Add to cart'}
             </button>
-            {!profile && (
-              <p className="text-[0.7rem] text-amber-300">
-                You need to sign in before saving items to the cart. This keeps your configurations private.
-              </p>
-            )}
             {cartFeedback && (
               <p
                 role="status"
