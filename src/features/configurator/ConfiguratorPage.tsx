@@ -595,6 +595,12 @@ const ConfiguratorPage: React.FC = () => {
     });
   };
 
+  // Let the maker clear the current catalogue choice without wiping their other inputs.
+  const handleClearCatalogueSelection = () => {
+    setSelectedCatalogueMaterialId(null);
+    setCatalogueSearch('');
+  };
+
   const formattedPrice =
     price != null
       ? price.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })
@@ -985,19 +991,38 @@ const ConfiguratorPage: React.FC = () => {
             <div className="space-y-3">
               <label className="flex flex-col gap-1 text-[0.75rem] font-medium text-slate-200" htmlFor="catalogue-search">
                 <span>Colour catalogue search</span>
-                <input
-                  id="catalogue-search"
-                  type="text"
-                  value={catalogueSearch}
-                  onChange={event => {
-                    setCatalogueSearch(event.target.value);
-                    if (!event.target.value) {
-                      setSelectedCatalogueMaterialId(null);
-                    }
-                  }}
-                  placeholder="Search saved colours, finishes or SKU codes…"
-                  className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
-                />
+                <span className="text-[0.7rem] font-normal text-slate-400">
+                  Type a colour name, finish description or supplier SKU to find the right swatch quickly.
+                </span>
+                <div className="relative flex items-center gap-2">
+                  <input
+                    id="catalogue-search"
+                    type="text"
+                    value={catalogueSearch}
+                    onChange={event => {
+                      setCatalogueSearch(event.target.value);
+                      if (!event.target.value) {
+                        setSelectedCatalogueMaterialId(null);
+                      }
+                    }}
+                    placeholder="Search saved colours, finishes or SKU codes…"
+                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 pr-11 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                  />
+                  {selectedCatalogueMaterial && (
+                    <button
+                      type="button"
+                      onClick={handleClearCatalogueSelection}
+                      className="absolute right-2 inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-700/80 bg-slate-900 text-slate-300 shadow-sm transition hover:border-emerald-400 hover:text-emerald-200"
+                      aria-label="Remove selected colour"
+                      title="Remove selected colour"
+                    >
+                      {/* Simple cross icon to mirror the close affordance without another dependency. */}
+                      <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4">
+                        <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
               </label>
               <div className="max-h-[60vh] space-y-3 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950/80 p-3">
                 {catalogueLoading ? (
