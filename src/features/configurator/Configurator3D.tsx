@@ -291,6 +291,7 @@ const TabletopMesh: React.FC<TabletopGeometryOptions> = ({ config, customOutline
     return createTabletopGeometry({ config, customOutline });
   }, [config, customOutline]);
   const [swatchTexture, setSwatchTexture] = useState<THREE.Texture | null>(null);
+  const { gl } = useThree();
 
   // Load the supplier swatch image (if provided) so the 3D preview mirrors the catalogue selection.
   // Apply a supplier swatch image to the tabletop whenever one exists. The trimmed check avoids
@@ -322,7 +323,8 @@ const TabletopMesh: React.FC<TabletopGeometryOptions> = ({ config, customOutline
         texture.wrapS = THREE.RepeatWrapping;
         texture.wrapT = THREE.RepeatWrapping;
         texture.repeat.set(2, 2);
-        texture.anisotropy = 8;
+        // Respect the renderer capabilities so fine-grain timber and linen swatches stay crisp.
+        texture.anisotropy = gl.capabilities.getMaxAnisotropy();
         texture.colorSpace = THREE.SRGBColorSpace;
         texture.needsUpdate = true;
         loadedTexture = texture;
@@ -344,7 +346,7 @@ const TabletopMesh: React.FC<TabletopGeometryOptions> = ({ config, customOutline
         loadedTexture.dispose();
       }
     };
-  }, [swatch?.imageUrl]);
+  }, [gl, swatch?.imageUrl]);
 
   const fallbackMaterialColor =
     swatch?.hexCode?.trim() ||
@@ -355,10 +357,12 @@ const TabletopMesh: React.FC<TabletopGeometryOptions> = ({ config, customOutline
       : '#d0d4da');
 
   const appliedMaterialColor = swatchTexture ? '#ffffff' : fallbackMaterialColor;
+  const materialKey = swatchTexture ? `textured-${swatchTexture.uuid}` : `flat-${fallbackMaterialColor}`;
 
   return (
     <mesh geometry={geometry} castShadow receiveShadow>
       <meshStandardMaterial
+        key={materialKey}
         // Apply the supplier texture when available, otherwise fall back to the HEX swatch.
         color={appliedMaterialColor}
         map={swatchTexture ?? undefined}

@@ -332,12 +332,8 @@ const CartPage = () => {
                       value={filters.label}
                       onChange={e => handleFilterChange('label', e.target.value)}
                       placeholder="Search names"
-                      aria-describedby="cart-filter-name-help"
                       className="rounded border border-slate-700 bg-slate-900/60 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500"
                     />
-                    <p id="cart-filter-name-help" className="text-[0.65rem] text-slate-500">
-                      Type part of a saved name to quickly reopen a top.
-                    </p>
                   </div>
                 </th>
                 <th className="p-4 align-bottom">
@@ -349,12 +345,21 @@ const CartPage = () => {
                       value={filters.material}
                       onChange={e => handleFilterChange('material', e.target.value)}
                       placeholder="Search materials"
-                      aria-describedby="cart-filter-material-help"
                       className="rounded border border-slate-700 bg-slate-900/60 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500"
                     />
-                    <p id="cart-filter-material-help" className="text-[0.65rem] text-slate-500">
-                      Use material tags like laminate, timber or linoleum.
-                    </p>
+                  </div>
+                </th>
+                <th className="p-4 align-bottom">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[0.65rem] font-semibold tracking-wide text-slate-400">Shape</span>
+                    <input
+                      id="cart-filter-shape"
+                      type="text"
+                      value={filters.shape}
+                      onChange={e => handleFilterChange('shape', e.target.value)}
+                      placeholder="Search shapes"
+                      className="rounded border border-slate-700 bg-slate-900/60 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500"
+                    />
                   </div>
                 </th>
                 <th className="p-4 align-bottom">
@@ -366,12 +371,8 @@ const CartPage = () => {
                       value={filters.dimensions}
                       onChange={e => handleFilterChange('dimensions', e.target.value)}
                       placeholder="e.g. 2000x900"
-                      aria-describedby="cart-filter-dimensions-help"
                       className="rounded border border-slate-700 bg-slate-900/60 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500"
                     />
-                    <p id="cart-filter-dimensions-help" className="text-[0.65rem] text-slate-500">
-                      Enter length × width in millimetres to narrow the list.
-                    </p>
                   </div>
                 </th>
                 <th className="p-4 align-bottom">
@@ -383,12 +384,8 @@ const CartPage = () => {
                       value={filters.price}
                       onChange={e => handleFilterChange('price', e.target.value)}
                       placeholder="Search $"
-                      aria-describedby="cart-filter-price-help"
                       className="rounded border border-slate-700 bg-slate-900/60 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500"
                     />
-                    <p id="cart-filter-price-help" className="text-[0.65rem] text-slate-500">
-                      Paste a value to match estimated pricing.
-                    </p>
                   </div>
                 </th>
                 <th className="p-4 align-bottom">
@@ -406,12 +403,8 @@ const CartPage = () => {
                       value={filters.fileName}
                       onChange={e => handleFilterChange('fileName', e.target.value)}
                       placeholder="Search file names"
-                      aria-describedby="cart-filter-file-help"
                       className="rounded border border-slate-700 bg-slate-900/60 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500"
                     />
-                    <p id="cart-filter-file-help" className="text-[0.65rem] text-slate-500">
-                      Look up DXF filenames or notes captured during upload.
-                    </p>
                   </div>
                 </th>
                 <th className="p-4 text-right align-bottom">Actions</th>
