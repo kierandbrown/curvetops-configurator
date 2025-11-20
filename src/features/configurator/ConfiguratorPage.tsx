@@ -1175,9 +1175,8 @@ const ConfiguratorPage: React.FC = () => {
 
   const edgeProfileSelector = (
     <div
-      className="rounded-2xl border border-slate-800 bg-slate-900 p-4"
+      className="h-full rounded-2xl border border-slate-800 bg-slate-900 p-4"
       aria-labelledby="edge-profile-label"
-      aria-describedby="edge-profile-help"
       role="radiogroup"
     >
       <div className="flex items-center justify-between gap-4 text-[0.75rem] font-medium" id="edge-profile-label">
@@ -1186,9 +1185,6 @@ const ConfiguratorPage: React.FC = () => {
           {edgeProfileOptions.find(option => option.value === config.edgeProfile)?.label}
         </span>
       </div>
-      <p id="edge-profile-help" className="mt-1 text-[0.7rem] text-slate-400">
-        Choose how the perimeter is finished so installers can search specs for “edged” or “sharknose” later on.
-      </p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         {edgeProfileOptions.map(option => {
           const isActive = option.value === config.edgeProfile;
@@ -1199,21 +1195,20 @@ const ConfiguratorPage: React.FC = () => {
               onClick={() => updateField('edgeProfile', option.value)}
               role="radio"
               aria-checked={isActive}
-              className={`flex h-full flex-col justify-between rounded-xl border p-3 text-left transition ${
+              className={`flex h-full items-center gap-3 rounded-xl border p-3 text-left transition ${
                 isActive
                   ? 'border-emerald-400 bg-emerald-400/5 shadow-[0_0_20px_rgba(16,185,129,0.15)]'
                   : 'border-slate-700 bg-slate-950/70 hover:border-emerald-300/80'
               }`}
             >
-              <div className="mb-3 flex items-center justify-center rounded-lg bg-slate-900/70 p-2">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-900/70 p-2">
                 {/* Inline SVG previews give installers a quick visual cue for the profile. */}
                 {option.preview}
               </div>
-              <div>
+              <div className="flex flex-col">
                 <p className="text-sm font-semibold text-slate-100">{option.label}</p>
-                <p className="mt-1 text-[0.7rem] text-slate-400">{option.description}</p>
+                <p className="text-[0.7rem] text-slate-400">Tap to apply this edge.</p>
               </div>
-              <p className="mt-3 text-[0.65rem] text-emerald-300">{option.searchHint}</p>
             </button>
           );
         })}
@@ -1248,67 +1243,69 @@ const ConfiguratorPage: React.FC = () => {
           )}
         </div>
 
-        {/* Surface edge profile controls directly beneath the 3D viewport so the visual change is immediately visible. */}
-        {edgeProfileSelector}
+        <div className="flex flex-col gap-4 md:flex-row md:items-stretch">
+          {/* Surface edge profile controls beside pricing so the call-to-action stays aligned. */}
+          <div className="flex-1">{edgeProfileSelector}</div>
 
-        {/* Place the pricing + cart controls directly under the viewport so the call-to-action is always visible. */}
-        <div className="flex w-full flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4 md:max-w-3xl md:flex-row md:items-center md:justify-start md:gap-6 md:self-start">
-          <div className="space-y-1 text-slate-200 md:w-1/2">
-            <div className="flex items-baseline gap-2 text-xs text-slate-400">
-              <span>Estimated price</span>
-              {loading && <span className="text-[0.65rem] text-slate-400">Recalculating…</span>}
-              {error && <span className="text-[0.65rem] text-red-300">Pricing error: {error}</span>}
-            </div>
-            <p className="text-xl font-semibold">{formattedPrice}</p>
-          </div>
-          {/* Keep the quantity input directly beside the call-to-action so buyers can set multiples before saving. */}
-          <div className="flex w-full flex-col gap-3 md:w-auto md:flex-1 md:flex-row md:items-start md:gap-4">
-            <div className="flex w-full flex-col gap-1 md:w-52">
-              <label htmlFor="cart-quantity" className="text-sm font-medium text-slate-200">
-                Quantity
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  id="cart-quantity"
-                  type="number"
-                  min={1}
-                  max={99}
-                  inputMode="numeric"
-                  value={config.quantity}
-                  onChange={handleQuantityChange}
-                  className="w-24 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 shadow-inner focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-                />
-                <span className="text-xs text-slate-400">pcs</span>
+          {/* Place the pricing + cart controls directly under the viewport so the call-to-action is always visible. */}
+          <div className="flex w-full flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4 md:w-[420px] md:flex-none md:flex-row md:items-center md:justify-start md:gap-6">
+            <div className="space-y-1 text-slate-200 md:w-1/2">
+              <div className="flex items-baseline gap-2 text-xs text-slate-400">
+                <span>Estimated price</span>
+                {loading && <span className="text-[0.65rem] text-slate-400">Recalculating…</span>}
+                {error && <span className="text-[0.65rem] text-red-300">Pricing error: {error}</span>}
               </div>
+              <p className="text-xl font-semibold">{formattedPrice}</p>
             </div>
-            <div className="flex w-full flex-col items-stretch gap-2 md:w-auto md:flex-none md:items-start">
-              <button
-                type="button"
-                onClick={handleAddToCart}
-                disabled={addingToCart || !profile}
-                className={`w-full rounded-lg px-6 py-2 text-sm font-semibold transition md:w-auto ${
-                  addingToCart || !profile
-                    ? 'cursor-not-allowed bg-slate-800 text-slate-400'
-                    : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
-                }`}
-              >
-                {addingToCart ? 'Saving top…' : 'Add to cart'}
-              </button>
-              {!profile && (
-                <p className="text-[0.7rem] text-amber-300">
-                  You need to sign in before saving items to the cart. This keeps your configurations private.
-                </p>
-              )}
-              {cartFeedback && (
-                <p
-                  role="status"
-                  className={`text-[0.7rem] ${
-                    cartFeedback.type === 'success' ? 'text-emerald-300' : 'text-red-300'
+            {/* Keep the quantity input directly beside the call-to-action so buyers can set multiples before saving. */}
+            <div className="flex w-full flex-col gap-3 md:w-auto md:flex-1 md:flex-row md:items-start md:gap-4">
+              <div className="flex w-full flex-col gap-1 md:w-52">
+                <label htmlFor="cart-quantity" className="text-sm font-medium text-slate-200">
+                  Quantity
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="cart-quantity"
+                    type="number"
+                    min={1}
+                    max={99}
+                    inputMode="numeric"
+                    value={config.quantity}
+                    onChange={handleQuantityChange}
+                    className="w-24 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 shadow-inner focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                  />
+                  <span className="text-xs text-slate-400">pcs</span>
+                </div>
+              </div>
+              <div className="flex w-full flex-col items-stretch gap-2 md:w-auto md:flex-none md:items-start">
+                <button
+                  type="button"
+                  onClick={handleAddToCart}
+                  disabled={addingToCart || !profile}
+                  className={`w-full rounded-lg px-6 py-2 text-sm font-semibold transition md:w-auto ${
+                    addingToCart || !profile
+                      ? 'cursor-not-allowed bg-slate-800 text-slate-400'
+                      : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
                   }`}
                 >
-                  {cartFeedback.message}
-                </p>
-              )}
+                  {addingToCart ? 'Saving top…' : 'Add to cart'}
+                </button>
+                {!profile && (
+                  <p className="text-[0.7rem] text-amber-300">
+                    You need to sign in before saving items to the cart. This keeps your configurations private.
+                  </p>
+                )}
+                {cartFeedback && (
+                  <p
+                    role="status"
+                    className={`text-[0.7rem] ${
+                      cartFeedback.type === 'success' ? 'text-emerald-300' : 'text-red-300'
+                    }`}
+                  >
+                    {cartFeedback.message}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </div>
