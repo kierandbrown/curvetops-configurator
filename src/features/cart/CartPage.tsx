@@ -50,7 +50,6 @@ interface CartItemRecord {
 interface CartFilters {
   label: string;
   material: string;
-  shape: string;
   dimensions: string;
   price: string;
   fileName: string;
@@ -65,7 +64,6 @@ const MATERIAL_LABELS: Record<TabletopConfig['material'], string> = {
 const emptyFilters: CartFilters = {
   label: '',
   material: '',
-  shape: '',
   dimensions: '',
   price: '',
   fileName: ''
@@ -145,7 +143,6 @@ const CartPage = () => {
       return (
         item.label.toLowerCase().includes(filters.label.toLowerCase()) &&
         item.config.material.toLowerCase().includes(filters.material.toLowerCase()) &&
-        item.config.shape.toLowerCase().includes(filters.shape.toLowerCase()) &&
         dimLabel.includes(filters.dimensions.toLowerCase()) &&
         priceLabel.includes(filters.price.toLowerCase()) &&
         customFileTokens.includes(filters.fileName.toLowerCase())
@@ -287,13 +284,7 @@ const CartPage = () => {
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-3 border-b border-slate-800 pb-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-widest text-slate-500">Cart</p>
-          <h1 className="text-2xl font-semibold text-slate-50">Saved tops</h1>
-          <p className="text-sm text-slate-400">
-            Browse every configuration that leaves the 3D configurator and reopen a top for edits by tapping its name below.
-          </p>
-        </div>
+        <p className="text-xs uppercase tracking-widest text-slate-500">Cart</p>
         <nav className="flex flex-wrap gap-2 text-xs text-slate-500" aria-label="Breadcrumb">
           <span>Home</span>
           <span aria-hidden="true">/</span>
@@ -368,23 +359,6 @@ const CartPage = () => {
                 </th>
                 <th className="p-4 align-bottom">
                   <div className="flex flex-col gap-1">
-                    <span className="text-[0.65rem] font-semibold tracking-wide text-slate-400">Shape</span>
-                    <input
-                      id="cart-filter-shape"
-                      type="text"
-                      value={filters.shape}
-                      onChange={e => handleFilterChange('shape', e.target.value)}
-                      placeholder="Search shapes"
-                      aria-describedby="cart-filter-shape-help"
-                      className="rounded border border-slate-700 bg-slate-900/60 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500"
-                    />
-                    <p id="cart-filter-shape-help" className="text-[0.65rem] text-slate-500">
-                      Filter by the chosen profile such as round or custom.
-                    </p>
-                  </div>
-                </th>
-                <th className="p-4 align-bottom">
-                  <div className="flex flex-col gap-1">
                     <span className="text-[0.65rem] font-semibold tracking-wide text-slate-400">Dimensions</span>
                     <input
                       id="cart-filter-dimensions"
@@ -446,7 +420,7 @@ const CartPage = () => {
             <tbody className="divide-y divide-slate-900/70 bg-slate-950">
               {filteredItems.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="p-6 text-center text-sm text-slate-400">
+                  <td colSpan={9} className="p-6 text-center text-sm text-slate-400">
                     No cart items matched your filters. Clear the search inputs to show everything again.
                   </td>
                 </tr>
@@ -489,7 +463,6 @@ const CartPage = () => {
                       </p>
                     </td>
                     <td className="p-4 text-slate-200">{materialLabel}</td>
-                    <td className="p-4 text-slate-200">{item.config.shape}</td>
                     <td className="p-4 text-slate-200">
                       {item.config.lengthMm} × {item.config.widthMm} mm
                     </td>
