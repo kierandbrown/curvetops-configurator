@@ -65,7 +65,9 @@ const CartTopPreview = ({ config, label, selectedColour }: CartTopPreviewProps) 
   const viewBoxWidth = 200;
   const viewBoxHeight = 140;
   const padding = 16;
+  const clipPadding = 10;
   const swatchPatternId = `${useId()}-swatch`;
+  const clipPathId = `${useId()}-plan-clip`;
 
   const safeLength = Math.max(config.lengthMm, 1);
   const safeWidth = Math.max(config.widthMm, 1);
@@ -182,7 +184,7 @@ const CartTopPreview = ({ config, label, selectedColour }: CartTopPreviewProps) 
 
   return (
     <figure className="flex flex-col items-center gap-2 text-center">
-      <div className="flex h-24 w-36 items-center justify-center rounded-xl border border-slate-800/50 bg-transparent">
+      <div className="flex h-24 w-36 items-center justify-center overflow-hidden rounded-xl border border-slate-800/80 bg-slate-950/70 shadow-inner shadow-slate-950/70">
         <svg
           viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`}
           role="img"
@@ -204,9 +206,27 @@ const CartTopPreview = ({ config, label, selectedColour }: CartTopPreviewProps) 
                 />
               </pattern>
             )}
+            <clipPath id={clipPathId}>
+              <rect
+                x={clipPadding}
+                y={clipPadding}
+                width={viewBoxWidth - clipPadding * 2}
+                height={viewBoxHeight - clipPadding * 2}
+                rx={8}
+              />
+            </clipPath>
           </defs>
-          {/* Render the table top alone so curved shapes don't sit on top of an obvious square backdrop. */}
-          {shapeElement}
+          <rect
+            x={clipPadding}
+            y={clipPadding}
+            width={viewBoxWidth - clipPadding * 2}
+            height={viewBoxHeight - clipPadding * 2}
+            rx={8}
+            fill="rgba(15,23,42,0.35)"
+            stroke="#1e293b"
+            strokeWidth={2}
+          />
+          <g clipPath={`url(#${clipPathId})`}>{shapeElement}</g>
         </svg>
       </div>
       <figcaption className="text-[0.6rem] uppercase tracking-wide text-slate-500">

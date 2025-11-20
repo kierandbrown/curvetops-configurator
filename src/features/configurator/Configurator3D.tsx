@@ -466,6 +466,42 @@ const MeetingRoomShell: React.FC<MeetingRoomShellProps> = ({ config }) => {
 
 type ViewPreset = 'top' | 'front' | 'side' | '3d';
 
+// Static isometric render used in confirmation modals where we only need to show the configured model
+// grounded in the same room + leg geometry as the main configurator.
+export const ConfiguratorSnapshot: React.FC<Props> = ({ config, customOutline, swatch }) => {
+  const tabletopThickness = config.thicknessMm * MM_TO_M;
+  const { roomLength, roomWidth } = useMemo(() => getRoomDimensions(config), [config]);
+  const cameraOffset = useMemo(() => Math.max(1.3, Math.min(2, roomLength / 2.4)), [roomLength]);
+
+  return (
+    <div className="relative h-36 w-full overflow-hidden rounded-xl border border-slate-800/80 bg-slate-950/80 shadow-inner shadow-slate-950/60">
+      <Canvas camera={{ position: [cameraOffset, 1.15, cameraOffset], fov: 38 }} shadows dpr={[1, 2]}>
+        <color attach="background" args={['#0b1220']} />
+        <ambientLight intensity={0.6} />
+        <directionalLight
+          position={[4, 6, 3]}
+          intensity={1}
+          castShadow
+          shadow-mapSize-width={768}
+          shadow-mapSize-height={768}
+        />
+        <spotLight position={[-3, 5, 2]} angle={0.7} penumbra={0.5} intensity={0.55} castShadow />
+        <MeetingRoomShell config={config} />
+        <TableBase config={config} />
+        <group rotation={[-Math.PI / 2, 0, 0]} position={[0, TABLETOP_STANDING_HEIGHT_M + tabletopThickness / 2, 0]}>
+          <TabletopMesh config={config} customOutline={customOutline} swatch={swatch} />
+        </group>
+        {/* Cast a subtle ground shadow so the table feels anchored. */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.001, 0]} receiveShadow>
+          <planeGeometry args={[roomLength, roomWidth]} />
+          <shadowMaterial transparent opacity={0.3} />
+        </mesh>
+        <Environment preset="lobby" />
+      </Canvas>
+    </div>
+  );
+};
+
 // Simple SVG helpers so each view button has a recognizable icon.
 const IconTop = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true" width={20} height={20} className="text-slate-200">
