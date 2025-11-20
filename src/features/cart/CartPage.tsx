@@ -1,12 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Timestamp, collection, deleteDoc, doc, onSnapshot, query, where } from 'firebase/firestore';
+import {
+  Timestamp,
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where
+} from 'firebase/firestore';
 import { db } from '@auth/firebase';
 import { useAuth } from '@auth/AuthContext';
 import Loader from '@/components/ui/Loader';
 import { TabletopConfig } from '../configurator/Configurator3D';
 import { defaultTabletopConfig } from '../configurator/defaultConfig';
 import CartTopPreview from './CartTopPreview';
+import { buildCartSearchKeywords } from './cartUtils';
 
 interface CartItemRecord {
   id: string;
@@ -151,6 +162,61 @@ const CartPage = () => {
     } catch (error) {
       console.error('Failed to delete cart item', error);
     }
+  };
+
+  const clampQuantity = (value: number) => Math.min(Math.max(Math.round(value), 1), 99);
+
+  // Build extra search keywords from the stored colour metadata so quantity updates
+  // keep the global search bar in sync with the latest item details.
+  const buildColourSearchKeywords = (
+    selectedColour: CartItemRecord['selectedColour']
+  ): string[] => {
+    const rawTerms = [
+      selectedColour?.name,
+      selectedColour?.materialType,
+      selectedColour?.finish,
+      selectedColour?.supplierSku
+    ];
+
+    return rawTerms.filter((term): term is string => Boolean(term)).map(term => term.toString());
+  };
+
+  const updateQuantity = async (item: CartItemRecord, nextQuantity: number) => {
+    const clampedQuantity = clampQuantity(nextQuantity);
+    const nextConfig = { ...item.config, quantity: clampedQuantity };
+
+    const searchKeywords = buildCartSearchKeywords(
+      nextConfig,
+      MATERIAL_LABELS[item.config.material],
+      item.customShape,
+      item.label,
+      buildColourSearchKeywords(item.selectedColour)
+    );
+
+    try {
+      await updateDoc(doc(db, 'cartItems', item.id), {
+        'config.quantity': clampedQuantity,
+        searchKeywords,
+        updatedAt: serverTimestamp()
+      });
+    } catch (error) {
+      console.error('Failed to update quantity', error);
+    }
+  };
+
+  // Apply a numeric input change directly to Firestore so the inline controls and
+  // the persisted cart stay aligned.
+  const handleQuantityInput = (item: CartItemRecord, value: string) => {
+    const parsed = Number(value);
+    if (Number.isNaN(parsed)) {
+      return;
+    }
+    updateQuantity(item, parsed);
+  };
+
+  const handleQuantityStep = (item: CartItemRecord, delta: number) => {
+    const currentQuantity = item.config.quantity ?? 1;
+    updateQuantity(item, currentQuantity + delta);
   };
 
   const handleBulkDelete = async () => {
@@ -415,7 +481,46 @@ const CartPage = () => {
                           })
                         : '—'}
                     </td>
-                    <td className="p-4 text-slate-200">{item.config.quantity ?? 1}</td>
+                    <td className="p-4 text-slate-200">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          aria-label={`Decrease quantity for ${item.label}`}
+                          onClick={() => handleQuantityStep(item, -1)}
+                          disabled={(item.config.quantity ?? 1) <= 1}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-700 bg-slate-900 text-slate-100 transition hover:border-emerald-400 hover:text-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          −
+                        </button>
+                        <div className="flex flex-col">
+                          <input
+                            type="number"
+                            min={1}
+                            max={99}
+                            inputMode="numeric"
+                            aria-label={`Quantity for ${item.label}`}
+                            aria-describedby={`cart-quantity-help-${item.id}`}
+                            value={item.config.quantity ?? 1}
+                            onChange={event => handleQuantityInput(item, event.target.value)}
+                            className="w-20 rounded-lg border border-slate-700 bg-slate-900 px-3 py-1 text-center text-sm font-semibold text-slate-100 transition focus:border-emerald-400 focus:outline-none"
+                          />
+                          <p
+                            id={`cart-quantity-help-${item.id}`}
+                            className="text-[0.65rem] text-slate-500"
+                          >
+                            Enter 1-99 or use the buttons to adjust how many of this top to make.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          aria-label={`Increase quantity for ${item.label}`}
+                          onClick={() => handleQuantityStep(item, 1)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-700 bg-slate-900 text-slate-100 transition hover:border-emerald-400 hover:text-emerald-300"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </td>
                     <td className="p-4 text-slate-200">
                       {item.customShape?.fileName ? (
                         <>
