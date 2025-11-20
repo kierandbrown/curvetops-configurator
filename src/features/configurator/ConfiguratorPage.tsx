@@ -811,7 +811,7 @@ const ConfiguratorPage: React.FC = () => {
       <h2 className="text-sm font-semibold text-slate-200">Parameters</h2>
       <div className="grid gap-3 text-xs text-slate-200">
         <div
-          className="relative rounded-xl border border-slate-800 bg-slate-950/70"
+          className="relative z-30 rounded-xl border border-slate-800 bg-slate-950/70"
           onMouseEnter={() => setIsShapeTrayExpanded(true)}
           onMouseLeave={() => setIsShapeTrayExpanded(false)}
           onFocus={() => setIsShapeTrayExpanded(true)}
@@ -856,7 +856,7 @@ const ConfiguratorPage: React.FC = () => {
           </div>
 
           <div
-            className={`absolute left-full top-2 z-10 ml-3 w-[min(28rem,70vw)] rounded-xl border border-emerald-400/50 bg-slate-950/95 p-3 shadow-2xl transition-all duration-300 ${
+            className={`absolute left-full top-2 z-50 ml-3 w-[min(28rem,70vw)] rounded-xl border border-emerald-400/50 bg-slate-950/95 p-3 shadow-2xl transition-all duration-300 ${
               isShapeTrayExpanded
                 ? 'visible opacity-100 translate-x-0'
                 : 'invisible translate-x-2 opacity-0 pointer-events-none'
@@ -1346,23 +1346,23 @@ const ConfiguratorPage: React.FC = () => {
                 >
                   {addingToCart ? 'Saving top…' : 'Add to cart'}
                 </button>
-                {/* Reserve a consistent status height so the button and quantity never shift when feedback appears. */}
-                <div className="min-h-[40px] space-y-1 text-[0.7rem] leading-snug">
+                {/* Reserve space for status messaging so the button/quantity alignment never shifts after clicking. */}
+                <div className="min-h-[36px] space-y-1">
                   {!profile && (
-                    <p className="text-amber-300">
+                    <p className="text-[0.7rem] text-amber-300">
                       You need to sign in before saving items to the cart. This keeps your configurations private.
                     </p>
                   )}
                   {cartFeedback && (
                     <p
                       role="status"
-                      className={cartFeedback.type === 'success' ? 'text-emerald-300' : 'text-red-300'}
+                      className={`text-[0.7rem] ${
+                        cartFeedback.type === 'success' ? 'text-emerald-300' : 'text-red-300'
+                      }`}
                     >
                       {cartFeedback.message}
                     </p>
                   )}
-                  {/* Invisible placeholder keeps the container height fixed when there is no messaging. */}
-                  {!cartFeedback && profile && <p className="invisible">Cart status placeholder</p>}
                 </div>
               </div>
               <div className="flex w-full flex-col gap-1 md:w-52">
