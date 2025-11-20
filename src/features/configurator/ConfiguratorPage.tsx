@@ -1390,14 +1390,14 @@ const ConfiguratorPage: React.FC = () => {
               role="radio"
               aria-checked={isActive}
               aria-label={option.label}
-              className={`group relative flex h-full flex-col items-center justify-center rounded-xl border p-4 text-left transition ${
+              className={`group relative flex h-full flex-col items-center justify-center rounded-xl border px-4 py-2 text-left transition ${
                 isActive
                   ? 'border-emerald-400 bg-emerald-400/5 shadow-[0_0_20px_rgba(16,185,129,0.15)]'
                   : 'border-slate-700 bg-slate-950/70 hover:border-emerald-300/80'
               }`}
             >
               {/* Icon-only presentation keeps the tray compact; tooltip reveals context on hover/focus. */}
-              <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-slate-900/70 p-2 text-emerald-300 [&>svg]:h-12 [&>svg]:w-12">
+              <div className="flex h-20 w-full max-w-[260px] items-center justify-center rounded-lg bg-slate-900/70 px-3 py-2 text-emerald-300 shadow-inner shadow-slate-950/60 [&>svg]:h-full [&>svg]:w-full">
                 {option.preview}
               </div>
               <span className="sr-only">{option.label}</span>
