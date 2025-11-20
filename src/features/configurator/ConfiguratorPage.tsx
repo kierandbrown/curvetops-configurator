@@ -1640,14 +1640,15 @@ const ConfiguratorPage: React.FC = () => {
             {/* Place the pricing + cart controls directly under the viewport so the call-to-action is always visible. */}
             <div className="flex w-full flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4 md:w-[420px] md:flex-none md:flex-row md:items-stretch md:justify-start md:gap-6">
               <div className="space-y-1 text-slate-200 md:w-1/2">
-                <div className="flex items-baseline gap-2 text-xs text-slate-400">
-                  <span>Estimated price</span>
-                  {loading && <span className="text-[0.65rem] text-slate-400">Recalculating…</span>}
-                  {error && <span className="text-[0.65rem] text-red-300">Pricing error: {error}</span>}
-                </div>
-                <p className="text-xl font-semibold">{formattedPrice}</p>
+              <div className="flex items-baseline gap-2 text-xs text-slate-400">
+                <span>Estimated price</span>
+                {loading && <span className="text-[0.65rem] text-slate-400">Recalculating…</span>}
+                {error && <span className="text-[0.65rem] text-red-300">Pricing error: {error}</span>}
               </div>
-              {/* Keep the quantity input directly beside the call-to-action so buyers can set multiples before saving. */}
+              <p className="text-xl font-semibold">{formattedPrice}</p>
+            </div>
+            {/* Keep the quantity input directly beside the call-to-action so buyers can set multiples before saving. */}
+            {selectedCatalogueMaterial ? (
               <div className="flex w-full flex-col gap-3 md:w-auto md:flex-1 md:flex-row-reverse md:items-stretch md:gap-4">
                 {/* Surface the call-to-action first on desktop so the “Add to cart” button sits to the left of the quantity input. */}
                 <div className="flex w-full flex-col items-stretch gap-2 md:w-auto md:flex-none md:items-stretch md:justify-between md:self-stretch">
@@ -1668,46 +1669,38 @@ const ConfiguratorPage: React.FC = () => {
                       className={`text-xs ${
                         cartFeedback.type === 'error' ? 'text-red-300' : 'text-emerald-300'
                       }`}
+                      aria-live="polite"
                     >
-                      {addingToCart ? 'Saving top…' : 'Add to cart'}
-                    </button>
-                    {cartFeedback && (
-                      <p
-                        className={`text-xs ${
-                          cartFeedback.type === 'error' ? 'text-red-300' : 'text-emerald-300'
-                        }`}
-                        aria-live="polite"
-                      >
-                        {cartFeedback.message}
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex min-h-[52px] w-full items-center justify-center rounded-lg border border-dashed border-slate-700 bg-slate-950/70 px-3 py-2 text-center text-sm text-slate-300">
-                    Select a colour to add this tabletop to your cart.
-                  </div>
-                )}
-                <div className="flex w-full flex-col gap-1 md:w-52">
-                  <label htmlFor="cart-quantity" className="text-sm font-medium text-slate-200">
-                    Quantity
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      id="cart-quantity"
-                      type="number"
-                      min={1}
-                      max={999}
-                      inputMode="numeric"
-                      value={config.quantity}
-                      onChange={handleQuantityChange}
-                      className="w-24 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 shadow-inner focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-                    />
-                    <span className="text-xs text-slate-400">pcs</span>
-                  </div>
+                      {cartFeedback.message}
+                    </p>
+                  )}
                 </div>
+              </div>
+            ) : (
+              <div className="flex min-h-[52px] w-full items-center justify-center rounded-lg border border-dashed border-slate-700 bg-slate-950/70 px-3 py-2 text-center text-sm text-slate-300">
+                Select a colour to add this tabletop to your cart.
+              </div>
+            )}
+            <div className="flex w-full flex-col gap-1 md:w-52">
+              <label htmlFor="cart-quantity" className="text-sm font-medium text-slate-200">
+                Quantity
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  id="cart-quantity"
+                  type="number"
+                  min={1}
+                  max={999}
+                  inputMode="numeric"
+                  value={config.quantity}
+                  onChange={handleQuantityChange}
+                  className="w-24 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 shadow-inner focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                />
+                <span className="text-xs text-slate-400">pcs</span>
               </div>
             </div>
           </div>
+        </div>
         </section>
       </div>
       {/* Lightweight confirmation overlay that keeps shoppers oriented after saving a configuration. */}
