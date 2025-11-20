@@ -70,11 +70,6 @@ const AccountPage: React.FC = () => {
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <div>
         <p className="text-sm uppercase tracking-wide text-emerald-300">Account</p>
-        <h1 className="text-2xl font-semibold">Contact & company profile</h1>
-        <p className="text-sm text-slate-300">
-          Keep this information current so we can send accurate freight estimates and reach you when
-          a fabrication milestone needs attention.
-        </p>
       </div>
       <form className="grid gap-4 md:grid-cols-2" onSubmit={onSubmit}>
         <div className="md:col-span-2">
