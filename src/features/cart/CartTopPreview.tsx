@@ -65,8 +65,7 @@ const CartTopPreview = ({ config, label, selectedColour }: CartTopPreviewProps) 
   const viewBoxWidth = 200;
   const viewBoxHeight = 140;
   const padding = 16;
-  const patternId = useId();
-  const swatchPatternId = `${patternId}-swatch`;
+  const swatchPatternId = `${useId()}-swatch`;
 
   const safeLength = Math.max(config.lengthMm, 1);
   const safeWidth = Math.max(config.widthMm, 1);
@@ -191,11 +190,7 @@ const CartTopPreview = ({ config, label, selectedColour }: CartTopPreviewProps) 
           className="h-full w-full"
         >
           <title>{`${label} preview`}</title>
-          {/* A faint grid helps communicate proportions on both mobile and desktop. */}
           <defs>
-            <pattern id={`${patternId}-grid`} width="20" height="20" patternUnits="userSpaceOnUse">
-              <path d="M20 0 H0 V20" fill="none" stroke="rgba(15,23,42,0.4)" strokeWidth={1} />
-            </pattern>
             {selectedColour?.imageUrl && (
               <pattern id={swatchPatternId} width="40" height="40" patternUnits="userSpaceOnUse">
                 {/* Use the supplier swatch image so the preview colour matches the cart selection. */}
@@ -210,7 +205,8 @@ const CartTopPreview = ({ config, label, selectedColour }: CartTopPreviewProps) 
               </pattern>
             )}
           </defs>
-          <rect width={viewBoxWidth} height={viewBoxHeight} fill={`url(#${patternId}-grid)`} />
+          {/* Keep the preview background plain white so the cart image always looks clean. */}
+          <rect width={viewBoxWidth} height={viewBoxHeight} fill="white" />
           {shapeElement}
         </svg>
       </div>
