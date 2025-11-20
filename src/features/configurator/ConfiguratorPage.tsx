@@ -1,4 +1,4 @@
-import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '@auth/AuthContext';
@@ -13,11 +13,120 @@ import { CustomShapeDetails } from './customShapeTypes';
 import { defaultTabletopConfig } from './defaultConfig';
 import { buildCartSearchKeywords } from '../cart/cartUtils';
 import ViewportMouseGuide from './ViewportMouseGuide';
+import CartTopPreview from '../cart/CartTopPreview';
 
 const ROUND_DIAMETER_LIMIT_MM = 1800;
 
 // Supported board thickness increments for the slider.
 const DEFAULT_THICKNESS_OPTIONS = [12, 16, 18, 25, 33];
+
+const PreviewCard = ({
+  title,
+  subtitle,
+  children
+}: {
+  title: string;
+  subtitle: string;
+  children: ReactNode;
+}) => (
+  <div className="flex flex-col items-center gap-2 rounded-xl border border-slate-800/80 bg-slate-950/60 p-3 text-center">
+    {children}
+    <div className="space-y-1">
+      <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-slate-300">{title}</p>
+      <p className="text-xs text-slate-400">{subtitle}</p>
+    </div>
+  </div>
+);
+
+const ElevationPreview = ({
+  primaryDimension,
+  secondaryDimension,
+  label,
+  subtitle
+}: {
+  primaryDimension: number;
+  secondaryDimension: number;
+  label: string;
+  subtitle: string;
+}) => {
+  const viewBoxWidth = 200;
+  const viewBoxHeight = 110;
+  const padding = 18;
+  const scale = Math.min(
+    (viewBoxWidth - padding * 2) / Math.max(primaryDimension, 1),
+    (viewBoxHeight - padding * 2) / Math.max(secondaryDimension, 1)
+  );
+
+  const rectWidth = Math.max(primaryDimension * scale, 8);
+  const rectHeight = Math.max(secondaryDimension * scale, 10);
+  const originX = (viewBoxWidth - rectWidth) / 2;
+  const originY = (viewBoxHeight - rectHeight) / 2;
+
+  return (
+    <PreviewCard title={label} subtitle={subtitle}>
+      <svg viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`} role="img" aria-label={`${label} view`} className="h-24 w-36">
+        <title>{`${label} view`}</title>
+        <rect
+          x={originX}
+          y={originY}
+          width={rectWidth}
+          height={rectHeight}
+          rx={6}
+          fill="#0f172a"
+          stroke="#22c55e"
+          strokeWidth={3}
+          className="drop-shadow-[0_10px_25px_rgba(16,185,129,0.2)]"
+        />
+      </svg>
+    </PreviewCard>
+  );
+};
+
+const IsometricPreview = ({
+  config,
+  subtitle
+}: {
+  config: TabletopConfig;
+  subtitle: string;
+}) => {
+  const viewBoxWidth = 200;
+  const viewBoxHeight = 140;
+  const padding = 22;
+  const scale = Math.min(
+    (viewBoxWidth - padding * 2) / Math.max(config.lengthMm + config.widthMm * 0.6, 1),
+    (viewBoxHeight - padding * 2) / Math.max(config.widthMm + config.thicknessMm * 1.5, 1)
+  );
+
+  const length = Math.max(config.lengthMm * scale, 12);
+  const width = Math.max(config.widthMm * scale, 10);
+  const thickness = Math.max(config.thicknessMm * scale, 8);
+
+  const startX = (viewBoxWidth - length) / 2 + width * 0.25;
+  const startY = padding;
+
+  const top = `M${startX} ${startY} L${startX + length} ${startY} L${startX + length - width * 0.5} ${
+    startY + width * 0.35
+  } L${startX - width * 0.5} ${startY + width * 0.35} Z`;
+  const side = `M${startX + length} ${startY} L${startX + length - width * 0.5} ${
+    startY + width * 0.35
+  } L${startX + length - width * 0.5} ${startY + width * 0.35 + thickness} L${startX + length} ${startY + thickness} Z`;
+  const front = `M${startX - width * 0.5} ${startY + width * 0.35} L${startX + length - width * 0.5} ${
+    startY + width * 0.35
+  } L${startX + length - width * 0.5} ${startY + width * 0.35 + thickness} L${startX - width * 0.5} ${
+    startY + width * 0.35 + thickness
+  } Z`;
+
+  return (
+    <PreviewCard title="3D" subtitle={subtitle}>
+      <svg viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`} role="img" aria-label="3D view" className="h-24 w-36">
+        <title>3D view</title>
+        <path d={top} fill="#22c55e" opacity={0.25} stroke="#22c55e" strokeWidth={1.5} />
+        <path d={side} fill="#16a34a" opacity={0.4} stroke="#22c55e" strokeWidth={1.5} />
+        <path d={front} fill="#22c55e" opacity={0.35} stroke="#22c55e" strokeWidth={1.5} />
+      </svg>
+    </PreviewCard>
+  );
+};
 
 interface ThicknessDimension {
   thickness: string;
@@ -39,6 +148,19 @@ interface CatalogueMaterial {
   availableThicknesses: string[];
   thicknessDimensions: ThicknessDimension[];
 }
+
+type ColourSnapshot = {
+  id?: string;
+  name?: string;
+  materialType?: string;
+  finish?: string;
+  supplierSku?: string;
+  hexCode?: string | null;
+  imageUrl?: string | null;
+  maxLength?: number | null;
+  maxWidth?: number | null;
+  availableThicknesses?: number[] | null;
+} | null;
 
 // Convert stored catalogue measurements (e.g. "3600mm" or "3.6m")
 // into a number of millimetres for enforcing limits.
@@ -292,7 +414,10 @@ const ConfiguratorPage: React.FC = () => {
   const [catalogueSearch, setCatalogueSearch] = useState('');
   const [selectedCatalogueMaterialId, setSelectedCatalogueMaterialId] = useState<string | null>(null);
   // Capture the latest cart item details so we can surface them in a confirmation modal immediately after saving.
-  const [cartModalDetails, setCartModalDetails] = useState<{ label: string; quantity: number } | null>(null);
+  const [cartModalDetails, setCartModalDetails] = useState<
+    { label: string; quantity: number; configSnapshot: TabletopConfig; colourSnapshot: ColourSnapshot }
+      | null
+  >(null);
   // Keep the tabletop shape picker compact until the user intentionally hovers/taps to expand it.
   const [isShapeTrayExpanded, setIsShapeTrayExpanded] = useState(false);
   // Track whether the colour catalogue slide-out is visible so we can toggle and collapse it safely.
@@ -737,6 +862,22 @@ const ConfiguratorPage: React.FC = () => {
             availableThicknesses: selectedCatalogueMaterial.availableThicknesses
           }
         : null;
+      const modalColourSnapshot: ColourSnapshot = selectedCatalogueMaterial
+        ? {
+            id: selectedCatalogueMaterial.id,
+            name: selectedCatalogueMaterial.name,
+            materialType: selectedCatalogueMaterial.materialType,
+            finish: selectedCatalogueMaterial.finish,
+            supplierSku: selectedCatalogueMaterial.supplierSku,
+            hexCode: selectedCatalogueMaterial.hexCode ?? null,
+            imageUrl: selectedCatalogueMaterial.imageUrl ?? null,
+            maxLength: parseMeasurementToMm(selectedCatalogueMaterial.maxLength),
+            maxWidth: parseMeasurementToMm(selectedCatalogueMaterial.maxWidth),
+            availableThicknesses: selectedCatalogueMaterial.availableThicknesses
+              .map(entry => Number(entry))
+              .filter(entry => !Number.isNaN(entry) && entry > 0)
+          }
+        : null;
       await addDoc(cartCollection, {
         userId: profile.id,
         label: cartItemLabel,
@@ -760,7 +901,9 @@ const ConfiguratorPage: React.FC = () => {
       });
       setCartModalDetails({
         label: cartItemLabel,
-        quantity: config.quantity
+        quantity: config.quantity,
+        configSnapshot: { ...config },
+        colourSnapshot: modalColourSnapshot
       });
     } catch (err) {
       console.error('Failed to add cart item', err);
@@ -1569,29 +1712,103 @@ const ConfiguratorPage: React.FC = () => {
             aria-labelledby="cart-modal-heading"
             className="w-full max-w-lg rounded-2xl border border-emerald-500/40 bg-slate-900 p-6 shadow-2xl"
           >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p id="cart-modal-heading" className="text-sm font-semibold uppercase tracking-wide text-emerald-300">
-                  Added to cart
-                </p>
-                <h3 className="mt-2 text-xl font-semibold text-slate-50">{cartModalDetails.label}</h3>
-                <p className="mt-1 text-sm text-slate-300">Quantity saved: {cartModalDetails.quantity} pcs</p>
-                <p className="mt-3 text-sm text-slate-400">
-                  Keep refining your tabletop measurements or jump straight to the cart to review materials, quantities and
-                  pricing.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={closeCartModal}
-                className="rounded-full p-2 text-slate-300 transition hover:bg-slate-800 hover:text-emerald-300"
-                aria-label="Close cart confirmation"
-              >
-                <svg aria-hidden viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <path d="M5 5 L15 15 M15 5 L5 15" strokeLinecap="round" />
-                </svg>
-              </button>
-            </div>
+            {(() => {
+              const modalConfig = cartModalDetails.configSnapshot;
+              const modalColour = cartModalDetails.colourSnapshot;
+              const planSubtitle = `${modalConfig.lengthMm} x ${modalConfig.widthMm} mm`;
+              const frontSubtitle = `${modalConfig.lengthMm} x ${modalConfig.thicknessMm} mm`;
+              const sideSubtitle = `${modalConfig.widthMm} x ${modalConfig.thicknessMm} mm`;
+              const isoSubtitle = `${modalConfig.lengthMm} x ${modalConfig.widthMm} x ${modalConfig.thicknessMm} mm`;
+              const swatchStyle = modalColour?.imageUrl
+                ? { backgroundImage: `url(${modalColour.imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                : { backgroundColor: modalColour?.hexCode ?? '#0f172a' };
+
+              return (
+                <>
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p id="cart-modal-heading" className="text-sm font-semibold uppercase tracking-wide text-emerald-300">
+                        Added to cart
+                      </p>
+                      <h3 className="mt-2 text-xl font-semibold text-slate-50">{cartModalDetails.label}</h3>
+                      <p className="mt-1 text-sm text-slate-300">Quantity saved: {cartModalDetails.quantity} pcs</p>
+                      <p className="mt-3 text-sm text-slate-400">
+                        Keep refining your tabletop measurements or jump straight to the cart to review materials, quantities and
+                        pricing.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={closeCartModal}
+                      className="rounded-full p-2 text-slate-300 transition hover:bg-slate-800 hover:text-emerald-300"
+                      aria-label="Close cart confirmation"
+                    >
+                      <svg aria-hidden viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2}>
+                        <path d="M5 5 L15 15 M15 5 L5 15" strokeLinecap="round" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div className="mt-6 grid gap-4 lg:grid-cols-[1.3fr_1fr]">
+                    <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+                      <div className="flex items-center justify-between text-xs font-semibold text-slate-200">
+                        <span>Tabletop previews</span>
+                        <span className="text-[0.7rem] text-slate-500">Plan, elevations & 3D</span>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <PreviewCard title="Plan" subtitle={planSubtitle}>
+                          <CartTopPreview config={modalConfig} label="Plan preview" selectedColour={modalColour} />
+                        </PreviewCard>
+                        <ElevationPreview
+                          primaryDimension={modalConfig.lengthMm}
+                          secondaryDimension={modalConfig.thicknessMm}
+                          label="Front elevation"
+                          subtitle={frontSubtitle}
+                        />
+                        <ElevationPreview
+                          primaryDimension={modalConfig.widthMm}
+                          secondaryDimension={modalConfig.thicknessMm}
+                          label="Side elevation"
+                          subtitle={sideSubtitle}
+                        />
+                        <IsometricPreview config={modalConfig} subtitle={isoSubtitle} />
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+                      <div className="flex items-center justify-between text-xs font-semibold text-slate-200">
+                        <span>Material selection</span>
+                        <span className="text-[0.7rem] text-slate-500">Colour, finish & supplier</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg border border-slate-800 bg-slate-900"
+                          style={swatchStyle}
+                          aria-label="Selected material swatch"
+                        >
+                          {!modalColour && (
+                            <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-slate-500">No swatch</span>
+                          )}
+                        </div>
+                        <div className="space-y-1 text-sm text-slate-200">
+                          <p className="font-semibold">{modalColour?.name || 'No colour selected'}</p>
+                          <p className="text-xs text-slate-400">
+                            {modalColour?.finish || 'Finish TBD'}
+                            {modalColour?.materialType ? ` · ${modalColour.materialType}` : ''}
+                          </p>
+                          {modalColour?.supplierSku ? (
+                            <p className="text-xs text-slate-400">Supplier: {modalColour.supplierSku}</p>
+                          ) : (
+                            <p className="text-xs text-slate-500">Supplier details pending</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
               <button
                 type="button"

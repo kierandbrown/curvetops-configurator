@@ -50,6 +50,7 @@ interface CartItemRecord {
 interface CartFilters {
   label: string;
   material: string;
+  shape: string;
   dimensions: string;
   price: string;
   fileName: string;
@@ -64,6 +65,7 @@ const MATERIAL_LABELS: Record<TabletopConfig['material'], string> = {
 const emptyFilters: CartFilters = {
   label: '',
   material: '',
+  shape: '',
   dimensions: '',
   price: '',
   fileName: ''
@@ -143,6 +145,7 @@ const CartPage = () => {
       return (
         item.label.toLowerCase().includes(filters.label.toLowerCase()) &&
         item.config.material.toLowerCase().includes(filters.material.toLowerCase()) &&
+        item.config.shape.toLowerCase().includes(filters.shape.toLowerCase()) &&
         dimLabel.includes(filters.dimensions.toLowerCase()) &&
         priceLabel.includes(filters.price.toLowerCase()) &&
         customFileTokens.includes(filters.fileName.toLowerCase())
