@@ -502,7 +502,7 @@ const CartPage = () => {
                             type="button"
                             aria-label={`Remove ${item.label} from cart`}
                             onClick={() => handleDelete(item.id)}
-                            className="inline-flex h-8 w-24 items-center justify-center gap-2 rounded-lg border border-red-400/70 bg-red-500/10 px-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/20 hover:text-red-100"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-400/70 bg-red-500/10 text-xs font-semibold text-red-200 transition hover:bg-red-500/20 hover:text-red-100"
                           >
                             {/* When the quantity reaches one, switch the decrement control to a destructive remove action. */}
                             <svg
@@ -520,7 +520,6 @@ const CartPage = () => {
                                 d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2m2 0v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V7m4 4v6m4-6v6"
                               />
                             </svg>
-                            Delete
                           </button>
                         ) : (
                           <button
