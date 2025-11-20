@@ -36,7 +36,7 @@ const PreviewCard = ({
   subtitle: string;
   children: ReactNode;
 }) => (
-  <div className="flex flex-col items-center gap-2 rounded-xl border border-slate-800/80 bg-slate-950/60 p-3 text-center">
+  <div className="flex w-full flex-col items-center gap-3 rounded-xl border border-slate-800/80 bg-slate-950/60 p-4 text-center">
     {children}
     <div className="space-y-1">
       <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-slate-300">{title}</p>
@@ -1735,7 +1735,7 @@ const ConfiguratorPage: React.FC = () => {
             role="dialog"
             aria-modal="true"
             aria-labelledby="cart-modal-heading"
-            className="w-full max-w-lg rounded-2xl border border-emerald-500/40 bg-slate-900 p-6 shadow-2xl"
+            className="w-full max-w-4xl rounded-2xl border border-emerald-500/40 bg-slate-900 p-6 shadow-2xl"
           >
               {(() => {
               const modalConfig = cartModalDetails.configSnapshot;
@@ -1775,7 +1775,7 @@ const ConfiguratorPage: React.FC = () => {
                         <span>Tabletop previews</span>
                         <span className="text-[0.7rem] text-slate-500">Plan & 3D</span>
                       </div>
-                      <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="grid gap-4">
                         <PreviewCard title="Plan" subtitle={planSubtitle}>
                           <CartTopPreview
                             config={modalConfig}
