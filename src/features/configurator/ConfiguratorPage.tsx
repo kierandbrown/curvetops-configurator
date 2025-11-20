@@ -999,11 +999,6 @@ const ConfiguratorPage: React.FC = () => {
                   className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
                 />
               </label>
-              <p className="text-[0.65rem] text-slate-400">
-                Enter the colour name, finish, supplier or SKU. Selecting a result locks the maximum blank size and the
-                available thicknesses so you stay within catalogue limits.
-              </p>
-
               <div className="max-h-[60vh] space-y-3 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950/80 p-3">
                 {catalogueLoading ? (
                   <p className="text-[0.7rem] text-slate-400">Loading colour catalogue…</p>
@@ -1011,7 +1006,7 @@ const ConfiguratorPage: React.FC = () => {
                   // When the user has not typed a colour name, highlight quick-pick swatches for popular colours.
                   filteredCatalogueMaterials.length ? (
                     <div className="space-y-3">
-                      <p className="text-[0.7rem] text-slate-300">Popular colours at a glance</p>
+                      <p className="text-[0.7rem] text-slate-300">Popular Colours</p>
                       <div className="flex flex-wrap gap-3" role="listbox" aria-label="Popular colours">
                         {filteredCatalogueMaterials.map(material => {
                           const isActive = material.id === selectedCatalogueMaterialId;
