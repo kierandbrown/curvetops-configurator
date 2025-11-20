@@ -1686,7 +1686,12 @@ const ConfiguratorPage: React.FC = () => {
                       </div>
                       <div className="grid gap-3 sm:grid-cols-2">
                         <PreviewCard title="Plan" subtitle={planSubtitle}>
-                          <CartTopPreview config={modalConfig} label="Plan preview" selectedColour={modalColour} />
+                          <CartTopPreview
+                            config={modalConfig}
+                            label="Plan preview"
+                            selectedColour={modalColour}
+                            size="roomy"
+                          />
                         </PreviewCard>
                         <IsometricPreview config={modalConfig} subtitle={isoSubtitle} selectedColour={modalColour} />
                       </div>
