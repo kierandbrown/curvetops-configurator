@@ -6,7 +6,6 @@ import { db } from '@auth/firebase';
 
 const Header: React.FC = () => {
   const { user, profile, signOut } = useAuth();
-  const isAdmin = profile?.role === 'admin';
   const [cartCount, setCartCount] = useState(0);
 
   useEffect(() => {
@@ -38,25 +37,12 @@ const Header: React.FC = () => {
         </Link>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-3 text-sm">
-            <Link to="/configurator" className="hover:text-emerald-300">
-              Configure
-            </Link>
-            {isAdmin && (
-              <Link to="/materials" className="hover:text-emerald-300">
-                Materials
-              </Link>
-            )}
             {user ? (
               <>
+                {/* Make the signed-in email the single entry point to account management. */}
                 <Link to="/account" className="text-slate-300 hover:text-emerald-300">
-                  Manage account
-                </Link>
-                <span className="hidden sm:inline text-slate-500" aria-hidden>
-                  •
-                </span>
-                <span className="hidden sm:inline text-slate-300">
                   {user.email}
-                </span>
+                </Link>
                 <button
                   onClick={signOut}
                   className="rounded bg-slate-800 px-3 py-1.5 hover:bg-slate-700"
