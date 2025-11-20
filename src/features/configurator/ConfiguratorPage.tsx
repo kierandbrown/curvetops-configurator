@@ -338,11 +338,6 @@ const ConfiguratorPage: React.FC = () => {
   const { price, loading, error } = usePricing(config);
   const { profile } = useAuth();
   const [addingToCart, setAddingToCart] = useState(false);
-  const [cartFeedback, setCartFeedback] = useState<
-    | { type: 'success'; message: string }
-    | { type: 'error'; message: string }
-    | null
-  >(null);
   const [catalogueMaterials, setCatalogueMaterials] = useState<CatalogueMaterial[]>([]);
   const [catalogueLoading, setCatalogueLoading] = useState(true);
   const [catalogueSearch, setCatalogueSearch] = useState('');
@@ -787,24 +782,9 @@ const ConfiguratorPage: React.FC = () => {
 
   // Persist the current configuration to Firestore so customers can reference it later.
   const handleAddToCart = async () => {
-    if (!selectedCatalogueMaterial) {
-      setCartFeedback({
-        type: 'error',
-        message: 'Pick a colour before adding this tabletop to your cart.'
-      });
-      return;
-    }
-
-    if (!profile) {
-      setCartFeedback({
-        type: 'error',
-        message: 'Sign in so we can store this configuration in your cart.'
-      });
-      return;
-    }
+    if (!selectedCatalogueMaterial || !profile) return;
 
     setAddingToCart(true);
-    setCartFeedback(null);
     try {
       const cartCollection = collection(db, 'cartItems');
       const customShapeMeta = customShape
@@ -858,10 +838,6 @@ const ConfiguratorPage: React.FC = () => {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
-      setCartFeedback({
-        type: 'success',
-        message: 'Top added to your cart. Use the global search to find it by size, material or file name.'
-      });
       setCartModalDetails({
         label: cartItemLabel,
         quantity: config.quantity,
@@ -870,10 +846,6 @@ const ConfiguratorPage: React.FC = () => {
       });
     } catch (err) {
       console.error('Failed to add cart item', err);
-      setCartFeedback({
-        type: 'error',
-        message: 'We could not save this configuration. Please try again after checking your connection.'
-      });
     } finally {
       setAddingToCart(false);
     }
@@ -1628,24 +1600,14 @@ const ConfiguratorPage: React.FC = () => {
                     type="button"
                     onClick={handleAddToCart}
                     disabled={addingToCart || !profile}
-                    className={`inline-flex min-h-[52px] w-full items-center justify-center rounded-lg p-3 text-sm font-semibold transition ${
+                    className={`inline-flex h-[52px] w-full items-center justify-center rounded-lg p-3 text-sm font-semibold transition whitespace-nowrap ${
                       addingToCart || !profile
                         ? 'cursor-not-allowed bg-slate-800 text-slate-400'
                         : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
                     }`}
                   >
-                    {addingToCart ? 'Saving top…' : 'Add to cart'}
+                    Add to cart
                   </button>
-                  {cartFeedback && (
-                    <p
-                      className={`text-xs ${
-                        cartFeedback.type === 'error' ? 'text-red-300' : 'text-emerald-300'
-                      }`}
-                      aria-live="polite"
-                    >
-                      {cartFeedback.message}
-                    </p>
-                  )}
                 </div>
               </div>
             ) : (
