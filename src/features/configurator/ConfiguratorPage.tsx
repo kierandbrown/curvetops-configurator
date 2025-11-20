@@ -1054,25 +1054,20 @@ const ConfiguratorPage: React.FC = () => {
             max={effectiveLengthLimit}
             step={10}
             value={config.lengthMm}
-            onChange={e => updateField('lengthMm', Number(e.target.value))}
-            className={`accent-emerald-400 ${dimensionLocked ? 'cursor-not-allowed opacity-50' : ''}`}
-            disabled={dimensionLocked}
-          />
-          <p className="text-[0.7rem] text-slate-400">
-            {config.shape === 'round'
-              ? `Round tops are limited to ${effectiveLengthLimit} mm in diameter so they stay practical to machine and transport.`
-              : `Slide between 500 mm and ${effectiveLengthLimit} mm.`}
+          onChange={e => updateField('lengthMm', Number(e.target.value))}
+          className={`accent-emerald-400 ${dimensionLocked ? 'cursor-not-allowed opacity-50' : ''}`}
+          disabled={dimensionLocked}
+        />
+        {limitedByCatalogueLength && selectedCatalogueMaterial && (
+          <p className="text-[0.65rem] text-emerald-300">
+            {selectedCatalogueMaterial.name} blanks top out at {catalogueMaxLengthLabel || `${effectiveLengthLimit} mm`}.
           </p>
-          {limitedByCatalogueLength && selectedCatalogueMaterial && (
-            <p className="text-[0.65rem] text-emerald-300">
-              {selectedCatalogueMaterial.name} blanks top out at {catalogueMaxLengthLabel || `${effectiveLengthLimit} mm`}.
-            </p>
-          )}
-          {dimensionLocked && (
-            <p className="text-[0.7rem] text-amber-300">
-              Length follows the bounding box of the uploaded DXF. Update your CAD file to adjust.
-            </p>
-          )}
+        )}
+        {dimensionLocked && (
+          <p className="text-[0.7rem] text-amber-300">
+            Length follows the bounding box of the uploaded DXF. Update your CAD file to adjust.
+          </p>
+        )}
         </label>
 
         <label className="flex flex-col gap-1">
@@ -1109,11 +1104,6 @@ const ConfiguratorPage: React.FC = () => {
             className={`accent-emerald-400 ${dimensionLocked ? 'cursor-not-allowed opacity-50' : ''}`}
             disabled={dimensionLocked}
           />
-          <p className="text-[0.7rem] text-slate-400">
-            {config.shape === 'round'
-              ? 'Width mirrors the length so the new round top stays perfectly circular.'
-              : `Choose a width from 300 mm to ${effectiveWidthLimit} mm.`}
-          </p>
           {limitedByCatalogueWidth && selectedCatalogueMaterial && (
             <p className="text-[0.65rem] text-emerald-300">
               {selectedCatalogueMaterial.name} sheets max out at {catalogueMaxWidthLabel || `${effectiveWidthLimit} mm`}.
@@ -1162,7 +1152,6 @@ const ConfiguratorPage: React.FC = () => {
               onChange={e => updateField('edgeRadiusMm', Number(e.target.value))}
               className="accent-emerald-400"
             />
-            <p className="text-[0.7rem] text-slate-400">Minimum 50&nbsp;mm up to half the table width.</p>
           </label>
         )}
 
@@ -1197,10 +1186,6 @@ const ConfiguratorPage: React.FC = () => {
               onChange={e => updateField('superEllipseExponent', Number(e.target.value))}
               className="accent-emerald-400"
             />
-            <p className="text-[0.7rem] text-slate-400">
-              Increase the exponent to morph the curve from a soft ellipse (n≈2) to a squarer super-ellipse that keeps wider
-              straights before sweeping into the ends.
-            </p>
           </label>
         )}
 
@@ -1247,9 +1232,6 @@ const ConfiguratorPage: React.FC = () => {
             }}
             className="accent-emerald-400"
           />
-          <p className="text-[0.7rem] text-slate-400">
-            Snap to the catalogue-supported thicknesses: {thicknessChoices.join(', ')}&nbsp;mm.
-          </p>
         </label>
 
       </div>
