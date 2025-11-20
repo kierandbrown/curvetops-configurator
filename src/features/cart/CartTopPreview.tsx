@@ -67,7 +67,7 @@ const toAlphaHex = (hex: string, alpha: number) => {
 const PREVIEW_SIZES: Record<PreviewSize, { viewBoxWidth: number; viewBoxHeight: number; frameClass: string }>
   = {
     compact: { viewBoxWidth: 200, viewBoxHeight: 140, frameClass: 'h-24 w-36' },
-    roomy: { viewBoxWidth: 260, viewBoxHeight: 180, frameClass: 'h-32 w-48 md:h-40 md:w-64' }
+    roomy: { viewBoxWidth: 320, viewBoxHeight: 180, frameClass: 'h-32 w-full max-w-xl md:h-40 md:max-w-2xl' }
   };
 
 const CartTopPreview = ({ config, label, selectedColour, size = 'compact' }: CartTopPreviewProps) => {
