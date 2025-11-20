@@ -447,6 +447,7 @@ const CartPage = () => {
               )}
               {filteredItems.map(item => {
                 const materialLabel = MATERIAL_LABELS[item.config.material];
+                const currentQuantity = item.config.quantity ?? 1;
                 return (
                   <tr key={item.id} className="hover:bg-slate-900/30">
                     <td className="p-4 align-middle">
@@ -496,15 +497,41 @@ const CartPage = () => {
                     </td>
                     <td className="p-4 text-slate-200">
                       <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          aria-label={`Decrease quantity for ${item.label}`}
-                          onClick={() => handleQuantityStep(item, -1)}
-                          disabled={(item.config.quantity ?? 1) <= 1}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-700 bg-slate-900 text-slate-100 transition hover:border-emerald-400 hover:text-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          −
-                        </button>
+                        {currentQuantity <= 1 ? (
+                          <button
+                            type="button"
+                            aria-label={`Remove ${item.label} from cart`}
+                            onClick={() => handleDelete(item.id)}
+                            className="inline-flex h-8 w-24 items-center justify-center gap-2 rounded-lg border border-red-400/70 bg-red-500/10 px-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/20 hover:text-red-100"
+                          >
+                            {/* When the quantity reaches one, switch the decrement control to a destructive remove action. */}
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                              className="h-4 w-4"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 7h12" />
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2m2 0v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V7m4 4v6m4-6v6"
+                              />
+                            </svg>
+                            Delete
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            aria-label={`Decrease quantity for ${item.label}`}
+                            onClick={() => handleQuantityStep(item, -1)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-700 bg-slate-900 text-slate-100 transition hover:border-emerald-400 hover:text-emerald-300"
+                          >
+                            −
+                          </button>
+                        )}
                         <div className="flex flex-col">
                           <input
                             type="number"
@@ -512,7 +539,7 @@ const CartPage = () => {
                             max={99}
                             inputMode="numeric"
                             aria-label={`Quantity for ${item.label}`}
-                            value={item.config.quantity ?? 1}
+                            value={currentQuantity}
                             onChange={event => handleQuantityInput(item, event.target.value)}
                             className="w-20 rounded-lg border border-slate-700 bg-slate-900 px-3 py-1 text-center text-sm font-semibold text-slate-100 transition focus:border-emerald-400 focus:outline-none"
                           />
