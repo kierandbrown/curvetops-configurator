@@ -1259,6 +1259,11 @@ const ConfiguratorPage: React.FC = () => {
             >
               {addingToCart ? 'Saving top…' : 'Add to cart'}
             </button>
+            {!profile && (
+              <p className="text-[0.7rem] text-amber-300">
+                You need to sign in before saving items to the cart. This keeps your configurations private.
+              </p>
+            )}
             {cartFeedback && (
               <p
                 role="status"
@@ -1266,24 +1271,9 @@ const ConfiguratorPage: React.FC = () => {
                   cartFeedback.type === 'success' ? 'text-emerald-300' : 'text-red-300'
                 }`}
               >
-                {addingToCart ? 'Saving top…' : 'Add to cart'}
-              </button>
-              {!profile && (
-                <p className="text-[0.7rem] text-amber-300">
-                  You need to sign in before saving items to the cart. This keeps your configurations private.
-                </p>
-              )}
-              {cartFeedback && (
-                <p
-                  role="status"
-                  className={`text-[0.7rem] ${
-                    cartFeedback.type === 'success' ? 'text-emerald-300' : 'text-red-300'
-                  }`}
-                >
-                  {cartFeedback.message}
-                </p>
-              )}
-            </div>
+                {cartFeedback.message}
+              </p>
+            )}
           </div>
         </div>
       </section>
