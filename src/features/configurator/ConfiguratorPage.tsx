@@ -661,6 +661,7 @@ const ConfiguratorPage: React.FC = () => {
   const limitedByCatalogueWidth = Boolean(
     selectedCatalogueMaterial && materialMaxWidth && materialMaxWidth < 1800
   );
+  const hasSelectedColour = Boolean(selectedCatalogueMaterial);
   const cartSurfaceLabel =
     selectedCatalogueMaterial?.name || selectedCatalogueMaterial?.materialType || 'Surface';
   const cartItemLabel = `${cartSurfaceLabel} ${config.shape} ${config.lengthMm}x${config.widthMm}mm top`;
@@ -703,6 +704,14 @@ const ConfiguratorPage: React.FC = () => {
 
   // Persist the current configuration to Firestore so customers can reference it later.
   const handleAddToCart = async () => {
+    if (!selectedCatalogueMaterial) {
+      setCartFeedback({
+        type: 'error',
+        message: 'Pick a colour before adding this tabletop to your cart.'
+      });
+      return;
+    }
+
     if (!profile) {
       setCartFeedback({
         type: 'error',
@@ -723,20 +732,18 @@ const ConfiguratorPage: React.FC = () => {
             notes: customShape.notes ?? null
           }
         : null;
-      const selectedColourMeta = selectedCatalogueMaterial
-        ? {
-            id: selectedCatalogueMaterial.id,
-            name: selectedCatalogueMaterial.name,
-            materialType: selectedCatalogueMaterial.materialType,
-            finish: selectedCatalogueMaterial.finish,
-            supplierSku: selectedCatalogueMaterial.supplierSku,
-            hexCode: selectedCatalogueMaterial.hexCode ?? null,
-            imageUrl: selectedCatalogueMaterial.imageUrl ?? null,
-            maxLength: selectedCatalogueMaterial.maxLength,
-            maxWidth: selectedCatalogueMaterial.maxWidth,
-            availableThicknesses: selectedCatalogueMaterial.availableThicknesses
-          }
-        : null;
+      const selectedColourMeta = {
+        id: selectedCatalogueMaterial.id,
+        name: selectedCatalogueMaterial.name,
+        materialType: selectedCatalogueMaterial.materialType,
+        finish: selectedCatalogueMaterial.finish,
+        supplierSku: selectedCatalogueMaterial.supplierSku,
+        hexCode: selectedCatalogueMaterial.hexCode ?? null,
+        imageUrl: selectedCatalogueMaterial.imageUrl ?? null,
+        maxLength: selectedCatalogueMaterial.maxLength,
+        maxWidth: selectedCatalogueMaterial.maxWidth,
+        availableThicknesses: selectedCatalogueMaterial.availableThicknesses
+      };
       await addDoc(cartCollection, {
         userId: profile.id,
         label: cartItemLabel,
@@ -1511,7 +1518,7 @@ const ConfiguratorPage: React.FC = () => {
                 <p className="text-xl font-semibold">{formattedPrice}</p>
               </div>
               {/* Keep the quantity input directly beside the call-to-action so buyers can set multiples before saving. */}
-              <div className="flex w/full flex-col gap-3 md:w-auto md:flex-1 md:flex-row-reverse md:items-stretch md:gap-4">
+              <div className="flex w-full flex-col gap-3 md:w-auto md:flex-1 md:flex-row-reverse md:items-stretch md:gap-4">
                 {/* Surface the call-to-action first on desktop so the “Add to cart” button sits to the left of the quantity input. */}
                 <div className="flex w-full flex-col items-stretch gap-2 md:w-auto md:flex-none md:items-stretch md:justify-between md:self-stretch">
                   <button
@@ -1531,12 +1538,25 @@ const ConfiguratorPage: React.FC = () => {
                       className={`text-xs ${
                         cartFeedback.type === 'error' ? 'text-red-300' : 'text-emerald-300'
                       }`}
-                      aria-live="polite"
                     >
-                      {cartFeedback.message}
-                    </p>
-                  )}
-                </div>
+                      {addingToCart ? 'Saving top…' : 'Add to cart'}
+                    </button>
+                    {cartFeedback && (
+                      <p
+                        className={`text-xs ${
+                          cartFeedback.type === 'error' ? 'text-red-300' : 'text-emerald-300'
+                        }`}
+                        aria-live="polite"
+                      >
+                        {cartFeedback.message}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex min-h-[52px] w-full items-center justify-center rounded-lg border border-dashed border-slate-700 bg-slate-950/70 px-3 py-2 text-center text-sm text-slate-300">
+                    Select a colour to add this tabletop to your cart.
+                  </div>
+                )}
                 <div className="flex w-full flex-col gap-1 md:w-52">
                   <label htmlFor="cart-quantity" className="text-sm font-medium text-slate-200">
                     Quantity
