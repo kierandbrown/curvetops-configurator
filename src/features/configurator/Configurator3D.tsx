@@ -57,7 +57,10 @@ interface TabletopGeometryOptions {
 
 const applySharknoseTaper = (geometry: THREE.ExtrudeGeometry, thickness: number) => {
   const sharknoseStraightEdge = 8 * MM_TO_M;
-  const bevelDepth = Math.max(thickness - sharknoseStraightEdge, 0);
+  // The reveal should sit directly under the top surface, so start tapering
+  // below the 8mm mark instead of chamfering the top.
+  const taperStartHeight = thickness - sharknoseStraightEdge;
+  const bevelDepth = Math.max(taperStartHeight, 0);
 
   if (bevelDepth <= 0) {
     return;
@@ -71,16 +74,17 @@ const applySharknoseTaper = (geometry: THREE.ExtrudeGeometry, thickness: number)
     const originalZ = position.getZ(i);
 
     // Snap the layer closest to the reveal height so the top face stays square.
-    if (Math.abs(originalZ - sharknoseStraightEdge) < revealSnapThreshold) {
-      position.setZ(i, sharknoseStraightEdge);
+    if (Math.abs(originalZ - taperStartHeight) < revealSnapThreshold) {
+      position.setZ(i, taperStartHeight);
     }
   }
 
   for (let i = 0; i < position.count; i++) {
     const z = position.getZ(i);
-    if (z <= sharknoseStraightEdge) continue;
+    // Preserve the 8mm straight edge closest to the top surface.
+    if (z >= taperStartHeight) continue;
 
-    const taperProgress = (z - sharknoseStraightEdge) / bevelDepth;
+    const taperProgress = (taperStartHeight - z) / bevelDepth;
     const inset = bevelDepth * taperProgress;
     const x = position.getX(i);
     const y = position.getY(i);
