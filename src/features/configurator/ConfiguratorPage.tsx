@@ -1263,14 +1263,16 @@ const ConfiguratorPage: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6">
-      <section className="space-y-4">
+    // Stretch the configurator to fill the viewport beneath the sticky header + nav so
+    // the 3D preview can occupy as much space as possible.
+    <div className="flex min-h-[calc(100dvh-220px)] flex-col space-y-6">
+      <section className="flex flex-1 flex-col space-y-4">
         <h1 className="text-2xl font-semibold">Configure your tabletop</h1>
         <p className="text-sm text-slate-300">
           Adjust dimensions, shape and material to match your project. The 3D
           preview updates in real time.
         </p>
-        <div className="relative h-[420px] overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
+        <div className="relative flex-1 min-h-[520px] overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
           <Configurator3D
             config={config}
             customOutline={customShape?.outline ?? null}
