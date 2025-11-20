@@ -1329,26 +1329,8 @@ const ConfiguratorPage: React.FC = () => {
               <p className="text-xl font-semibold">{formattedPrice}</p>
             </div>
             {/* Keep the quantity input directly beside the call-to-action so buyers can set multiples before saving. */}
-            <div className="flex w-full flex-col gap-3 md:w-auto md:flex-1 md:flex-row md:items-start md:gap-4">
-              <div className="flex w-full flex-col gap-1 md:w-52">
-                <label htmlFor="cart-quantity" className="text-sm font-medium text-slate-200">
-                  Quantity
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    id="cart-quantity"
-                    type="number"
-                    min={1}
-                    max={99}
-                    inputMode="numeric"
-                    value={config.quantity}
-                    onChange={handleQuantityChange}
-                    className="w-24 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 shadow-inner focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-                  />
-                  <span className="text-xs text-slate-400">pcs</span>
-                </div>
-              </div>
-              {/* Keep the call-to-action comfortably inset inside the card so it lines up with the card padding. */}
+            <div className="flex w-full flex-col gap-3 md:w-auto md:flex-1 md:flex-row-reverse md:items-start md:gap-4">
+              {/* Surface the call-to-action first on desktop so the “Add to cart” button sits to the left of the quantity input. */}
               <div className="flex w-full flex-col items-stretch gap-2 md:w-auto md:flex-none md:items-start md:self-stretch">
                 <button
                   type="button"
@@ -1377,6 +1359,24 @@ const ConfiguratorPage: React.FC = () => {
                     {cartFeedback.message}
                   </p>
                 )}
+              </div>
+              <div className="flex w-full flex-col gap-1 md:w-52">
+                <label htmlFor="cart-quantity" className="text-sm font-medium text-slate-200">
+                  Quantity
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="cart-quantity"
+                    type="number"
+                    min={1}
+                    max={99}
+                    inputMode="numeric"
+                    value={config.quantity}
+                    onChange={handleQuantityChange}
+                    className="w-24 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 shadow-inner focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                  />
+                  <span className="text-xs text-slate-400">pcs</span>
+                </div>
               </div>
             </div>
           </div>
