@@ -1204,20 +1204,6 @@ const ConfiguratorPage: React.FC = () => {
           </div>
         </div>
 
-        <label className="flex flex-col gap-1">
-          <span>Quantity</span>
-          <input
-            type="number"
-            min={1}
-            max={50}
-            value={config.quantity}
-            onChange={e => updateField('quantity', Number(e.target.value))}
-            className="rounded border border-slate-700 bg-slate-950 px-2 py-1"
-          />
-          <p className="text-[0.7rem] text-slate-400">
-            Tell us how many identical tops you require (between 1 and 50) so pricing stays accurate.
-          </p>
-        </label>
       </div>
 
     </section>
@@ -1280,9 +1266,24 @@ const ConfiguratorPage: React.FC = () => {
                   cartFeedback.type === 'success' ? 'text-emerald-300' : 'text-red-300'
                 }`}
               >
-                {cartFeedback.message}
-              </p>
-            )}
+                {addingToCart ? 'Saving top…' : 'Add to cart'}
+              </button>
+              {!profile && (
+                <p className="text-[0.7rem] text-amber-300">
+                  You need to sign in before saving items to the cart. This keeps your configurations private.
+                </p>
+              )}
+              {cartFeedback && (
+                <p
+                  role="status"
+                  className={`text-[0.7rem] ${
+                    cartFeedback.type === 'success' ? 'text-emerald-300' : 'text-red-300'
+                  }`}
+                >
+                  {cartFeedback.message}
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </section>
