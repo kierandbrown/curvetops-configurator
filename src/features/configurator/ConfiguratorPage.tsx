@@ -1293,7 +1293,7 @@ const ConfiguratorPage: React.FC = () => {
     // Stretch the configurator to fill the viewport beneath the sticky header + nav so
     // the 3D preview can occupy as much space as possible without forcing the page to scroll.
     // The height is slightly reduced to give breathing room for the new action bar beneath the viewport.
-    <div className="flex h-[calc(100dvh-260px)] flex-col space-y-6 overflow-hidden">
+    <div className="flex h-[calc(100dvh-260px)] flex-col space-y-6 overflow-x-visible overflow-y-hidden">
       <section className="flex flex-1 min-h-0 flex-col space-y-4">
         <div className="relative flex-1 min-h-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
           <Configurator3D
