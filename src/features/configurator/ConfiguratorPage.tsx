@@ -1349,7 +1349,7 @@ const ConfiguratorPage: React.FC = () => {
                 </div>
               </div>
               {/* Keep the call-to-action comfortably inset inside the card so it lines up with the card padding. */}
-              <div className="flex w-full flex-col items-stretch gap-2 md:w-auto md:flex-none md:items-end md:self-stretch">
+              <div className="flex w-full flex-col items-stretch gap-2 md:w-auto md:flex-none md:items-start md:self-stretch">
                 <button
                   type="button"
                   onClick={handleAddToCart}
