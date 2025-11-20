@@ -1077,7 +1077,7 @@ const ConfiguratorPage: React.FC = () => {
                               role="option"
                               aria-selected={isActive}
                               onClick={() => handleCatalogueSelection(material)}
-                              title={material.name}
+                              title={`${material.name} — ${material.finish || 'Finish TBD'}`}
                               className={`group relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg border transition ${
                                 isActive
                                   ? 'border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.25)]'
@@ -1097,8 +1097,11 @@ const ConfiguratorPage: React.FC = () => {
                                   style={{ backgroundColor: material.hexCode || '#1f2937' }}
                                 />
                               )}
-                              <span className="pointer-events-none absolute -bottom-7 left-1/2 -translate-x-1/2 rounded bg-slate-900 px-2 py-0.5 text-[0.65rem] text-slate-100 opacity-0 shadow-lg transition group-hover:opacity-100">
-                                {material.name}
+                              <span className="pointer-events-none absolute -bottom-9 left-1/2 -translate-x-1/2 rounded bg-slate-900 px-2 py-0.5 text-[0.65rem] text-slate-100 opacity-0 shadow-lg transition group-hover:opacity-100">
+                                <span className="block font-semibold">{material.name}</span>
+                                <span className="text-[0.6rem] text-slate-300">
+                                  {material.finish || 'Finish TBD'}
+                                </span>
                               </span>
                             </button>
                           );
