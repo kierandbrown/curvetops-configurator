@@ -1256,8 +1256,11 @@ const ConfiguratorPage: React.FC = () => {
   return (
     // Keep everything inside the main viewport so customers are never juggling multiple scroll areas.
     <div className="flex flex-col gap-6 lg:gap-8">
-      <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[1.6fr_1fr] lg:items-start lg:gap-8">
-        <section className="flex flex-col space-y-4">
+      <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[1fr_1.6fr] lg:items-start lg:gap-8">
+        {/* Surface the parameter tray on the left for quicker scanning on widescreens. */}
+        <section className="order-2 w-full space-y-4 lg:order-1">{parametersPanel}</section>
+
+        <section className="order-1 flex flex-col space-y-4 lg:order-2">
           <div className="relative min-h-[360px] overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 lg:h-[60vh]">
             <Configurator3D
               config={config}
@@ -1350,9 +1353,6 @@ const ConfiguratorPage: React.FC = () => {
             </div>
           </div>
         </section>
-
-        {/* Keep the parameter tray alongside the main viewport on large screens so there are no nested scrollbars. */}
-        <section className="w-full space-y-4">{parametersPanel}</section>
       </div>
     </div>
   );
