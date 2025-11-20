@@ -87,20 +87,20 @@ const Layout: React.FC = () => {
         </div>
       </nav>
       <div className="flex flex-1 flex-col lg:flex-row">
-        <main className="flex-1 p-4 md:p-6">
-          {/* Main routed content renders here. */}
-          <Outlet />
-        </main>
         {/*
           Feature pages such as the configurator can still portal controls into this region.
-          On large screens it docks to the right, while on mobile it stacks after the content.
+          On large screens it docks to the left, while on mobile it stacks after the content.
           Making the aside sticky with its own overflow lets long parameter panels scroll
           independently without moving the rest of the page.
         */}
         <aside
           id="configurator-sidebar"
-          className="border-t border-slate-800 bg-slate-900/40 p-4 lg:w-80 lg:border-t-0 lg:border-l lg:sticky lg:top-0 lg:max-h-screen lg:overflow-y-auto"
+          className="border-t border-slate-800 bg-slate-900/40 p-4 lg:order-1 lg:w-80 lg:border-t-0 lg:border-r lg:sticky lg:top-0 lg:max-h-screen lg:overflow-y-auto"
         />
+        <main className="flex-1 p-4 md:p-6 lg:order-2">
+          {/* Main routed content renders here. */}
+          <Outlet />
+        </main>
       </div>
     </div>
   );
