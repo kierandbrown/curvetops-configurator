@@ -474,7 +474,7 @@ export const ConfiguratorSnapshot: React.FC<Props> = ({ config, customOutline, s
   const cameraOffset = useMemo(() => Math.max(1.3, Math.min(2, roomLength / 2.4)), [roomLength]);
 
   return (
-    <div className="relative h-36 w-full overflow-hidden rounded-xl border border-slate-800/80 bg-slate-950/80 shadow-inner shadow-slate-950/60">
+    <div className="relative h-48 w-full overflow-hidden rounded-xl border border-slate-800/80 bg-slate-950/80 shadow-inner shadow-slate-950/60 md:h-56">
       <Canvas camera={{ position: [cameraOffset, 1.15, cameraOffset], fov: 38 }} shadows dpr={[1, 2]}>
         <color attach="background" args={['#0b1220']} />
         <ambientLight intensity={0.6} />

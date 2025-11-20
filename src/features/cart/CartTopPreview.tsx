@@ -1,6 +1,8 @@
 import { useId } from 'react';
 import { TabletopConfig } from '../configurator/Configurator3D';
 
+type PreviewSize = 'compact' | 'roomy';
+
 interface CartTopPreviewProps {
   config: TabletopConfig;
   label: string;
@@ -16,6 +18,7 @@ interface CartTopPreviewProps {
     maxWidth?: number | null;
     availableThicknesses?: number[] | null;
   } | null;
+  size?: PreviewSize;
 }
 
 const MATERIAL_FILL: Record<TabletopConfig['material'], string> = {
@@ -61,9 +64,14 @@ const toAlphaHex = (hex: string, alpha: number) => {
   return `rgba(${r},${g},${b},${safeAlpha})`;
 };
 
-const CartTopPreview = ({ config, label, selectedColour }: CartTopPreviewProps) => {
-  const viewBoxWidth = 200;
-  const viewBoxHeight = 140;
+const PREVIEW_SIZES: Record<PreviewSize, { viewBoxWidth: number; viewBoxHeight: number; frameClass: string }>
+  = {
+    compact: { viewBoxWidth: 200, viewBoxHeight: 140, frameClass: 'h-24 w-36' },
+    roomy: { viewBoxWidth: 260, viewBoxHeight: 180, frameClass: 'h-32 w-48 md:h-40 md:w-64' }
+  };
+
+const CartTopPreview = ({ config, label, selectedColour, size = 'compact' }: CartTopPreviewProps) => {
+  const { viewBoxWidth, viewBoxHeight, frameClass } = PREVIEW_SIZES[size];
   const padding = 16;
   const clipPadding = 10;
   const swatchPatternId = `${useId()}-swatch`;
@@ -184,7 +192,9 @@ const CartTopPreview = ({ config, label, selectedColour }: CartTopPreviewProps) 
 
   return (
     <figure className="flex flex-col items-center gap-2 text-center">
-      <div className="flex h-24 w-36 items-center justify-center overflow-hidden rounded-xl border border-slate-800/80 bg-slate-950/70 shadow-inner shadow-slate-950/70">
+      <div
+        className={`flex items-center justify-center overflow-hidden rounded-xl border border-slate-800/80 bg-slate-950/70 shadow-inner shadow-slate-950/70 ${frameClass}`}
+      >
         <svg
           viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`}
           role="img"
