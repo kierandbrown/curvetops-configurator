@@ -521,17 +521,10 @@ const CartPage = () => {
                             max={99}
                             inputMode="numeric"
                             aria-label={`Quantity for ${item.label}`}
-                            aria-describedby={`cart-quantity-help-${item.id}`}
                             value={item.config.quantity ?? 1}
                             onChange={event => handleQuantityInput(item, event.target.value)}
                             className="w-20 rounded-lg border border-slate-700 bg-slate-900 px-3 py-1 text-center text-sm font-semibold text-slate-100 transition focus:border-emerald-400 focus:outline-none"
                           />
-                          <p
-                            id={`cart-quantity-help-${item.id}`}
-                            className="text-[0.65rem] text-slate-500"
-                          >
-                            Enter 1-99 or use the buttons to adjust how many of this top to make.
-                          </p>
                         </div>
                         <button
                           type="button"
