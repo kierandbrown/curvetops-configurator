@@ -964,9 +964,24 @@ const ConfiguratorPage: React.FC = () => {
               )}
             </div>
             <div className="space-y-1">
-              <p className="text-sm font-semibold text-slate-100">
-                {selectedCatalogueMaterial?.name ?? 'No colour selected yet'}
-              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-semibold text-slate-100">
+                  {selectedCatalogueMaterial?.name ?? 'No colour selected yet'}
+                </p>
+                {selectedCatalogueMaterial?.finish ? (
+                  <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-emerald-200">
+                    {/* Keep finish visible beside the colour so the selection is unambiguous. */}
+                    {selectedCatalogueMaterial.finish}
+                  </span>
+                ) : (
+                  selectedCatalogueMaterial && (
+                    <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-300">
+                      {/* Fall back to a clear placeholder if the swatch has no finish recorded yet. */}
+                      Finish TBD
+                    </span>
+                  )
+                )}
+              </div>
               <p className="text-[0.7rem] text-slate-400">
                 {selectedCatalogueMaterial
                   ? 'Tap “Show colours” to adjust the finish or swap to another saved swatch.'
