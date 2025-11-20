@@ -49,7 +49,8 @@ interface CartItemRecord {
 
 interface CartFilters {
   label: string;
-  material: string;
+  colour: string;
+  finish: string;
   shape: string;
   dimensions: string;
   price: string;
@@ -64,7 +65,8 @@ const MATERIAL_LABELS: Record<TabletopConfig['material'], string> = {
 
 const emptyFilters: CartFilters = {
   label: '',
-  material: '',
+  colour: '',
+  finish: '',
   shape: '',
   dimensions: '',
   price: '',
@@ -142,10 +144,14 @@ const CartPage = () => {
       const dimLabel = `${item.config.lengthMm}x${item.config.widthMm}`.toLowerCase();
       const priceLabel = item.estimatedPrice != null ? item.estimatedPrice.toString() : '';
       const customFileTokens = `${item.customShape?.fileName ?? ''} ${item.customShape?.notes ?? ''}`.toLowerCase();
+      const colourLabel = (item.selectedColour?.name ?? '').toLowerCase();
+      const finishLabel = (item.selectedColour?.finish ?? '').toLowerCase();
+      const shapeLabel = item.config.shape.toLowerCase();
       return (
         item.label.toLowerCase().includes(filters.label.toLowerCase()) &&
-        item.config.material.toLowerCase().includes(filters.material.toLowerCase()) &&
-        item.config.shape.toLowerCase().includes(filters.shape.toLowerCase()) &&
+        colourLabel.includes(filters.colour.toLowerCase()) &&
+        finishLabel.includes(filters.finish.toLowerCase()) &&
+        shapeLabel.includes(filters.shape.toLowerCase()) &&
         dimLabel.includes(filters.dimensions.toLowerCase()) &&
         priceLabel.includes(filters.price.toLowerCase()) &&
         customFileTokens.includes(filters.fileName.toLowerCase())
@@ -341,13 +347,26 @@ const CartPage = () => {
                 </th>
                 <th className="p-4 align-bottom">
                   <div className="flex flex-col gap-1">
-                    <span className="text-[0.65rem] font-semibold tracking-wide text-slate-400">Material</span>
+                    <span className="text-[0.65rem] font-semibold tracking-wide text-slate-400">Colour</span>
                     <input
-                      id="cart-filter-material"
+                      id="cart-filter-colour"
                       type="text"
-                      value={filters.material}
-                      onChange={e => handleFilterChange('material', e.target.value)}
-                      placeholder="Search materials"
+                      value={filters.colour}
+                      onChange={e => handleFilterChange('colour', e.target.value)}
+                      placeholder="Search colours"
+                      className="rounded border border-slate-700 bg-slate-900/60 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500"
+                    />
+                  </div>
+                </th>
+                <th className="p-4 align-bottom">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[0.65rem] font-semibold tracking-wide text-slate-400">Finish</span>
+                    <input
+                      id="cart-filter-finish"
+                      type="text"
+                      value={filters.finish}
+                      onChange={e => handleFilterChange('finish', e.target.value)}
+                      placeholder="Search finishes"
                       className="rounded border border-slate-700 bg-slate-900/60 px-2 py-1 text-xs text-slate-100 placeholder:text-slate-500"
                     />
                   </div>
@@ -416,13 +435,12 @@ const CartPage = () => {
             <tbody className="divide-y divide-slate-900/70 bg-slate-950">
               {filteredItems.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="p-6 text-center text-sm text-slate-400">
+                  <td colSpan={11} className="p-6 text-center text-sm text-slate-400">
                     No cart items matched your filters. Clear the search inputs to show everything again.
                   </td>
                 </tr>
               )}
               {filteredItems.map(item => {
-                const materialLabel = MATERIAL_LABELS[item.config.material];
                 const currentQuantity = item.config.quantity ?? 1;
                 return (
                   <tr key={item.id} className="hover:bg-slate-900/30">
@@ -458,7 +476,9 @@ const CartPage = () => {
                         Updated {item.updatedAt ? item.updatedAt.toDate().toLocaleDateString() : '—'}
                       </p>
                     </td>
-                    <td className="p-4 text-slate-200">{materialLabel}</td>
+                    <td className="p-4 text-slate-200">{item.selectedColour?.name ?? 'Not selected'}</td>
+                    <td className="p-4 text-slate-200">{item.selectedColour?.finish ?? 'Not selected'}</td>
+                    <td className="p-4 text-slate-200">{item.config.shape}</td>
                     <td className="p-4 text-slate-200">
                       {item.config.lengthMm} × {item.config.widthMm} mm
                     </td>
