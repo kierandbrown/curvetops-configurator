@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter';
 import { STLExporter } from 'three/examples/jsm/exporters/STLExporter';
 import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter';
+import exportModelIcon from './assets/export-model-icon.svg';
 
 import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { ParsedCustomOutline, OutlinePoint } from './customShapeTypes';
@@ -955,9 +956,13 @@ const Configurator3D: React.FC<Props> = ({ config, customOutline, swatch }) => {
             <button
               type="button"
               onClick={() => setShowExportModal(true)}
-              className="mt-2 flex w-full items-center justify-center rounded-lg border border-emerald-400 bg-emerald-500/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-emerald-200 transition hover:bg-emerald-400/20"
+              // Match the compact square controls above while using an inline image for clarity.
+              className="mt-2 flex h-11 w-11 items-center justify-center rounded-lg border border-emerald-400 bg-emerald-500/10 text-emerald-200 transition hover:bg-emerald-400/20"
+              title="Export model"
+              aria-label="Open export model modal"
             >
-              Export model
+              <img src={exportModelIcon} alt="" className="h-6 w-6" />
+              <span className="sr-only">Export model</span>
             </button>
           </div>
         </div>
