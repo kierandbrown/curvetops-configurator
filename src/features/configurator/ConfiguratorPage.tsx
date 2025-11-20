@@ -771,7 +771,7 @@ const ConfiguratorPage: React.FC = () => {
       return;
     }
 
-    const clampedQuantity = clampNumber(Math.round(parsedValue), 1, 99);
+    const clampedQuantity = clampNumber(Math.round(parsedValue), 1, 999);
     updateField('quantity', clampedQuantity);
   };
 
@@ -1369,7 +1369,7 @@ const ConfiguratorPage: React.FC = () => {
                     id="cart-quantity"
                     type="number"
                     min={1}
-                    max={99}
+                    max={999}
                     inputMode="numeric"
                     value={config.quantity}
                     onChange={handleQuantityChange}

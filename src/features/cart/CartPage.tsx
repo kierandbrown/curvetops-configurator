@@ -171,7 +171,7 @@ const CartPage = () => {
     }
   };
 
-  const clampQuantity = (value: number) => Math.min(Math.max(Math.round(value), 1), 99);
+  const clampQuantity = (value: number) => Math.min(Math.max(Math.round(value), 1), 999);
 
   // Build extra search keywords from the stored colour metadata so quantity updates
   // keep the global search bar in sync with the latest item details.
@@ -535,7 +535,7 @@ const CartPage = () => {
                           <input
                             type="number"
                             min={1}
-                            max={99}
+                            max={999}
                             inputMode="numeric"
                             aria-label={`Quantity for ${item.label}`}
                             value={currentQuantity}
