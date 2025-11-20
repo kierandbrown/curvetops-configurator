@@ -78,6 +78,9 @@ const CartPage = () => {
   const [filters, setFilters] = useState<CartFilters>(emptyFilters);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  // Keep a simple flag for showing action buttons in the UI instead of
+  // recalculating lengths inline for every render.
+  const hasCartItems = cartItems.length > 0;
 
   // Sync the cart list for the authenticated user. Every entry is normalised with
   // the default table config so the UI can always render complete rows.
@@ -250,6 +253,12 @@ const CartPage = () => {
     });
   };
 
+  // Send customers to the orders view so they can confirm their purchase
+  // details and follow the approval workflow with the saved tops.
+  const handlePlaceOrder = () => {
+    navigate('/orders');
+  };
+
   const handleNameClick = (itemId: string) => {
     // Send the user back to the configurator so they can edit or duplicate the
     // selection there. Passing the cartId lets the downstream page load context
@@ -286,6 +295,19 @@ const CartPage = () => {
         <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
           <h2 className="text-sm font-semibold text-slate-200">Cart items</h2>
           <div className="flex items-center gap-3">
+            <div className="flex flex-col items-end gap-1 text-right">
+              <button
+                type="button"
+                onClick={handlePlaceOrder}
+                disabled={!hasCartItems}
+                className="rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+              >
+                Place order
+              </button>
+              <p className="text-[0.65rem] text-slate-500">
+                Jump to orders to submit the saved tops when you are ready.
+              </p>
+            </div>
             <button
               type="button"
               onClick={handleBulkDelete}
