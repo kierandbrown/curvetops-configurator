@@ -811,7 +811,7 @@ const ConfiguratorPage: React.FC = () => {
       <h2 className="text-sm font-semibold text-slate-200">Parameters</h2>
       <div className="grid gap-3 text-xs text-slate-200">
         <div
-          className="rounded-xl border border-slate-800 bg-slate-950/70"
+          className="relative rounded-xl border border-slate-800 bg-slate-950/70"
           onMouseEnter={() => setIsShapeTrayExpanded(true)}
           onMouseLeave={() => setIsShapeTrayExpanded(false)}
           onFocus={() => setIsShapeTrayExpanded(true)}
@@ -840,48 +840,50 @@ const ConfiguratorPage: React.FC = () => {
             </button>
           </div>
 
+          {/* Keep the collapsed row height stable and reveal the shape grid in an overlay that grows to the right. */}
+          <div className="flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-emerald-300/40 bg-emerald-500/5">
+              {selectedShapeOption?.icon}
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-slate-100">
+                {selectedShapeOption?.label ?? 'Select a tabletop shape'}
+              </p>
+              <p className="text-[0.7rem] text-slate-400">
+                Hover over this row (or tap the toggle) to expand and choose a different outline.
+              </p>
+            </div>
+          </div>
+
           <div
-            className={`overflow-hidden px-3 pb-3 transition-[max-height,opacity] duration-300 ${
-              isShapeTrayExpanded ? 'max-h-[520px] opacity-100' : 'max-h-28 opacity-95'
+            className={`absolute left-full top-2 z-10 ml-3 w-[min(28rem,70vw)] rounded-xl border border-emerald-400/50 bg-slate-950/95 p-3 shadow-2xl transition-all duration-300 ${
+              isShapeTrayExpanded
+                ? 'visible opacity-100 translate-x-0'
+                : 'invisible translate-x-2 opacity-0 pointer-events-none'
             }`}
           >
-            {isShapeTrayExpanded ? (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {shapeOptions.map(option => (
-                  <button
-                    key={option.shape}
-                    onClick={() => handleShapeSelect(option.shape)}
-                    className={`group relative flex h-20 items-center justify-center rounded-xl border bg-slate-950/70 transition ${
-                      config.shape === option.shape
-                        ? 'border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.2)]'
-                        : 'border-slate-700 hover:border-emerald-300/80'
-                    }`}
-                  >
-                    {/* Icon previews make it easier to understand each table type at a glance. */}
-                    {option.icon}
-                    {/* Screen reader label + hover label */}
-                    <span className="sr-only">{option.label}</span>
-                    <span className="pointer-events-none absolute -bottom-7 rounded bg-slate-900 px-2 py-0.5 text-[0.65rem] text-slate-100 opacity-0 transition group-hover:opacity-100">
-                      {option.label}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-900/70 p-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-emerald-300/40 bg-emerald-500/5">
-                  {selectedShapeOption?.icon}
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-slate-100">
-                    {selectedShapeOption?.label ?? 'Select a tabletop shape'}
-                  </p>
-                  <p className="text-[0.7rem] text-slate-400">
-                    Hover over this row (or tap the toggle) to expand and choose a different outline.
-                  </p>
-                </div>
-              </div>
-            )}
+            <p className="mb-2 text-[0.75rem] font-semibold text-emerald-100">Pick a tabletop outline</p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+              {shapeOptions.map(option => (
+                <button
+                  key={option.shape}
+                  onClick={() => handleShapeSelect(option.shape)}
+                  className={`group relative flex h-20 items-center justify-center rounded-xl border bg-slate-950/70 transition ${
+                    config.shape === option.shape
+                      ? 'border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.2)]'
+                      : 'border-slate-700 hover:border-emerald-300/80'
+                  }`}
+                >
+                  {/* Icon previews make it easier to understand each table type at a glance. */}
+                  {option.icon}
+                  {/* Screen reader label + hover label */}
+                  <span className="sr-only">{option.label}</span>
+                  <span className="pointer-events-none absolute -bottom-7 rounded bg-slate-900 px-2 py-0.5 text-[0.65rem] text-slate-100 opacity-0 transition group-hover:opacity-100">
+                    {option.label}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
