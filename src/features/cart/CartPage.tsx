@@ -217,6 +217,19 @@ const CartPage = () => {
     const clampedQuantity = normaliseQuantity(nextQuantity);
     const nextConfig = { ...item.config, quantity: clampedQuantity };
 
+    // Optimistically update the UI so the quantity and totals change immediately
+    // while Firestore writes complete.
+    setCartItems(prev =>
+      prev.map(cartItem =>
+        cartItem.id === item.id
+          ? {
+              ...cartItem,
+              config: { ...cartItem.config, quantity: clampedQuantity }
+            }
+          : cartItem
+      )
+    );
+
     const searchKeywords = buildCartSearchKeywords(
       nextConfig,
       MATERIAL_LABELS[item.config.material],
