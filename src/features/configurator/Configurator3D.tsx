@@ -55,6 +55,50 @@ interface TabletopGeometryOptions {
   swatch?: SurfaceSwatch | null;
 }
 
+const applySharknoseTaper = (geometry: THREE.ExtrudeGeometry, thickness: number) => {
+  const sharknoseStraightEdge = 8 * MM_TO_M;
+  const bevelDepth = Math.max(thickness - sharknoseStraightEdge, 0);
+
+  if (bevelDepth <= 0) {
+    return;
+  }
+
+  const { position } = geometry.attributes;
+  const stepHeight = thickness / Math.max(geometry.parameters.options?.steps ?? 1, 1);
+  const revealSnapThreshold = stepHeight * 0.6;
+
+  for (let i = 0; i < position.count; i++) {
+    const originalZ = position.getZ(i);
+
+    // Snap the layer closest to the reveal height so the top face stays square.
+    if (Math.abs(originalZ - sharknoseStraightEdge) < revealSnapThreshold) {
+      position.setZ(i, sharknoseStraightEdge);
+    }
+  }
+
+  for (let i = 0; i < position.count; i++) {
+    const z = position.getZ(i);
+    if (z <= sharknoseStraightEdge) continue;
+
+    const taperProgress = (z - sharknoseStraightEdge) / bevelDepth;
+    const inset = bevelDepth * taperProgress;
+    const x = position.getX(i);
+    const y = position.getY(i);
+    const radius = Math.hypot(x, y);
+
+    if (radius === 0) continue;
+
+    // Reduce the radius linearly so the underside tucks in at roughly 45° while
+    // keeping the top reveal square.
+    const scaledRadius = Math.max(radius - inset, 0);
+    const scale = scaledRadius / radius;
+    position.setXY(i, x * scale, y * scale);
+  }
+
+  position.needsUpdate = true;
+  geometry.computeVertexNormals();
+};
+
 // Build an extruded mesh from the uploaded DXF outline so it can share the same
 // lighting + material pipeline as the procedural shapes.
 const buildCustomGeometry = (
@@ -105,22 +149,20 @@ const buildCustomGeometry = (
   });
 
   const thickness = thicknessMm * MM_TO_M;
-  // Sharknose: keep an 8mm vertical reveal on the top face, then drop away at 45° underneath.
-  const sharknoseStraightEdge = 8 * MM_TO_M;
-  const sharknoseBevelDepth = edgeProfile === 'painted-sharknose' ? Math.max(thickness - sharknoseStraightEdge, 0) : 0;
+  const steps = edgeProfile === 'painted-sharknose' ? 12 : 1;
   const extrudeSettings: THREE.ExtrudeGeometryOptions = {
     depth: thickness,
-    bevelEnabled: edgeProfile === 'painted-sharknose',
-    // Equal bevel thickness + size produces a 45° taper.
-    bevelThickness: sharknoseBevelDepth,
-    bevelSize: sharknoseBevelDepth,
-    // A single segment keeps the break crisp where the 8mm reveal meets the 45° run.
-    bevelSegments: edgeProfile === 'painted-sharknose' ? 1 : 0,
-    // Pull the bevel fully underneath so the top 8mm stays square before the underside tucks in.
-    bevelOffset: edgeProfile === 'painted-sharknose' ? -sharknoseBevelDepth : 0
+    bevelEnabled: false,
+    steps
   };
 
-  return new THREE.ExtrudeGeometry(shape2d, extrudeSettings);
+  const geometry = new THREE.ExtrudeGeometry(shape2d, extrudeSettings);
+
+  if (edgeProfile === 'painted-sharknose') {
+    applySharknoseTaper(geometry, thickness);
+  }
+
+  return geometry;
 };
 
 const createTabletopGeometry = ({ config, customOutline }: TabletopGeometryOptions) => {
@@ -212,21 +254,20 @@ const createTabletopGeometry = ({ config, customOutline }: TabletopGeometryOptio
   // Edge profiles alter the bevel to mirror the selected fabrication style.
   //  - "edged" keeps the square ABS banding with crisp corners.
   //  - "painted-sharknose" keeps an 8mm vertical reveal before tapering underneath at 45°.
-  const sharknoseStraightEdge = 8 * MM_TO_M;
-  const sharknoseBevelDepth = edgeProfile === 'painted-sharknose' ? Math.max(thickness - sharknoseStraightEdge, 0) : 0;
+  const steps = edgeProfile === 'painted-sharknose' ? 12 : 1;
   const extrudeSettings: THREE.ExtrudeGeometryOptions = {
     depth: thickness,
-    bevelEnabled: edgeProfile === 'painted-sharknose',
-    // Equal bevel thickness + size produces a 45° taper.
-    bevelThickness: sharknoseBevelDepth,
-    bevelSize: sharknoseBevelDepth,
-    // A single segment keeps the break crisp where the 8mm reveal meets the 45° run.
-    bevelSegments: edgeProfile === 'painted-sharknose' ? 1 : 0,
-    // Pull the bevel fully underneath so the top 8mm stays square before the underside tucks in.
-    bevelOffset: edgeProfile === 'painted-sharknose' ? -sharknoseBevelDepth : 0
+    bevelEnabled: false,
+    steps
   };
 
-  return new THREE.ExtrudeGeometry(shape2d, extrudeSettings);
+  const geometry = new THREE.ExtrudeGeometry(shape2d, extrudeSettings);
+
+  if (edgeProfile === 'painted-sharknose') {
+    applySharknoseTaper(geometry, thickness);
+  }
+
+  return geometry;
 };
 
 const TabletopMesh: React.FC<TabletopGeometryOptions> = ({ config, customOutline, swatch }) => {
