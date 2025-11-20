@@ -182,7 +182,7 @@ const CartTopPreview = ({ config, label, selectedColour }: CartTopPreviewProps) 
 
   return (
     <figure className="flex flex-col items-center gap-2 text-center">
-      <div className="flex h-24 w-36 items-center justify-center rounded-xl border border-black bg-white">
+      <div className="flex h-24 w-36 items-center justify-center rounded-xl border border-slate-800/50 bg-transparent">
         <svg
           viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`}
           role="img"
@@ -205,8 +205,7 @@ const CartTopPreview = ({ config, label, selectedColour }: CartTopPreviewProps) 
               </pattern>
             )}
           </defs>
-          {/* Keep the preview background plain white so the cart image always looks clean. */}
-          <rect width={viewBoxWidth} height={viewBoxHeight} fill="white" />
+          {/* Render the table top alone so curved shapes don't sit on top of an obvious square backdrop. */}
           {shapeElement}
         </svg>
       </div>
