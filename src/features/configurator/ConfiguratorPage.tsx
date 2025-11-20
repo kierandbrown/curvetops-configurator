@@ -93,7 +93,7 @@ const edgeProfileOptions: {
   {
     value: 'edged',
     label: 'Square ABS edge',
-    description: 'Standard straight edge banding for fast production and resilient school/workplace installs.',
+    description: 'Standard straight edge banding for fast production and resilient installs.',
     searchHint: 'Search for “edged ABS” to filter quotes.',
     preview: (
       // Stylised square edge that highlights the ABS band being applied.
