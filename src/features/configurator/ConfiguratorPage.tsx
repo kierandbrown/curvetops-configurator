@@ -1267,11 +1267,6 @@ const ConfiguratorPage: React.FC = () => {
     // the 3D preview can occupy as much space as possible without forcing the page to scroll.
     <div className="flex h-[calc(100dvh-220px)] flex-col space-y-6 overflow-hidden">
       <section className="flex flex-1 min-h-0 flex-col space-y-4">
-        <h1 className="text-2xl font-semibold">Configure your tabletop</h1>
-        <p className="text-sm text-slate-300">
-          Adjust dimensions, shape and material to match your project. The 3D
-          preview updates in real time.
-        </p>
         <div className="relative flex-1 min-h-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
           <Configurator3D
             config={config}
