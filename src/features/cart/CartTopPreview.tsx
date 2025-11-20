@@ -24,12 +24,6 @@ const MATERIAL_FILL: Record<TabletopConfig['material'], string> = {
   linoleum: 'rgba(59,130,246,0.25)'
 };
 
-const MATERIAL_STROKE: Record<TabletopConfig['material'], string> = {
-  laminate: '#34d399',
-  timber: '#fbbf24',
-  linoleum: '#60a5fa'
-};
-
 // Convert a standard super ellipse formula to an SVG path so the 2D preview
 // mirrors the designer-friendly sliders that exist inside the configurator UI.
 const buildSuperEllipsePath = (
@@ -91,7 +85,9 @@ const CartTopPreview = ({ config, label, selectedColour }: CartTopPreviewProps) 
   const selectedHex = selectedColour?.hexCode?.trim();
   const fillFromHex = selectedHex ? toAlphaHex(selectedHex, 0.35) ?? selectedHex : null;
   const fill = selectedColour?.imageUrl ? `url(#${swatchPatternId})` : fillFromHex ?? MATERIAL_FILL[config.material];
-  const stroke = selectedHex || MATERIAL_STROKE[config.material];
+
+  // Keep the outline neutral so the cart preview is always legible regardless of the chosen material colour.
+  const stroke = '#000000';
 
   let shapeElement: JSX.Element;
 
@@ -187,7 +183,7 @@ const CartTopPreview = ({ config, label, selectedColour }: CartTopPreviewProps) 
 
   return (
     <figure className="flex flex-col items-center gap-2 text-center">
-      <div className="flex h-24 w-36 items-center justify-center rounded-xl border border-slate-800 bg-slate-950/70">
+      <div className="flex h-24 w-36 items-center justify-center rounded-xl border border-black bg-white">
         <svg
           viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`}
           role="img"
