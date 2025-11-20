@@ -6,6 +6,7 @@ import {
   deleteDoc,
   doc,
   onSnapshot,
+  orderBy,
   query,
   serverTimestamp,
   updateDoc,
@@ -87,7 +88,8 @@ const CartPage = () => {
   useEffect(() => {
     if (!profile) return;
     const cartRef = collection(db, 'cartItems');
-    const cartQuery = query(cartRef, where('userId', '==', profile.id));
+    // Order cart rows by when they were first created so edits do not reshuffle the list.
+    const cartQuery = query(cartRef, where('userId', '==', profile.id), orderBy('createdAt', 'asc'));
 
     const unsubscribe = onSnapshot(cartQuery, snapshot => {
       const nextItems: CartItemRecord[] = snapshot.docs.map(docSnap => {
@@ -126,10 +128,14 @@ const CartPage = () => {
   }, []);
 
   const filteredItems = useMemo(() => {
+    // Preserve the original add order even after quantity tweaks or label updates.
     const sorted = [...cartItems].sort((a, b) => {
-      const aDate = a.updatedAt?.toMillis() || a.createdAt?.toMillis() || 0;
-      const bDate = b.updatedAt?.toMillis() || b.createdAt?.toMillis() || 0;
-      return bDate - aDate;
+      const aDate = a.createdAt?.toMillis() || 0;
+      const bDate = b.createdAt?.toMillis() || 0;
+      if (aDate === bDate) {
+        return a.id.localeCompare(b.id);
+      }
+      return aDate - bDate;
     });
 
     return sorted.filter(item => {
