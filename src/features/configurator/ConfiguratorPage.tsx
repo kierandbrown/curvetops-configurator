@@ -111,9 +111,6 @@ const edgeProfileOptions: {
         </defs>
         <rect x="15" y="25" width="130" height="45" fill="#0f172a" stroke="#34d399" strokeWidth={3} rx={4} />
         <rect x="118" y="25" width="27" height="45" fill="url(#absEdge)" stroke="#34d399" strokeWidth={3} />
-        <text x="95" y="20" className="fill-emerald-200 text-[10px]" textAnchor="middle">
-          ABS band
-        </text>
       </svg>
     )
   },
@@ -150,9 +147,6 @@ const edgeProfileOptions: {
         {/* Highlight the 8mm straight reveal before the 45° underside taper. */}
         <rect x="134" y="25" width="12" height="8" fill="url(#sharknoseReveal)" rx={2} />
         <path d="M140 33 L103 70" stroke="url(#sharknosePaint)" strokeWidth={5} strokeLinecap="round" />
-        <text x="115" y="20" className="fill-emerald-200 text-[10px]" textAnchor="middle">
-          Hand-painted bevel
-        </text>
       </svg>
     )
   }
