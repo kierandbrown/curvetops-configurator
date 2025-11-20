@@ -1237,65 +1237,43 @@ const ConfiguratorPage: React.FC = () => {
         </div>
 
         {/* Place the pricing + cart controls directly under the viewport so the call-to-action is always visible. */}
-        <div className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4 md:flex-row md:items-start md:justify-between">
-          <div className="space-y-1 text-slate-200">
+        <div className="flex w-full flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4 md:max-w-3xl md:flex-row md:items-center md:justify-start md:gap-6 md:self-start">
+          <div className="space-y-1 text-slate-200 md:w-1/2">
             <div className="flex items-baseline gap-2 text-xs text-slate-400">
               <span>Estimated price</span>
               {loading && <span className="text-[0.65rem] text-slate-400">Recalculating…</span>}
               {error && <span className="text-[0.65rem] text-red-300">Pricing error: {error}</span>}
             </div>
             <p className="text-xl font-semibold">{formattedPrice}</p>
-            <p className="text-[0.75rem] text-slate-400">
-              Save this configuration to retrieve it later from the search bar or during checkout.
-            </p>
           </div>
-          <div className="flex w-full flex-col gap-3 md:max-w-lg">
-            {/* Keep quantity alongside the CTA and make it visible on desktop by laying it out horizontally. */}
-            <div className="flex flex-col gap-2 md:flex-row md:items-end md:gap-4">
-              <label className="flex flex-1 flex-col gap-1 text-sm text-slate-200 md:max-w-[220px]">
-                <span className="font-medium">Quantity</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={50}
-                  value={config.quantity}
-                  onChange={e => updateField('quantity', Number(e.target.value))}
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 shadow-inner focus:border-emerald-400 focus:outline-none"
-                />
-                <p className="text-[0.7rem] text-slate-400">
-                  Enter how many identical tops you need (1-50). Keeping this beside the button ensures the quantity is visible before saving.
-                </p>
-              </label>
-              <div className="flex flex-1 flex-col items-stretch gap-2 md:items-end">
-                <button
-                  type="button"
-                  onClick={handleAddToCart}
-                  disabled={addingToCart || !profile}
-                  className={`w-full rounded-lg px-6 py-2 text-sm font-semibold transition md:w-auto ${
-                    addingToCart || !profile
-                      ? 'cursor-not-allowed bg-slate-800 text-slate-400'
-                      : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
-                  }`}
-                >
-                  {addingToCart ? 'Saving top…' : 'Add to cart'}
-                </button>
-                {!profile && (
-                  <p className="text-[0.7rem] text-amber-300">
-                    You need to sign in before saving items to the cart. This keeps your configurations private.
-                  </p>
-                )}
-                {cartFeedback && (
-                  <p
-                    role="status"
-                    className={`text-[0.7rem] ${
-                      cartFeedback.type === 'success' ? 'text-emerald-300' : 'text-red-300'
-                    }`}
-                  >
-                    {cartFeedback.message}
-                  </p>
-                )}
-              </div>
-            </div>
+          <div className="flex w-full flex-col items-stretch gap-2 md:w-auto md:flex-none md:items-start">
+            <button
+              type="button"
+              onClick={handleAddToCart}
+              disabled={addingToCart || !profile}
+              className={`w-full rounded-lg px-6 py-2 text-sm font-semibold transition md:w-auto ${
+                addingToCart || !profile
+                  ? 'cursor-not-allowed bg-slate-800 text-slate-400'
+                  : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
+              }`}
+            >
+              {addingToCart ? 'Saving top…' : 'Add to cart'}
+            </button>
+            {!profile && (
+              <p className="text-[0.7rem] text-amber-300">
+                You need to sign in before saving items to the cart. This keeps your configurations private.
+              </p>
+            )}
+            {cartFeedback && (
+              <p
+                role="status"
+                className={`text-[0.7rem] ${
+                  cartFeedback.type === 'success' ? 'text-emerald-300' : 'text-red-300'
+                }`}
+              >
+                {cartFeedback.message}
+              </p>
+            )}
           </div>
         </div>
       </section>
