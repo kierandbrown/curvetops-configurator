@@ -743,6 +743,20 @@ const ConfiguratorPage: React.FC = () => {
     }
   };
 
+  // Keep the cart quantity as a clean integer within a sensible range so pricing,
+  // search keywords and saved cart items always reflect what the customer expects.
+  const handleQuantityChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const rawValue = event.target.value.trim();
+    const parsedValue = Number(rawValue);
+    if (rawValue === '' || Number.isNaN(parsedValue)) {
+      updateField('quantity', 1);
+      return;
+    }
+
+    const clampedQuantity = clampNumber(Math.round(parsedValue), 1, 99);
+    updateField('quantity', clampedQuantity);
+  };
+
   useEffect(() => {
     const mediaQuery = window.matchMedia('(min-width: 768px)');
     const handleChange = (event: MediaQueryListEvent) => setIsDesktopSidebar(event.matches);
@@ -1246,34 +1260,60 @@ const ConfiguratorPage: React.FC = () => {
             </div>
             <p className="text-xl font-semibold">{formattedPrice}</p>
           </div>
-          <div className="flex w-full flex-col items-stretch gap-2 md:w-auto md:flex-none md:items-start">
-            <button
-              type="button"
-              onClick={handleAddToCart}
-              disabled={addingToCart || !profile}
-              className={`w-full rounded-lg px-6 py-2 text-sm font-semibold transition md:w-auto ${
-                addingToCart || !profile
-                  ? 'cursor-not-allowed bg-slate-800 text-slate-400'
-                  : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
-              }`}
-            >
-              {addingToCart ? 'Saving top…' : 'Add to cart'}
-            </button>
-            {!profile && (
-              <p className="text-[0.7rem] text-amber-300">
-                You need to sign in before saving items to the cart. This keeps your configurations private.
+          {/* Keep the quantity input directly beside the call-to-action so buyers can set multiples before saving. */}
+          <div className="flex w-full flex-col gap-3 md:w-auto md:flex-1 md:flex-row md:items-start md:gap-4">
+            <div className="flex w-full flex-col gap-1 md:w-52">
+              <label htmlFor="cart-quantity" className="text-sm font-medium text-slate-200">
+                Quantity
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  id="cart-quantity"
+                  type="number"
+                  min={1}
+                  max={99}
+                  inputMode="numeric"
+                  value={config.quantity}
+                  onChange={handleQuantityChange}
+                  className="w-24 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 shadow-inner focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                  aria-describedby="cart-quantity-help"
+                />
+                <span className="text-xs text-slate-400">pcs</span>
+              </div>
+              <p id="cart-quantity-help" className="text-[0.7rem] text-slate-400">
+                Tell us how many identical tops you need (1–99). Pricing, search keywords and saved cart items will all
+                reflect this quantity.
               </p>
-            )}
-            {cartFeedback && (
-              <p
-                role="status"
-                className={`text-[0.7rem] ${
-                  cartFeedback.type === 'success' ? 'text-emerald-300' : 'text-red-300'
+            </div>
+            <div className="flex w-full flex-col items-stretch gap-2 md:w-auto md:flex-none md:items-start">
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                disabled={addingToCart || !profile}
+                className={`w-full rounded-lg px-6 py-2 text-sm font-semibold transition md:w-auto ${
+                  addingToCart || !profile
+                    ? 'cursor-not-allowed bg-slate-800 text-slate-400'
+                    : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
                 }`}
               >
-                {cartFeedback.message}
-              </p>
-            )}
+                {addingToCart ? 'Saving top…' : 'Add to cart'}
+              </button>
+              {!profile && (
+                <p className="text-[0.7rem] text-amber-300">
+                  You need to sign in before saving items to the cart. This keeps your configurations private.
+                </p>
+              )}
+              {cartFeedback && (
+                <p
+                  role="status"
+                  className={`text-[0.7rem] ${
+                    cartFeedback.type === 'success' ? 'text-emerald-300' : 'text-red-300'
+                  }`}
+                >
+                  {cartFeedback.message}
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </section>
