@@ -1168,59 +1168,57 @@ const ConfiguratorPage: React.FC = () => {
           </p>
         </label>
 
-        {/* Radio buttons mirror the material UI so operators immediately recognise how to flag the edge treatment. */}
-        <div
-          className="flex flex-col gap-2"
-          aria-labelledby="edge-profile-label"
-          aria-describedby="edge-profile-help"
-          role="radiogroup"
-        >
-          <div
-            className="flex items-center justify-between text-[0.75rem] font-medium"
-            id="edge-profile-label"
-          >
-            <span>Edge profile</span>
-            <span className="text-slate-400">
-              {edgeProfileOptions.find(option => option.value === config.edgeProfile)?.label}
-            </span>
-          </div>
-          <p id="edge-profile-help" className="text-[0.7rem] text-slate-400">
-            Pick how the perimeter is finished so installers can search specs for “edged” or “sharknose” later on.
-          </p>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {edgeProfileOptions.map(option => {
-              const isActive = option.value === config.edgeProfile;
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => updateField('edgeProfile', option.value)}
-                  role="radio"
-                  aria-checked={isActive}
-                  className={`flex h-full flex-col justify-between rounded-xl border p-3 text-left transition ${
-                    isActive
-                      ? 'border-emerald-400 bg-emerald-400/5 shadow-[0_0_20px_rgba(16,185,129,0.15)]'
-                      : 'border-slate-700 bg-slate-950/70 hover:border-emerald-300/80'
-                  }`}
-                >
-                  <div className="mb-3 flex items-center justify-center rounded-lg bg-slate-900/70 p-2">
-                    {/* Inline SVG previews give installers a quick visual cue for the profile. */}
-                    {option.preview}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-100">{option.label}</p>
-                    <p className="mt-1 text-[0.7rem] text-slate-400">{option.description}</p>
-                  </div>
-                  <p className="mt-3 text-[0.65rem] text-emerald-300">{option.searchHint}</p>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
       </div>
 
     </section>
+  );
+
+  const edgeProfileSelector = (
+    <div
+      className="rounded-2xl border border-slate-800 bg-slate-900 p-4"
+      aria-labelledby="edge-profile-label"
+      aria-describedby="edge-profile-help"
+      role="radiogroup"
+    >
+      <div className="flex items-center justify-between gap-4 text-[0.75rem] font-medium" id="edge-profile-label">
+        <span className="text-slate-200">Edge profile</span>
+        <span className="text-slate-400">
+          {edgeProfileOptions.find(option => option.value === config.edgeProfile)?.label}
+        </span>
+      </div>
+      <p id="edge-profile-help" className="mt-1 text-[0.7rem] text-slate-400">
+        Choose how the perimeter is finished so installers can search specs for “edged” or “sharknose” later on.
+      </p>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {edgeProfileOptions.map(option => {
+          const isActive = option.value === config.edgeProfile;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => updateField('edgeProfile', option.value)}
+              role="radio"
+              aria-checked={isActive}
+              className={`flex h-full flex-col justify-between rounded-xl border p-3 text-left transition ${
+                isActive
+                  ? 'border-emerald-400 bg-emerald-400/5 shadow-[0_0_20px_rgba(16,185,129,0.15)]'
+                  : 'border-slate-700 bg-slate-950/70 hover:border-emerald-300/80'
+              }`}
+            >
+              <div className="mb-3 flex items-center justify-center rounded-lg bg-slate-900/70 p-2">
+                {/* Inline SVG previews give installers a quick visual cue for the profile. */}
+                {option.preview}
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-100">{option.label}</p>
+                <p className="mt-1 text-[0.7rem] text-slate-400">{option.description}</p>
+              </div>
+              <p className="mt-3 text-[0.65rem] text-emerald-300">{option.searchHint}</p>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 
   return (
@@ -1249,6 +1247,9 @@ const ConfiguratorPage: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Surface edge profile controls directly beneath the 3D viewport so the visual change is immediately visible. */}
+        {edgeProfileSelector}
 
         {/* Place the pricing + cart controls directly under the viewport so the call-to-action is always visible. */}
         <div className="flex w-full flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4 md:max-w-3xl md:flex-row md:items-center md:justify-start md:gap-6 md:self-start">
