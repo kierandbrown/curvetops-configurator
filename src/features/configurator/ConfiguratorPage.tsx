@@ -1770,10 +1770,6 @@ const ConfiguratorPage: React.FC = () => {
                       </p>
                       <h3 className="mt-2 text-xl font-semibold text-slate-50">{cartModalDetails.label}</h3>
                       <p className="mt-1 text-sm text-slate-300">Quantity saved: {cartModalDetails.quantity} pcs</p>
-                      <p className="mt-3 text-sm text-slate-400">
-                        Keep refining your tabletop measurements or jump straight to the cart to review materials, quantities and
-                        pricing.
-                      </p>
                     </div>
                     <button
                       type="button"
