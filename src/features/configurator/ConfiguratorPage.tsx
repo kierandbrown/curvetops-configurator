@@ -811,7 +811,7 @@ const ConfiguratorPage: React.FC = () => {
       <h2 className="text-sm font-semibold text-slate-200">Parameters</h2>
       <div className="grid gap-3 text-xs text-slate-200">
         <div
-          className="relative rounded-xl border border-slate-800 bg-slate-950/70"
+          className="relative z-30 rounded-xl border border-slate-800 bg-slate-950/70"
           onMouseEnter={() => setIsShapeTrayExpanded(true)}
           onMouseLeave={() => setIsShapeTrayExpanded(false)}
           onFocus={() => setIsShapeTrayExpanded(true)}
@@ -856,7 +856,7 @@ const ConfiguratorPage: React.FC = () => {
           </div>
 
           <div
-            className={`absolute left-full top-2 z-10 ml-3 w-[min(28rem,70vw)] rounded-xl border border-emerald-400/50 bg-slate-950/95 p-3 shadow-2xl transition-all duration-300 ${
+            className={`absolute left-full top-2 z-50 ml-3 w-[min(28rem,70vw)] rounded-xl border border-emerald-400/50 bg-slate-950/95 p-3 shadow-2xl transition-all duration-300 ${
               isShapeTrayExpanded
                 ? 'visible opacity-100 translate-x-0'
                 : 'invisible translate-x-2 opacity-0 pointer-events-none'
@@ -1293,7 +1293,7 @@ const ConfiguratorPage: React.FC = () => {
     // Stretch the configurator to fill the viewport beneath the sticky header + nav so
     // the 3D preview can occupy as much space as possible without forcing the page to scroll.
     // The height is slightly reduced to give breathing room for the new action bar beneath the viewport.
-    <div className="flex h-[calc(100dvh-260px)] flex-col space-y-6 overflow-hidden">
+    <div className="flex h-[calc(100dvh-260px)] flex-col space-y-6 overflow-x-visible overflow-y-hidden">
       <section className="flex flex-1 min-h-0 flex-col space-y-4">
         <div className="relative flex-1 min-h-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
           <Configurator3D
