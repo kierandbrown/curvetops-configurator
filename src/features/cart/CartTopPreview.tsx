@@ -27,6 +27,8 @@ const MATERIAL_FILL: Record<TabletopConfig['material'], string> = {
   linoleum: 'rgba(59,130,246,0.25)'
 };
 
+const DIMENSION_COLOR = '#fcd34d';
+
 // Convert a standard super ellipse formula to an SVG path so the 2D preview
 // mirrors the designer-friendly sliders that exist inside the configurator UI.
 const buildSuperEllipsePath = (
@@ -97,6 +99,13 @@ const CartTopPreview = ({ config, label, selectedColour, size = 'compact' }: Car
 
   // Keep the outline neutral so the cart preview is always legible regardless of the chosen material colour.
   const stroke = '#000000';
+
+  const dimensionTextProps = {
+    fontSize: 11,
+    fill: '#fef3c7',
+    fontWeight: 600 as const,
+    letterSpacing: '0.5px'
+  };
 
   let shapeElement: JSX.Element;
 
@@ -237,6 +246,88 @@ const CartTopPreview = ({ config, label, selectedColour, size = 'compact' }: Car
             strokeWidth={2}
           />
           <g clipPath={`url(#${clipPathId})`}>{shapeElement}</g>
+          {/* Plan view dimensions anchored to the scaled shape so buyers see the saved size at a glance. */}
+          <g>
+            {/* Length dimension */}
+            <line
+              x1={originX}
+              y1={originY - 8}
+              x2={originX + scaledLength}
+              y2={originY - 8}
+              stroke={DIMENSION_COLOR}
+              strokeWidth={2}
+            />
+            <line
+              x1={originX}
+              y1={originY}
+              x2={originX}
+              y2={originY - 8}
+              stroke="#94a3b8"
+              strokeWidth={1.5}
+            />
+            <line
+              x1={originX + scaledLength}
+              y1={originY}
+              x2={originX + scaledLength}
+              y2={originY - 8}
+              stroke="#94a3b8"
+              strokeWidth={1.5}
+            />
+            <rect
+              x={centerX - 36}
+              y={originY - 22}
+              rx={4}
+              ry={4}
+              width={72}
+              height={16}
+              fill="#0f172a"
+              stroke="#c084fc"
+              strokeWidth={1}
+            />
+            <text x={centerX} y={originY - 10} textAnchor="middle" {...dimensionTextProps}>
+              {config.lengthMm} mm
+            </text>
+
+            {/* Width dimension */}
+            <line
+              x1={originX + scaledLength + 8}
+              y1={originY}
+              x2={originX + scaledLength + 8}
+              y2={originY + scaledWidth}
+              stroke={DIMENSION_COLOR}
+              strokeWidth={2}
+            />
+            <line
+              x1={originX + scaledLength}
+              y1={originY}
+              x2={originX + scaledLength + 8}
+              y2={originY}
+              stroke="#94a3b8"
+              strokeWidth={1.5}
+            />
+            <line
+              x1={originX + scaledLength}
+              y1={originY + scaledWidth}
+              x2={originX + scaledLength + 8}
+              y2={originY + scaledWidth}
+              stroke="#94a3b8"
+              strokeWidth={1.5}
+            />
+            <rect
+              x={originX + scaledLength - 70}
+              y={centerY - 9}
+              rx={4}
+              ry={4}
+              width={70}
+              height={18}
+              fill="#0f172a"
+              stroke="#c084fc"
+              strokeWidth={1}
+            />
+            <text x={originX + scaledLength - 35} y={centerY + 3} textAnchor="middle" {...dimensionTextProps}>
+              {config.widthMm} mm
+            </text>
+          </g>
         </svg>
       </div>
       <figcaption className="text-[0.6rem] uppercase tracking-wide text-slate-500">

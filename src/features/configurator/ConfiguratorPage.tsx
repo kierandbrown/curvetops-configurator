@@ -2504,8 +2504,40 @@ const ConfiguratorPage: React.FC = () => {
                         </div>
                         <div className="mt-2 flex items-center justify-center rounded-lg border border-slate-800 bg-slate-950/70 p-3 text-emerald-300">
                           {modalEdgeProfile?.preview ? (
-                            <div className="w-full max-w-[260px] [&>svg]:h-20 [&>svg]:w-full">
+                            <div className="relative w-full max-w-[260px] [&>svg]:h-20 [&>svg]:w-full">
                               {modalEdgeProfile.preview}
+                              <svg
+                                viewBox="0 0 160 90"
+                                className="pointer-events-none absolute inset-0"
+                                aria-hidden
+                              >
+                                {/* Overlay a thickness dimension so production teams see what was saved with the edge. */}
+                                <line x1="138" y1="22" x2="138" y2="68" stroke="#fcd34d" strokeWidth={2} />
+                                <line x1="128" y1="22" x2="138" y2="22" stroke="#94a3b8" strokeWidth={1.5} />
+                                <line x1="128" y1="68" x2="138" y2="68" stroke="#94a3b8" strokeWidth={1.5} />
+                                <rect
+                                  x="110"
+                                  y="38"
+                                  width="44"
+                                  height="16"
+                                  rx="4"
+                                  ry="4"
+                                  fill="#0f172a"
+                                  stroke="#c084fc"
+                                  strokeWidth="1"
+                                />
+                                <text
+                                  x="132"
+                                  y="50"
+                                  textAnchor="middle"
+                                  fontSize="11"
+                                  fill="#fef3c7"
+                                  fontWeight="600"
+                                  letterSpacing="0.5px"
+                                >
+                                  {modalConfig.thicknessMm} mm
+                                </text>
+                              </svg>
                             </div>
                           ) : (
                             <p className="text-xs text-slate-500">Edge to be selected</p>
