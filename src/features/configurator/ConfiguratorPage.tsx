@@ -333,6 +333,97 @@ type NumericConfigField =
   | 'superEllipseExponent'
   | 'thicknessMm';
 
+type LabourBasis = 'edge-m' | 'area-m2';
+
+type LabourItem = {
+  id: string;
+  label: string;
+  basis: LabourBasis;
+  rate: string | number;
+  appliesToEdgeProfile: 'any' | TabletopConfig['edgeProfile'];
+};
+
+type AppliedLabourCost = {
+  id: string;
+  label: string;
+  basis: LabourBasis;
+  appliesToEdgeProfile: LabourItem['appliesToEdgeProfile'];
+  units: number;
+  rate: number;
+  cost: number;
+};
+
+const DEFAULT_LABOUR_ITEMS: LabourItem[] = [
+  {
+    id: 'labour-saw',
+    label: 'Saw',
+    basis: 'edge-m',
+    rate: '4.50',
+    appliesToEdgeProfile: 'any'
+  },
+  {
+    id: 'labour-bmg',
+    label: 'BMG',
+    basis: 'edge-m',
+    rate: '12.00',
+    appliesToEdgeProfile: 'edged'
+  },
+  {
+    id: 'labour-packaging',
+    label: 'Packaging',
+    basis: 'area-m2',
+    rate: '18.00',
+    appliesToEdgeProfile: 'any'
+  }
+];
+
+const generateId = () => `labour-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+
+const calculateAreaM2 = (config: TabletopConfig) => {
+  const { shape, lengthMm, widthMm } = config;
+  if (shape === 'round' || shape === 'round-top') {
+    const radiusMm = Math.max(lengthMm, widthMm) / 2;
+    return (Math.PI * radiusMm * radiusMm) / 1_000_000;
+  }
+
+  if (shape === 'ellipse' || shape === 'super-ellipse') {
+    const a = lengthMm / 2;
+    const b = widthMm / 2;
+    return (Math.PI * a * b) / 1_000_000;
+  }
+
+  return (lengthMm * widthMm) / 1_000_000;
+};
+
+const calculateEdgeLengthMeters = (config: TabletopConfig) => {
+  const { shape, lengthMm, widthMm } = config;
+
+  if (shape === 'round' || shape === 'round-top') {
+    const diameterMm = Math.max(lengthMm, widthMm);
+    return (Math.PI * diameterMm) / 1000;
+  }
+
+  if (shape === 'ellipse' || shape === 'super-ellipse') {
+    const a = lengthMm / 2;
+    const b = widthMm / 2;
+    const perimeter =
+      Math.PI * (3 * (a + b) - Math.sqrt((3 * a + b) * (a + 3 * b)));
+    return perimeter / 1000;
+  }
+
+  return (2 * (lengthMm + widthMm)) / 1000;
+};
+
+const parseCurrencyNumber = (value?: string | number | null): number | null => {
+  if (value == null || value === '') return null;
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  const numeric = Number(value.replace(/[^0-9.\-]/g, ''));
+  if (Number.isNaN(numeric)) return null;
+  return numeric;
+};
+
 const ConfiguratorPage: React.FC = () => {
   const [config, setConfig] = useState<TabletopConfig>(defaultTabletopConfig);
   // Mirror the manual inputs as strings so makers can type freely before we
@@ -348,6 +439,14 @@ const ConfiguratorPage: React.FC = () => {
   const [customShape, setCustomShape] = useState<CustomShapeDetails | null>(null);
   const { price, loading, error } = usePricing(config);
   const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
+  const [labourItems, setLabourItems] = useState<LabourItem[]>(DEFAULT_LABOUR_ITEMS);
+  const [newLabourItem, setNewLabourItem] = useState<Omit<LabourItem, 'id'>>({
+    label: '',
+    basis: 'edge-m',
+    rate: '',
+    appliesToEdgeProfile: 'any'
+  });
   const [addingToCart, setAddingToCart] = useState(false);
   const [catalogueMaterials, setCatalogueMaterials] = useState<CatalogueMaterial[]>([]);
   const [catalogueLoading, setCatalogueLoading] = useState(true);
@@ -425,6 +524,7 @@ const ConfiguratorPage: React.FC = () => {
           config: Partial<TabletopConfig>;
           customShape: Partial<CustomShapeDetails> | null;
           selectedColour: (Partial<CatalogueMaterial> & { id: string }) | null;
+          labourItems?: LabourItem[];
         }>;
 
         if (data.userId && data.userId !== profile.id) return;
@@ -452,6 +552,21 @@ const ConfiguratorPage: React.FC = () => {
           });
         } else {
           setCustomShape(null);
+        }
+
+        if (Array.isArray(data.labourItems)) {
+          setLabourItems(
+            data.labourItems.map(item => ({
+              id: item.id ?? generateId(),
+              label: item.label ?? 'Labour item',
+              basis: (item.basis as LabourBasis) ?? 'edge-m',
+              rate:
+                typeof item.rate === 'number'
+                  ? item.rate.toString()
+                  : (item.rate as string) ?? '0',
+              appliesToEdgeProfile: item.appliesToEdgeProfile ?? 'any'
+            }))
+          );
         }
 
         setEditingCartId(cartIdParam);
@@ -767,6 +882,27 @@ const ConfiguratorPage: React.FC = () => {
     setCatalogueSearch('');
   };
 
+  const updateLabourItemField = (
+    id: string,
+    field: keyof Omit<LabourItem, 'id'>,
+    value: string | LabourBasis | LabourItem['appliesToEdgeProfile']
+  ) => {
+    setLabourItems(prev =>
+      prev.map(item => (item.id === id ? { ...item, [field]: value } : item))
+    );
+  };
+
+  const handleAddLabourItem = () => {
+    if (!newLabourItem.label.trim()) return;
+    const freshItem: LabourItem = { ...newLabourItem, id: generateId() };
+    setLabourItems(prev => [...prev, freshItem]);
+    setNewLabourItem({ label: '', basis: 'edge-m', rate: '', appliesToEdgeProfile: 'any' });
+  };
+
+  const handleRemoveLabourItem = (id: string) => {
+    setLabourItems(prev => prev.filter(item => item.id !== id));
+  };
+
   const formattedPrice =
     price != null
       ? price.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })
@@ -834,6 +970,112 @@ const ConfiguratorPage: React.FC = () => {
     activeThicknessDimensions?.maxLength || selectedCatalogueMaterial?.maxLength;
   const catalogueMaxWidthLabel =
     activeThicknessDimensions?.maxWidth || selectedCatalogueMaterial?.maxWidth;
+
+  const areaM2 = useMemo(() => calculateAreaM2(config), [
+    config.lengthMm,
+    config.widthMm,
+    config.shape
+  ]);
+
+  const edgeLengthM = useMemo(
+    () => calculateEdgeLengthMeters(config),
+    [config.lengthMm, config.widthMm, config.shape]
+  );
+
+  const squareMeterRate = useMemo(
+    () => parseCurrencyNumber(activeThicknessDimensions?.squareMeterPrice),
+    [activeThicknessDimensions?.squareMeterPrice]
+  );
+
+  const sheetAreaM2 = useMemo(() => {
+    if (!materialMaxLength || !materialMaxWidth) return null;
+    return (materialMaxLength * materialMaxWidth) / 1_000_000;
+  }, [materialMaxLength, materialMaxWidth]);
+
+  const piecesPerSheet = useMemo(() => {
+    if (!materialMaxLength || !materialMaxWidth) return 1;
+    const perLength = Math.floor(materialMaxLength / Math.max(config.lengthMm, 1));
+    const perWidth = Math.floor(materialMaxWidth / Math.max(config.widthMm, 1));
+    const pieces = perLength * perWidth;
+    return Math.max(pieces, 1);
+  }, [config.lengthMm, config.widthMm, materialMaxLength, materialMaxWidth]);
+
+  const sheetsRequired = useMemo(() => {
+    return Math.max(1, Math.ceil(config.quantity / piecesPerSheet));
+  }, [config.quantity, piecesPerSheet]);
+
+  const sheetUnitCost = useMemo(() => {
+    if (squareMeterRate == null || sheetAreaM2 == null) return null;
+    return squareMeterRate * sheetAreaM2;
+  }, [sheetAreaM2, squareMeterRate]);
+
+  const materialCost = useMemo(() => {
+    if (sheetUnitCost == null) return null;
+    return sheetUnitCost * sheetsRequired;
+  }, [sheetUnitCost, sheetsRequired]);
+
+  const appliedLabourCosts = useMemo<AppliedLabourCost[]>(() => {
+    return labourItems
+      .map(item => {
+        const numericRate = parseCurrencyNumber(item.rate) ?? 0;
+        if (numericRate <= 0) return null;
+
+        if (
+          item.appliesToEdgeProfile !== 'any' &&
+          item.appliesToEdgeProfile !== config.edgeProfile
+        ) {
+          return null;
+        }
+
+        const units =
+          item.basis === 'edge-m' ? edgeLengthM * config.quantity : areaM2 * config.quantity;
+        const cost = units * numericRate;
+
+        return {
+          id: item.id,
+          label: item.label || 'Labour',
+          basis: item.basis,
+          appliesToEdgeProfile: item.appliesToEdgeProfile,
+          units,
+          rate: numericRate,
+          cost
+        } satisfies AppliedLabourCost;
+      })
+      .filter((entry): entry is AppliedLabourCost => Boolean(entry));
+  }, [areaM2, config.edgeProfile, config.quantity, edgeLengthM, labourItems]);
+
+  const labourTotal = useMemo(
+    () => appliedLabourCosts.reduce((sum, item) => sum + item.cost, 0),
+    [appliedLabourCosts]
+  );
+
+  const adminCostingSummary = useMemo(
+    () => ({
+      areaM2,
+      edgeLengthM,
+      squareMeterRate,
+      sheetAreaM2,
+      piecesPerSheet,
+      sheetsRequired,
+      sheetUnitCost,
+      materialCost,
+      labourItems: appliedLabourCosts,
+      labourTotal,
+      totalCost: (materialCost ?? 0) + labourTotal
+    }),
+    [
+      appliedLabourCosts,
+      areaM2,
+      edgeLengthM,
+      labourTotal,
+      materialCost,
+      piecesPerSheet,
+      sheetAreaM2,
+      sheetUnitCost,
+      sheetsRequired,
+      squareMeterRate
+    ]
+  );
 
   const dimensionLocked = config.shape === 'custom';
   const limitedByCatalogueLength = Boolean(
@@ -925,6 +1167,18 @@ const ConfiguratorPage: React.FC = () => {
           ?.map(value => Number(value))
           .filter(value => Number.isFinite(value)) ?? null
       };
+      const persistedLabourItems = labourItems.map(item => ({
+        id: item.id,
+        label: item.label,
+        basis: item.basis,
+        rate: parseCurrencyNumber(item.rate) ?? 0,
+        appliesToEdgeProfile: item.appliesToEdgeProfile
+      }));
+      const costingSnapshot = {
+        ...adminCostingSummary,
+        labourItems: adminCostingSummary.labourItems.map(item => ({ ...item })),
+        recordedAt: new Date().toISOString()
+      };
       const basePayload = {
         userId: profile.id,
         label: cartItemLabel,
@@ -932,6 +1186,8 @@ const ConfiguratorPage: React.FC = () => {
         customShape: customShapeMeta,
         selectedColour: selectedColourMeta,
         estimatedPrice: price ?? null,
+        labourItems: persistedLabourItems,
+        costing: costingSnapshot,
         searchKeywords: buildCartSearchKeywords(
           config,
           cartSurfaceLabel,
@@ -1753,6 +2009,200 @@ const ConfiguratorPage: React.FC = () => {
         </div>
         </section>
       </div>
+      {isAdmin && (
+        <section className="space-y-4 rounded-2xl border border-emerald-500/40 bg-slate-900 p-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-emerald-200">Admin costing</p>
+              <p className="text-xs text-slate-300">
+                Only visible to admins. Saved with the order but hidden from customers.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+            <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950 p-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-slate-100">Labour items</p>
+                <span className="text-[0.7rem] uppercase tracking-wide text-slate-400">Per table</span>
+              </div>
+              <div className="space-y-3">
+                {labourItems.map(item => (
+                  <div
+                    key={item.id}
+                    className="grid gap-2 rounded-lg border border-slate-800 bg-slate-900 p-3 md:grid-cols-[1.2fr_1fr_1fr_auto] md:items-center"
+                  >
+                    <input
+                      value={item.label}
+                      onChange={event => updateLabourItemField(item.id, 'label', event.target.value)}
+                      placeholder="Label"
+                      className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                    />
+                    <input
+                      value={item.rate}
+                      onChange={event => updateLabourItemField(item.id, 'rate', event.target.value)}
+                      placeholder="Rate"
+                      className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                    />
+                    <div className="flex gap-2">
+                      <select
+                        value={item.basis}
+                        onChange={event =>
+                          updateLabourItemField(item.id, 'basis', event.target.value as LabourBasis)
+                        }
+                        className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                      >
+                        <option value="edge-m">Per lineal metre</option>
+                        <option value="area-m2">Per m²</option>
+                      </select>
+                      <select
+                        value={item.appliesToEdgeProfile}
+                        onChange={event =>
+                          updateLabourItemField(
+                            item.id,
+                            'appliesToEdgeProfile',
+                            event.target.value as LabourItem['appliesToEdgeProfile']
+                          )
+                        }
+                        className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                      >
+                        <option value="any">Any edge</option>
+                        <option value="edged">Square ABS only</option>
+                        <option value="painted-sharknose">Painted sharknose only</option>
+                      </select>
+                    </div>
+                    <div className="flex justify-end gap-2 md:justify-center">
+                      <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-200">
+                        {(() => {
+                          const applied = appliedLabourCosts.find(cost => cost.id === item.id);
+                          if (!applied) return 'Not applied';
+                          const basisLabel = applied.basis === 'edge-m' ? 'lm' : 'm²';
+                          return `${applied.units.toFixed(2)} ${basisLabel}`;
+                        })()}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveLabourItem(item.id)}
+                        className="inline-flex items-center justify-center rounded border border-red-500/50 px-3 py-1 text-xs font-semibold text-red-200 transition hover:bg-red-500/10"
+                        aria-label={`Remove labour item ${item.label}`}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-col gap-2 rounded-lg border border-dashed border-slate-700 p-3 md:flex-row md:items-center">
+                <input
+                  value={newLabourItem.label}
+                  onChange={event => setNewLabourItem(prev => ({ ...prev, label: event.target.value }))}
+                  placeholder="New labour label"
+                  className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                />
+                <input
+                  value={newLabourItem.rate}
+                  onChange={event => setNewLabourItem(prev => ({ ...prev, rate: event.target.value }))}
+                  placeholder="Rate"
+                  className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                />
+                <div className="flex gap-2">
+                  <select
+                    value={newLabourItem.basis}
+                    onChange={event =>
+                      setNewLabourItem(prev => ({
+                        ...prev,
+                        basis: event.target.value as LabourBasis
+                      }))
+                    }
+                    className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                  >
+                    <option value="edge-m">Per lineal metre</option>
+                    <option value="area-m2">Per m²</option>
+                  </select>
+                  <select
+                    value={newLabourItem.appliesToEdgeProfile}
+                    onChange={event =>
+                      setNewLabourItem(prev => ({
+                        ...prev,
+                        appliesToEdgeProfile: event.target.value as LabourItem['appliesToEdgeProfile']
+                      }))
+                    }
+                    className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                  >
+                    <option value="any">Any edge</option>
+                    <option value="edged">Square ABS only</option>
+                    <option value="painted-sharknose">Painted sharknose only</option>
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddLabourItem}
+                  className="inline-flex items-center justify-center rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400"
+                >
+                  Add labour item
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950 p-3">
+              <p className="text-sm font-semibold text-slate-100">Cost breakdown</p>
+              <div className="grid grid-cols-2 gap-2 text-xs text-slate-300">
+                <span className="text-slate-400">Surface area</span>
+                <span>{areaM2.toFixed(2)} m²</span>
+                <span className="text-slate-400">Edge length</span>
+                <span>{edgeLengthM.toFixed(2)} lm</span>
+                <span className="text-slate-400">Sheet size</span>
+                <span>
+                  {materialMaxLength && materialMaxWidth
+                    ? `${materialMaxLength} x ${materialMaxWidth} mm`
+                    : 'Not provided'}
+                </span>
+                <span className="text-slate-400">Pieces per sheet</span>
+                <span>{piecesPerSheet}</span>
+                <span className="text-slate-400">Sheets required</span>
+                <span>{sheetsRequired}</span>
+                <span className="text-slate-400">Square metre rate</span>
+                <span>
+                  {squareMeterRate != null
+                    ? squareMeterRate.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })
+                    : '—'}
+                </span>
+                <span className="text-slate-400">Sheet cost</span>
+                <span>
+                  {sheetUnitCost != null
+                    ? sheetUnitCost.toLocaleString('en-AU', {
+                        style: 'currency',
+                        currency: 'AUD'
+                      })
+                    : '—'}
+                </span>
+                <span className="text-slate-400">Material cost</span>
+                <span>
+                  {materialCost != null
+                    ? materialCost.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })
+                    : '—'}
+                </span>
+                <span className="text-slate-400">Labour total</span>
+                <span>
+                  {labourTotal.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })}
+                </span>
+              </div>
+              <div className="rounded-lg border border-emerald-500/60 bg-emerald-500/10 p-3 text-sm text-emerald-100">
+                <p className="text-xs uppercase tracking-wide text-emerald-200">Internal top cost</p>
+                <p className="text-xl font-semibold text-emerald-100">
+                  {(adminCostingSummary.totalCost || 0).toLocaleString('en-AU', {
+                    style: 'currency',
+                    currency: 'AUD'
+                  })}
+                </p>
+                <p className="text-xs text-emerald-200">
+                  Stored with the order but hidden from customer-facing views.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
       {/* Lightweight confirmation overlay that keeps shoppers oriented after saving a configuration. */}
       {cartModalDetails && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4">
