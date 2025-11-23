@@ -471,6 +471,10 @@ const CartPage = () => {
               )}
               {filteredItems.map(item => {
                 const currentQuantity = normaliseQuantity(item.config.quantity);
+                const perTopPrice =
+                  item.estimatedPrice != null && currentQuantity > 0
+                    ? item.estimatedPrice / currentQuantity
+                    : null;
                 return (
                   <tr key={item.id} className="hover:bg-slate-900/30">
                     <td className="p-4 align-middle">
@@ -512,12 +516,27 @@ const CartPage = () => {
                       {item.config.lengthMm} × {item.config.widthMm} mm
                     </td>
                     <td className="p-4 text-slate-200">
-                      {item.estimatedPrice != null
-                        ? item.estimatedPrice.toLocaleString('en-AU', {
-                            style: 'currency',
-                            currency: 'AUD'
-                          })
-                        : '—'}
+                      {item.estimatedPrice != null ? (
+                        <div className="flex flex-col leading-tight">
+                          <span>
+                            {item.estimatedPrice.toLocaleString('en-AU', {
+                              style: 'currency',
+                              currency: 'AUD'
+                            })}
+                          </span>
+                          {perTopPrice != null && (
+                            <span className="text-xs text-slate-400">
+                              ≈
+                              {` ${perTopPrice.toLocaleString('en-AU', {
+                                style: 'currency',
+                                currency: 'AUD'
+                              })} per top`}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        '—'
+                      )}
                     </td>
                     <td className="p-4 text-slate-200">
                       <div className="flex items-center gap-2">

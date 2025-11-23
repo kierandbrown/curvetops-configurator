@@ -928,6 +928,17 @@ const ConfiguratorPage: React.FC = () => {
       ? price.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })
       : '—';
 
+  const quantityAsNumber = Number(config.quantity);
+  const perTopPrice =
+    price != null && Number.isFinite(quantityAsNumber) && quantityAsNumber > 0
+      ? price / quantityAsNumber
+      : null;
+
+  const formattedPerTopPrice =
+    perTopPrice != null
+      ? perTopPrice.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })
+      : null;
+
   const formatSquareMeterPrice = (value?: string) => {
     if (!value) return null;
     const trimmed = value.trim();
@@ -2054,13 +2065,16 @@ const ConfiguratorPage: React.FC = () => {
             {/* Place the pricing + cart controls directly under the viewport so the call-to-action is always visible. */}
             <div className="flex w-full flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-4 md:w-[420px] md:flex-none md:flex-row md:items-stretch md:justify-start md:gap-6">
               <div className="space-y-1 text-slate-200 md:w-1/2">
-              <div className="flex items-baseline gap-2 text-xs text-slate-400">
-                <span>Estimated price</span>
-                {loading && <span className="text-[0.65rem] text-slate-400">Recalculating…</span>}
-                {error && <span className="text-[0.65rem] text-red-300">Pricing error: {error}</span>}
+                <div className="flex items-baseline gap-2 text-xs text-slate-400">
+                  <span>Estimated price</span>
+                  {loading && <span className="text-[0.65rem] text-slate-400">Recalculating…</span>}
+                  {error && <span className="text-[0.65rem] text-red-300">Pricing error: {error}</span>}
+                </div>
+                <p className="text-xl font-semibold">{formattedPrice}</p>
+                {formattedPerTopPrice && (
+                  <p className="text-xs text-slate-400">≈ {formattedPerTopPrice} per top</p>
+                )}
               </div>
-              <p className="text-xl font-semibold">{formattedPrice}</p>
-            </div>
             {/* Keep the quantity input directly beside the call-to-action so buyers can set multiples before saving. */}
             {selectedCatalogueMaterial ? (
               <div className="flex w-full flex-col gap-3 md:w-auto md:flex-1 md:flex-row-reverse md:items-stretch md:gap-4">
