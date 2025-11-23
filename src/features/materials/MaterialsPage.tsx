@@ -473,61 +473,51 @@ const MaterialsPage: React.FC = () => {
     key: FilterKeys;
     label: string;
     placeholder: string;
-    helper: string;
   }[] = [
     {
       key: 'name',
       label: 'Colour name',
-      placeholder: 'Search names…',
-      helper: 'Type any part of the colour name to filter the list.'
+      placeholder: 'Search names…'
     },
     {
       key: 'supplierName',
       label: 'Supplier',
-      placeholder: 'Corian, Polytec…',
-      helper: 'Filter by the distributor so procurement knows who to contact.'
+      placeholder: 'Corian, Polytec…'
     },
     {
       key: 'materialType',
       label: 'Material type',
-      placeholder: 'Melamine, veneer…',
-      helper: 'Filter materials by their core substrate or supplier category.'
+      placeholder: 'Melamine, veneer…'
     },
     {
       key: 'finish',
       label: 'Finish',
-      placeholder: 'Gloss, matte…',
-      helper: 'Limit the table to a specific sheen or surface treatment.'
+      placeholder: 'Gloss, matte…'
     },
     {
       key: 'isPopular',
       label: 'Popular',
-      placeholder: 'yes / no',
-      helper: 'Type “yes” to see featured finishes or “no” to hide them.'
+      placeholder: 'yes / no'
     },
     {
       key: 'supplierSku',
       label: 'Supplier SKU',
-      placeholder: 'SKU, code…',
-      helper: 'Search by thickness-specific catalogue or supplier code when ordering replacements.'
+      placeholder: 'SKU, code…'
     },
     {
       key: 'lengthDetails',
       label: 'Maximum length',
-      placeholder: 'e.g. 16mm 3600',
-      helper: 'Include a thickness or measurement to narrow the rows.'
+      placeholder: 'e.g. 16mm 3600'
     },
     {
       key: 'widthDetails',
       label: 'Maximum width',
-      placeholder: 'e.g. 18mm 1500',
-      helper: 'Search by thickness or span to find wide enough sheets.'
+      placeholder: 'e.g. 18mm 1500'
     },
     {
       key: 'thicknessDimensions',
       label: 'Thicknesses',
-      placeholder: '12, 16, 18…',
-      helper: 'Enter a number to see all finishes stocked in that thickness.'
+      placeholder: '12, 16, 18…'
     }
   ];
 
@@ -677,17 +667,14 @@ const MaterialsPage: React.FC = () => {
                         <th key={column.key} className="px-4 py-3 text-xs font-semibold uppercase text-slate-400">
                           <div className="space-y-2">
                             <span>{column.label}</span>
-                            <div>
-                              <input
-                                type="text"
-                                value={filters[column.key]}
-                                onChange={event => handleFilterChange(column.key, event.target.value)}
-                                placeholder={column.placeholder}
-                                className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-100 focus:border-emerald-400 focus:outline-none"
-                                aria-label={column.label}
-                              />
-                              <p className="mt-1 text-[0.65rem] text-slate-400">{column.helper}</p>
-                            </div>
+                            <input
+                              type="text"
+                              value={filters[column.key]}
+                              onChange={event => handleFilterChange(column.key, event.target.value)}
+                              placeholder={column.placeholder}
+                              className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-100 focus:border-emerald-400 focus:outline-none"
+                              aria-label={column.label}
+                            />
                           </div>
                         </th>
                       ))}
