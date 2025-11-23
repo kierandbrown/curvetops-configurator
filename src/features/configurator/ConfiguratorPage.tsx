@@ -333,7 +333,7 @@ type NumericConfigField =
   | 'superEllipseExponent'
   | 'thicknessMm';
 
-type LabourBasis = 'edge-m' | 'area-m2';
+type LabourBasis = 'edge-m' | 'area-m2' | 'per-table' | 'per-order';
 
 type LabourItem = {
   id: string;
@@ -422,6 +422,13 @@ const parseCurrencyNumber = (value?: string | number | null): number | null => {
   const numeric = Number(value.replace(/[^0-9.\-]/g, ''));
   if (Number.isNaN(numeric)) return null;
   return numeric;
+};
+
+const formatLabourUnits = (basis: LabourBasis, units: number) => {
+  if (basis === 'edge-m') return `${units.toFixed(2)} lm`;
+  if (basis === 'area-m2') return `${units.toFixed(2)} m²`;
+  if (basis === 'per-table') return `${units.toFixed(0)} table${units === 1 ? '' : 's'}`;
+  return 'Per order';
 };
 
 const ConfiguratorPage: React.FC = () => {
@@ -1027,8 +1034,20 @@ const ConfiguratorPage: React.FC = () => {
           return null;
         }
 
-        const units =
-          item.basis === 'edge-m' ? edgeLengthM * config.quantity : areaM2 * config.quantity;
+        const units = (() => {
+          switch (item.basis) {
+            case 'edge-m':
+              return edgeLengthM * config.quantity;
+            case 'area-m2':
+              return areaM2 * config.quantity;
+            case 'per-table':
+              return config.quantity;
+            case 'per-order':
+              return 1;
+            default:
+              return 0;
+          }
+        })();
         const cost = units * numericRate;
 
         return {
@@ -1049,6 +1068,18 @@ const ConfiguratorPage: React.FC = () => {
     [appliedLabourCosts]
   );
 
+  const baseCost = useMemo(
+    () => (materialCost ?? 0) + labourTotal,
+    [labourTotal, materialCost]
+  );
+
+  const profit = useMemo(() => {
+    if (price == null) return null;
+    return price - baseCost;
+  }, [baseCost, price]);
+
+  const totalCost = useMemo(() => baseCost + (profit ?? 0), [baseCost, profit]);
+
   const adminCostingSummary = useMemo(
     () => ({
       areaM2,
@@ -1061,7 +1092,9 @@ const ConfiguratorPage: React.FC = () => {
       materialCost,
       labourItems: appliedLabourCosts,
       labourTotal,
-      totalCost: (materialCost ?? 0) + labourTotal
+      baseCost,
+      profit,
+      totalCost
     }),
     [
       appliedLabourCosts,
@@ -1069,11 +1102,14 @@ const ConfiguratorPage: React.FC = () => {
       edgeLengthM,
       labourTotal,
       materialCost,
+      baseCost,
+      profit,
       piecesPerSheet,
       sheetAreaM2,
       sheetUnitCost,
       sheetsRequired,
-      squareMeterRate
+      squareMeterRate,
+      totalCost
     ]
   );
 
@@ -2024,7 +2060,7 @@ const ConfiguratorPage: React.FC = () => {
             <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950 p-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-slate-100">Labour items</p>
-                <span className="text-[0.7rem] uppercase tracking-wide text-slate-400">Per table</span>
+                <span className="text-[0.7rem] uppercase tracking-wide text-slate-400">Cost basis</span>
               </div>
               <div className="space-y-3">
                 {labourItems.map(item => (
@@ -2054,6 +2090,8 @@ const ConfiguratorPage: React.FC = () => {
                       >
                         <option value="edge-m">Per lineal metre</option>
                         <option value="area-m2">Per m²</option>
+                        <option value="per-table">Per table</option>
+                        <option value="per-order">Per order</option>
                       </select>
                       <select
                         value={item.appliesToEdgeProfile}
@@ -2076,8 +2114,7 @@ const ConfiguratorPage: React.FC = () => {
                         {(() => {
                           const applied = appliedLabourCosts.find(cost => cost.id === item.id);
                           if (!applied) return 'Not applied';
-                          const basisLabel = applied.basis === 'edge-m' ? 'lm' : 'm²';
-                          return `${applied.units.toFixed(2)} ${basisLabel}`;
+                          return formatLabourUnits(applied.basis, applied.units);
                         })()}
                       </span>
                       <button
@@ -2118,6 +2155,8 @@ const ConfiguratorPage: React.FC = () => {
                   >
                     <option value="edge-m">Per lineal metre</option>
                     <option value="area-m2">Per m²</option>
+                    <option value="per-table">Per table</option>
+                    <option value="per-order">Per order</option>
                   </select>
                   <select
                     value={newLabourItem.appliesToEdgeProfile}
@@ -2186,9 +2225,19 @@ const ConfiguratorPage: React.FC = () => {
                 <span>
                   {labourTotal.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })}
                 </span>
+                <span className="text-slate-400">Base cost (materials + labour)</span>
+                <span>
+                  {baseCost.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })}
+                </span>
+                <span className="text-slate-400">Profit</span>
+                <span>
+                  {profit != null
+                    ? profit.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })
+                    : '—'}
+                </span>
               </div>
               <div className="rounded-lg border border-emerald-500/60 bg-emerald-500/10 p-3 text-sm text-emerald-100">
-                <p className="text-xs uppercase tracking-wide text-emerald-200">Internal top cost</p>
+                <p className="text-xs uppercase tracking-wide text-emerald-200">Internal top cost (incl. profit)</p>
                 <p className="text-xl font-semibold text-emerald-100">
                   {(adminCostingSummary.totalCost || 0).toLocaleString('en-AU', {
                     style: 'currency',
