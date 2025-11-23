@@ -4,6 +4,7 @@ import {
   addDoc,
   collection,
   doc,
+  setDoc,
   getDoc,
   onSnapshot,
   orderBy,
@@ -14,7 +15,6 @@ import {
 import { useAuth } from '@auth/AuthContext';
 import { db } from '@auth/firebase';
 import Configurator3D, { ConfiguratorSnapshot, TableShape, TabletopConfig } from './Configurator3D';
-import { usePricing } from './usePricing';
 import CustomShapeUpload from './CustomShapeUpload';
 import { CustomShapeDetails } from './customShapeTypes';
 import { defaultTabletopConfig } from './defaultConfig';
@@ -445,9 +445,9 @@ const ConfiguratorPage: React.FC = () => {
   });
   // Custom shape metadata drives the DXF preview + the locked dimensions.
   const [customShape, setCustomShape] = useState<CustomShapeDetails | null>(null);
-  const { price, loading, error } = usePricing(config);
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
+  const adminCostingRef = useMemo(() => doc(db, 'adminCosting', 'global'), []);
   const [labourItems, setLabourItems] = useState<LabourItem[]>(DEFAULT_LABOUR_ITEMS);
   const [newLabourItem, setNewLabourItem] = useState<Omit<LabourItem, 'id'>>({
     label: '',
@@ -474,6 +474,9 @@ const ConfiguratorPage: React.FC = () => {
   const shapeTrayHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Track a hide timeout so the colour catalogue slideout mirrors the tabletop hover behaviour.
   const colourTrayHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [adminCostingLoaded, setAdminCostingLoaded] = useState(false);
+  const [persistedProfitPercentage, setPersistedProfitPercentage] = useState<number | null>(null);
+  const [profitPercentageInput, setProfitPercentageInput] = useState('0');
   const selectedShapeOption = useMemo(
     () => shapeOptions.find(option => option.shape === config.shape),
     [config.shape]
@@ -502,6 +505,45 @@ const ConfiguratorPage: React.FC = () => {
   useEffect(() => {
     setManualInputs(prev => ({ ...prev, thicknessMm: config.thicknessMm.toString() }));
   }, [config.thicknessMm]);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      adminCostingRef,
+      snapshot => {
+        const data = snapshot.data() as
+          | { labourItems?: LabourItem[]; profitPercentage?: number }
+          | undefined;
+
+        if (data?.labourItems?.length) {
+          setLabourItems(
+            data.labourItems.map(item => ({
+              id: item.id ?? generateId(),
+              label: item.label ?? 'Labour item',
+              basis: (item.basis as LabourBasis) ?? 'edge-m',
+              rate:
+                typeof item.rate === 'number'
+                  ? item.rate.toString()
+                  : (item.rate as string) ?? '0',
+              appliesToEdgeProfile: item.appliesToEdgeProfile ?? 'any'
+            }))
+          );
+        }
+
+        if (typeof data?.profitPercentage === 'number' && Number.isFinite(data.profitPercentage)) {
+          setPersistedProfitPercentage(data.profitPercentage);
+          setProfitPercentageInput(data.profitPercentage.toString());
+        }
+
+        setAdminCostingLoaded(true);
+      },
+      error => {
+        console.error('Failed to load admin costing defaults', error);
+        setAdminCostingLoaded(true);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [adminCostingRef]);
 
   useEffect(() => {
     const cartIdParam = searchParams.get('cartId');
@@ -560,21 +602,6 @@ const ConfiguratorPage: React.FC = () => {
           });
         } else {
           setCustomShape(null);
-        }
-
-        if (Array.isArray(data.labourItems)) {
-          setLabourItems(
-            data.labourItems.map(item => ({
-              id: item.id ?? generateId(),
-              label: item.label ?? 'Labour item',
-              basis: (item.basis as LabourBasis) ?? 'edge-m',
-              rate:
-                typeof item.rate === 'number'
-                  ? item.rate.toString()
-                  : (item.rate as string) ?? '0',
-              appliesToEdgeProfile: item.appliesToEdgeProfile ?? 'any'
-            }))
-          );
         }
 
         setEditingCartId(cartIdParam);
@@ -649,6 +676,35 @@ const ConfiguratorPage: React.FC = () => {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!isAdmin || !adminCostingLoaded) return;
+
+    const saveTimeout = setTimeout(() => {
+      const normalizedLabourItems = labourItems.map(item => ({
+        id: item.id,
+        label: item.label,
+        basis: item.basis,
+        rate: parseCurrencyNumber(item.rate) ?? 0,
+        appliesToEdgeProfile: item.appliesToEdgeProfile
+      }));
+
+      const profitValue = Number(profitPercentageInput);
+
+      setDoc(
+        adminCostingRef,
+        {
+          labourItems: normalizedLabourItems,
+          profitPercentage: Number.isFinite(profitValue) ? profitValue : null
+        },
+        { merge: true }
+      ).catch(error => {
+        console.error('Failed to persist admin costing defaults', error);
+      });
+    }, 400);
+
+    return () => clearTimeout(saveTimeout);
+  }, [adminCostingLoaded, adminCostingRef, isAdmin, labourItems, profitPercentageInput]);
 
   const selectedCatalogueMaterial = useMemo(() => {
     if (!selectedCatalogueMaterialId) return null;
@@ -915,29 +971,16 @@ const ConfiguratorPage: React.FC = () => {
   };
 
   const handleProfitPercentageChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setHasManualProfitPercentage(true);
     setProfitPercentageInput(event.target.value);
   };
 
   const resetProfitPercentage = () => {
-    setHasManualProfitPercentage(false);
+    if (persistedProfitPercentage != null) {
+      setProfitPercentageInput(persistedProfitPercentage.toString());
+      return;
+    }
+    setProfitPercentageInput('0');
   };
-
-  const formattedPrice =
-    price != null
-      ? price.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })
-      : '—';
-
-  const quantityAsNumber = Number(config.quantity);
-  const perTopPrice =
-    price != null && Number.isFinite(quantityAsNumber) && quantityAsNumber > 0
-      ? price / quantityAsNumber
-      : null;
-
-  const formattedPerTopPrice =
-    perTopPrice != null
-      ? perTopPrice.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })
-      : null;
 
   const formatSquareMeterPrice = (value?: string) => {
     if (!value) return null;
@@ -1097,49 +1140,45 @@ const ConfiguratorPage: React.FC = () => {
     [labourTotal, materialCost]
   );
 
-  const inferredProfitPercentage = useMemo(() => {
-    if (price == null || baseCost <= 0) return null;
-    const derivedPercentage = ((price - baseCost) / baseCost) * 100;
-    if (!Number.isFinite(derivedPercentage)) return null;
-    return derivedPercentage;
-  }, [baseCost, price]);
-
-  const inferredProfitPercentageLabel = useMemo(
-    () => (inferredProfitPercentage == null ? '' : inferredProfitPercentage.toFixed(2)),
-    [inferredProfitPercentage]
-  );
-
-  const [profitPercentageInput, setProfitPercentageInput] = useState('');
-  const [hasManualProfitPercentage, setHasManualProfitPercentage] = useState(false);
-
-  useEffect(() => {
-    if (hasManualProfitPercentage) return;
-    setProfitPercentageInput(inferredProfitPercentageLabel);
-  }, [hasManualProfitPercentage, inferredProfitPercentageLabel]);
-
   const profitPercentage = useMemo(() => {
     const numericValue = Number(profitPercentageInput);
-    if (!Number.isFinite(numericValue)) return null;
+    if (!Number.isFinite(numericValue)) return 0;
     return numericValue;
   }, [profitPercentageInput]);
 
   const profit = useMemo(() => {
-    if (profitPercentage != null) {
-      return baseCost * (profitPercentage / 100);
-    }
-    if (price == null) return null;
-    return price - baseCost;
-  }, [baseCost, price, profitPercentage]);
+    return baseCost * (profitPercentage / 100);
+  }, [baseCost, profitPercentage]);
 
-  const displayProfitPercentage = useMemo(() => {
-    if (profitPercentage != null) return profitPercentage;
-    if (profit == null || baseCost <= 0) return null;
-    const derivedPercentage = (profit / baseCost) * 100;
-    if (!Number.isFinite(derivedPercentage)) return null;
-    return derivedPercentage;
-  }, [baseCost, profit, profitPercentage]);
+  const displayProfitPercentage = profitPercentage;
 
-  const totalCost = useMemo(() => baseCost + (profit ?? 0), [baseCost, profit]);
+  const totalCost = useMemo(() => baseCost + profit, [baseCost, profit]);
+
+  const estimatedPrice = totalCost;
+  const loading = false;
+  const error = null;
+
+  const resetProfitDisabled = useMemo(
+    () =>
+      persistedProfitPercentage == null ||
+      Number(profitPercentageInput) === persistedProfitPercentage,
+    [persistedProfitPercentage, profitPercentageInput]
+  );
+
+  const formattedPrice = Number.isFinite(estimatedPrice)
+    ? estimatedPrice.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })
+    : '—';
+
+  const quantityAsNumber = Number(config.quantity);
+  const perTopPrice =
+    Number.isFinite(estimatedPrice) && Number.isFinite(quantityAsNumber) && quantityAsNumber > 0
+      ? estimatedPrice / quantityAsNumber
+      : null;
+
+  const formattedPerTopPrice =
+    perTopPrice != null
+      ? perTopPrice.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })
+      : null;
 
   const adminCostingSummary = useMemo(
     () => ({
@@ -1155,7 +1194,7 @@ const ConfiguratorPage: React.FC = () => {
       labourTotal,
       baseCost,
       profit,
-      profitPercentage: profitPercentage ?? displayProfitPercentage ?? null,
+      profitPercentage,
       totalCost
     }),
     [
@@ -1290,7 +1329,7 @@ const ConfiguratorPage: React.FC = () => {
         config,
         customShape: customShapeMeta,
         selectedColour: selectedColourMeta,
-        estimatedPrice: price ?? null,
+        estimatedPrice: estimatedPrice ?? null,
         labourItems: persistedLabourItems,
         costing: costingSnapshot,
         searchKeywords: buildCartSearchKeywords(
@@ -2277,7 +2316,7 @@ const ConfiguratorPage: React.FC = () => {
                       inputMode="decimal"
                       value={profitPercentageInput}
                       onChange={handleProfitPercentageChange}
-                      placeholder={inferredProfitPercentageLabel || 'Enter %'}
+                      placeholder="Enter %"
                       className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 shadow-inner focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
                     />
                     <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-400">
@@ -2287,14 +2326,14 @@ const ConfiguratorPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={resetProfitPercentage}
-                    disabled={!hasManualProfitPercentage && profitPercentageInput === inferredProfitPercentageLabel}
+                    disabled={resetProfitDisabled}
                     className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
-                      !hasManualProfitPercentage && profitPercentageInput === inferredProfitPercentageLabel
+                      resetProfitDisabled
                         ? 'cursor-not-allowed border border-slate-800 bg-slate-800 text-slate-400'
                         : 'border border-emerald-500/50 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/20'
                     }`}
                   >
-                    Use estimate
+                    Revert to saved
                   </button>
                 </div>
                 <p className="text-xs text-slate-400">
