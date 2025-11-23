@@ -914,6 +914,15 @@ const ConfiguratorPage: React.FC = () => {
     setLabourItems(prev => prev.filter(item => item.id !== id));
   };
 
+  const handleProfitPercentageChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setHasManualProfitPercentage(true);
+    setProfitPercentageInput(event.target.value);
+  };
+
+  const resetProfitPercentage = () => {
+    setHasManualProfitPercentage(false);
+  };
+
   const formattedPrice =
     price != null
       ? price.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })
@@ -1077,10 +1086,47 @@ const ConfiguratorPage: React.FC = () => {
     [labourTotal, materialCost]
   );
 
+  const inferredProfitPercentage = useMemo(() => {
+    if (price == null || baseCost <= 0) return null;
+    const derivedPercentage = ((price - baseCost) / baseCost) * 100;
+    if (!Number.isFinite(derivedPercentage)) return null;
+    return derivedPercentage;
+  }, [baseCost, price]);
+
+  const inferredProfitPercentageLabel = useMemo(
+    () => (inferredProfitPercentage == null ? '' : inferredProfitPercentage.toFixed(2)),
+    [inferredProfitPercentage]
+  );
+
+  const [profitPercentageInput, setProfitPercentageInput] = useState('');
+  const [hasManualProfitPercentage, setHasManualProfitPercentage] = useState(false);
+
+  useEffect(() => {
+    if (hasManualProfitPercentage) return;
+    setProfitPercentageInput(inferredProfitPercentageLabel);
+  }, [hasManualProfitPercentage, inferredProfitPercentageLabel]);
+
+  const profitPercentage = useMemo(() => {
+    const numericValue = Number(profitPercentageInput);
+    if (!Number.isFinite(numericValue)) return null;
+    return numericValue;
+  }, [profitPercentageInput]);
+
   const profit = useMemo(() => {
+    if (profitPercentage != null) {
+      return baseCost * (profitPercentage / 100);
+    }
     if (price == null) return null;
     return price - baseCost;
-  }, [baseCost, price]);
+  }, [baseCost, price, profitPercentage]);
+
+  const displayProfitPercentage = useMemo(() => {
+    if (profitPercentage != null) return profitPercentage;
+    if (profit == null || baseCost <= 0) return null;
+    const derivedPercentage = (profit / baseCost) * 100;
+    if (!Number.isFinite(derivedPercentage)) return null;
+    return derivedPercentage;
+  }, [baseCost, profit, profitPercentage]);
 
   const totalCost = useMemo(() => baseCost + (profit ?? 0), [baseCost, profit]);
 
@@ -1098,12 +1144,14 @@ const ConfiguratorPage: React.FC = () => {
       labourTotal,
       baseCost,
       profit,
+      profitPercentage: profitPercentage ?? displayProfitPercentage ?? null,
       totalCost
     }),
     [
       appliedLabourCosts,
       areaM2,
       edgeLengthM,
+      displayProfitPercentage,
       labourTotal,
       materialCost,
       baseCost,
@@ -2199,6 +2247,46 @@ const ConfiguratorPage: React.FC = () => {
 
             <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950 p-3">
               <p className="text-sm font-semibold text-slate-100">Cost breakdown</p>
+              <div className="space-y-2 rounded-lg border border-slate-800 bg-slate-900 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <label htmlFor="profit-percentage" className="text-xs uppercase tracking-wide text-slate-300">
+                    Profit margin
+                  </label>
+                  <span className="text-[0.7rem] text-slate-400">Applied to base cost</span>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <div className="relative flex-1">
+                    <input
+                      id="profit-percentage"
+                      type="number"
+                      step="0.1"
+                      inputMode="decimal"
+                      value={profitPercentageInput}
+                      onChange={handleProfitPercentageChange}
+                      placeholder={inferredProfitPercentageLabel || 'Enter %'}
+                      className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 shadow-inner focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                    />
+                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-slate-400">
+                      %
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={resetProfitPercentage}
+                    disabled={!hasManualProfitPercentage && profitPercentageInput === inferredProfitPercentageLabel}
+                    className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                      !hasManualProfitPercentage && profitPercentageInput === inferredProfitPercentageLabel
+                        ? 'cursor-not-allowed border border-slate-800 bg-slate-800 text-slate-400'
+                        : 'border border-emerald-500/50 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/20'
+                    }`}
+                  >
+                    Use estimate
+                  </button>
+                </div>
+                <p className="text-xs text-slate-400">
+                  Adjust the profit margin as a percentage of materials and labour to immediately update the internal cost.
+                </p>
+              </div>
               <div className="grid grid-cols-2 gap-2 text-xs text-slate-300">
                 <span className="text-slate-400">Surface area</span>
                 <span>{areaM2.toFixed(2)} m²</span>
@@ -2246,7 +2334,9 @@ const ConfiguratorPage: React.FC = () => {
                 <span className="text-slate-400">Profit</span>
                 <span>
                   {profit != null
-                    ? profit.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })
+                    ? `${profit.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })}${
+                        displayProfitPercentage != null ? ` (${displayProfitPercentage.toFixed(2)}%)` : ''
+                      }`
                     : '—'}
                 </span>
               </div>
