@@ -20,6 +20,34 @@ import { defaultTabletopConfig } from '../configurator/defaultConfig';
 import CartTopPreview from './CartTopPreview';
 import { buildCartSearchKeywords } from './cartUtils';
 
+interface CartLabourCost {
+  id?: string;
+  label?: string;
+  basis?: string;
+  appliesToEdgeProfile?: string;
+  units?: number;
+  rate?: number;
+  cost?: number;
+}
+
+interface CartCostingSnapshot {
+  areaM2?: number;
+  edgeLengthM?: number;
+  squareMeterRate?: number;
+  sheetAreaM2?: number;
+  piecesPerSheet?: number;
+  sheetsRequired?: number;
+  sheetUnitCost?: number;
+  materialCost?: number;
+  labourItems?: CartLabourCost[];
+  labourTotal?: number;
+  baseCost?: number;
+  profit?: number;
+  profitPercentage?: number;
+  totalCost?: number;
+  recordedAt?: string;
+}
+
 interface CartItemRecord {
   id: string;
   label: string;
@@ -43,6 +71,7 @@ interface CartItemRecord {
     notes?: string | null;
   } | null;
   estimatedPrice: number | null;
+  costing: CartCostingSnapshot | null;
   createdAt?: Timestamp | null;
   updatedAt?: Timestamp | null;
 }
@@ -95,6 +124,44 @@ const CartPage = () => {
     return clampQuantity(parsed);
   };
 
+  const scaleCostValue = (value: number | undefined, ratio: number) => {
+    return Number.isFinite(value) ? (value as number) * ratio : value;
+  };
+
+  const scaleCostingForQuantity = (
+    costing: CartCostingSnapshot | null,
+    currentQuantity: number,
+    nextQuantity: number
+  ): CartCostingSnapshot | null => {
+    if (!costing) return null;
+
+    const current = Number(currentQuantity);
+    const next = Number(nextQuantity);
+    if (!Number.isFinite(current) || current <= 0 || !Number.isFinite(next) || next <= 0) {
+      return costing;
+    }
+
+    const ratio = next / current;
+
+    return {
+      ...costing,
+      areaM2: scaleCostValue(costing.areaM2, ratio),
+      edgeLengthM: scaleCostValue(costing.edgeLengthM, ratio),
+      sheetsRequired: scaleCostValue(costing.sheetsRequired, ratio),
+      materialCost: scaleCostValue(costing.materialCost, ratio),
+      labourTotal: scaleCostValue(costing.labourTotal, ratio),
+      baseCost: scaleCostValue(costing.baseCost, ratio),
+      profit: scaleCostValue(costing.profit, ratio),
+      totalCost: scaleCostValue(costing.totalCost, ratio),
+      labourItems:
+        costing.labourItems?.map(item => ({
+          ...item,
+          units: scaleCostValue(item.units, ratio),
+          cost: scaleCostValue(item.cost, ratio)
+        })) ?? costing.labourItems
+    };
+  };
+
   // Sync the cart list for the authenticated user. Every entry is normalised with
   // the default table config so the UI can always render complete rows.
   useEffect(() => {
@@ -119,6 +186,7 @@ const CartPage = () => {
           selectedColour: data.selectedColour || null,
           customShape: data.customShape || null,
           estimatedPrice: typeof data.estimatedPrice === 'number' ? data.estimatedPrice : null,
+          costing: data.costing || null,
           createdAt: data.createdAt || null,
           updatedAt: data.updatedAt || null
         };
@@ -175,11 +243,9 @@ const CartPage = () => {
   // mirrors what the user sees on screen.
   const { pricedCount, totalEstimatedValue } = useMemo(() => {
     const pricedItems = filteredItems.filter(item => typeof item.estimatedPrice === 'number');
-    // Multiply by quantity so cart totals stay in sync with inline adjustments.
-    const total = pricedItems.reduce((sum, item) => {
-      const quantity = item.config.quantity ?? 1;
-      return sum + (item.estimatedPrice ?? 0) * quantity;
-    }, 0);
+    // Totals come directly from the admin costing panel. The saved estimated price already
+    // reflects the recorded quantity, so avoid multiplying again to keep the sum accurate.
+    const total = pricedItems.reduce((sum, item) => sum + (item.estimatedPrice ?? 0), 0);
     return { pricedCount: pricedItems.length, totalEstimatedValue: total };
   }, [filteredItems]);
 
@@ -215,7 +281,14 @@ const CartPage = () => {
 
   const updateQuantity = async (item: CartItemRecord, nextQuantity: number) => {
     const clampedQuantity = normaliseQuantity(nextQuantity);
+    const currentQuantity = normaliseQuantity(item.config.quantity);
     const nextConfig = { ...item.config, quantity: clampedQuantity };
+    const scaledCosting = scaleCostingForQuantity(item.costing, currentQuantity, clampedQuantity);
+    const nextEstimatedPrice =
+      scaledCosting?.totalCost ??
+      (item.estimatedPrice != null && currentQuantity > 0
+        ? (item.estimatedPrice * clampedQuantity) / currentQuantity
+        : item.estimatedPrice);
 
     // Optimistically update the UI so the quantity and totals change immediately
     // while Firestore writes complete.
@@ -224,7 +297,9 @@ const CartPage = () => {
         cartItem.id === item.id
           ? {
               ...cartItem,
-              config: { ...cartItem.config, quantity: clampedQuantity }
+              config: { ...cartItem.config, quantity: clampedQuantity },
+              estimatedPrice: nextEstimatedPrice,
+              costing: scaledCosting ?? cartItem.costing ?? null
             }
           : cartItem
       )
@@ -241,6 +316,8 @@ const CartPage = () => {
     try {
       await updateDoc(doc(db, 'cartItems', item.id), {
         'config.quantity': clampedQuantity,
+        estimatedPrice: nextEstimatedPrice ?? null,
+        costing: scaledCosting ?? item.costing ?? null,
         searchKeywords,
         updatedAt: serverTimestamp()
       });
