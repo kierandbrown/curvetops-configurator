@@ -375,10 +375,9 @@ const CartPage = () => {
     });
   };
 
-  // Send customers to the orders view so they can confirm their purchase
-  // details and follow the approval workflow with the saved tops.
+  // Temporarily disable order submission until the checkout flow is ready.
   const handlePlaceOrder = () => {
-    navigate('/orders');
+    window.alert('Checkout flow to be implemented.');
   };
 
   const handleNameClick = (itemId: string) => {
