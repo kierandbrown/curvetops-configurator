@@ -20,6 +20,7 @@ interface ThicknessDimension {
   thickness: string;
   maxLength: string;
   maxWidth: string;
+  squareMeterPrice: string;
 }
 
 interface MaterialInput {
@@ -88,7 +89,10 @@ const buildSearchKeywords = (material: MaterialInput): string[] => {
     material.hexCode,
     material.supplierSku,
     material.thicknessDimensions
-      .map(dimension => `${dimension.thickness} ${dimension.maxLength} ${dimension.maxWidth}`)
+      .map(
+        dimension =>
+          `${dimension.thickness} ${dimension.maxLength} ${dimension.maxWidth} ${dimension.squareMeterPrice}`
+      )
       .join(' '),
     material.notes,
     material.isPopular ? 'popular favourite top-pick' : ''
@@ -133,7 +137,8 @@ const MaterialsPage: React.FC = () => {
             return data.thicknessDimensions.map(dimension => ({
               thickness: dimension.thickness || '',
               maxLength: dimension.maxLength || '',
-              maxWidth: dimension.maxWidth || ''
+              maxWidth: dimension.maxWidth || '',
+              squareMeterPrice: dimension.squareMeterPrice || ''
             }));
           }
 
@@ -141,7 +146,8 @@ const MaterialsPage: React.FC = () => {
             return data.availableThicknesses.map(thicknessValue => ({
               thickness: thicknessValue || '',
               maxLength: data.maxLength || '',
-              maxWidth: data.maxWidth || ''
+              maxWidth: data.maxWidth || '',
+              squareMeterPrice: ''
             }));
           }
 
@@ -150,7 +156,8 @@ const MaterialsPage: React.FC = () => {
               {
                 thickness: '',
                 maxLength: data.maxLength || '',
-                maxWidth: data.maxWidth || ''
+                maxWidth: data.maxWidth || '',
+                squareMeterPrice: ''
               }
             ];
           }
@@ -180,7 +187,12 @@ const MaterialsPage: React.FC = () => {
       setFormState({
         ...emptyMaterial,
         ...match,
-        thicknessDimensions: match.thicknessDimensions.map(dimension => ({ ...dimension }))
+        thicknessDimensions: match.thicknessDimensions.map(dimension => ({
+          thickness: dimension.thickness,
+          maxLength: dimension.maxLength,
+          maxWidth: dimension.maxWidth,
+          squareMeterPrice: dimension.squareMeterPrice || ''
+        }))
       });
       setImagePreview(match.imageUrl || '');
       setPendingImageFile(null);
@@ -285,7 +297,7 @@ const MaterialsPage: React.FC = () => {
   const addThicknessDimension = () => {
     handleFormChange('thicknessDimensions', [
       ...formState.thicknessDimensions,
-      { thickness: '', maxLength: '', maxWidth: '' }
+      { thickness: '', maxLength: '', maxWidth: '', squareMeterPrice: '' }
     ]);
   };
 
@@ -380,9 +392,13 @@ const MaterialsPage: React.FC = () => {
         .map(dimension => ({
           thickness: dimension.thickness.trim(),
           maxLength: dimension.maxLength.trim(),
-          maxWidth: dimension.maxWidth.trim()
+          maxWidth: dimension.maxWidth.trim(),
+          squareMeterPrice: dimension.squareMeterPrice.trim()
         }))
-        .filter(dimension => dimension.thickness || dimension.maxLength || dimension.maxWidth);
+        .filter(
+          dimension =>
+            dimension.thickness || dimension.maxLength || dimension.maxWidth || dimension.squareMeterPrice
+        );
       const baseMaterial: MaterialInput = {
         ...formState,
         hexCode: sanitizedHex.toUpperCase(),
@@ -500,6 +516,18 @@ const MaterialsPage: React.FC = () => {
     }
   ];
 
+  const formatSquareMeterPrice = (value?: string) => {
+    if (!value) return '';
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    const numeric = Number(trimmed.replace(/[^0-9.]/g, ''));
+    const numericOnly = /^[0-9.,]+$/.test(trimmed);
+    if (!Number.isNaN(numeric) && numericOnly) {
+      return `${numeric.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })} /m²`;
+    }
+    return /m2|m²|\/m/i.test(trimmed) ? trimmed : `${trimmed} /m²`;
+  };
+
   const renderTableCell = (material: MaterialRecord, key: FilterKeys) => {
     const sharedClass = 'text-slate-200';
     switch (key) {
@@ -525,7 +553,12 @@ const MaterialsPage: React.FC = () => {
               <ul className="space-y-1 text-xs text-slate-300">
                 {material.thicknessDimensions.map((dimension, index) => (
                   <li key={`${material.id}-thickness-${index}`}>
-                    {dimension.thickness ? `${dimension.thickness} mm` : 'Unspecified thickness'}
+                    <div className="font-semibold text-slate-100">
+                      {dimension.thickness ? `${dimension.thickness} mm` : 'Unspecified thickness'}
+                    </div>
+                    {dimension.squareMeterPrice && (
+                      <p className="text-slate-400">{formatSquareMeterPrice(dimension.squareMeterPrice)}</p>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -888,12 +921,13 @@ const MaterialsPage: React.FC = () => {
                       const thicknessId = `thickness-${index}`;
                       const lengthId = `length-${index}`;
                       const widthId = `width-${index}`;
+                      const priceId = `price-${index}`;
                       return (
                         <div
                           key={`${thicknessId}-${lengthId}-${widthId}`}
                           className="rounded-xl border border-slate-800 bg-slate-950/40 p-4"
                         >
-                          <div className="flex flex-col gap-4 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end sm:gap-3">
+                          <div className="flex flex-col gap-4 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end sm:gap-3">
                             <div>
                               <label className="text-sm font-semibold text-slate-100" htmlFor={thicknessId}>
                                 Thickness (mm)
@@ -944,6 +978,28 @@ const MaterialsPage: React.FC = () => {
                               />
                               <p id={`${widthId}-help`} className="mt-1 text-[0.7rem] text-slate-400">
                                 Record the widest sheet stocked in this thickness so wide tops are quoted correctly.
+                              </p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-semibold text-slate-100" htmlFor={priceId}>
+                                Square metre price (AUD)
+                              </label>
+                              <input
+                                id={priceId}
+                                type="number"
+                                inputMode="decimal"
+                                min="0"
+                                step="0.01"
+                                className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                                value={dimension.squareMeterPrice}
+                                onChange={event =>
+                                  updateThicknessDimension(index, 'squareMeterPrice', event.target.value)
+                                }
+                                placeholder="e.g. 245"
+                                aria-describedby={`${priceId}-help`}
+                              />
+                              <p id={`${priceId}-help`} className="mt-1 text-[0.7rem] text-slate-400">
+                                Note the cost per m² for this thickness so estimators can budget quickly.
                               </p>
                             </div>
                             <div className="sm:text-right">
