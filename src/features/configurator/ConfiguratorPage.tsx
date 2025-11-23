@@ -76,6 +76,7 @@ interface ThicknessDimension {
   thickness: string;
   maxLength: string;
   maxWidth: string;
+  squareMeterPrice: string;
 }
 
 interface CatalogueMaterial {
@@ -481,10 +482,15 @@ const ConfiguratorPage: React.FC = () => {
                 .map(dimension => ({
                   thickness: dimension.thickness ?? '',
                   maxLength: dimension.maxLength ?? '',
-                  maxWidth: dimension.maxWidth ?? ''
+                  maxWidth: dimension.maxWidth ?? '',
+                  squareMeterPrice: dimension.squareMeterPrice ?? ''
                 }))
                 .filter(
-                  dimension => dimension.thickness || dimension.maxLength || dimension.maxWidth
+                  dimension =>
+                    dimension.thickness ||
+                    dimension.maxLength ||
+                    dimension.maxWidth ||
+                    dimension.squareMeterPrice
                 )
             : [];
           const derivedThicknesses = normalizedDimensions
@@ -766,6 +772,18 @@ const ConfiguratorPage: React.FC = () => {
       ? price.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })
       : '—';
 
+  const formatSquareMeterPrice = (value?: string) => {
+    if (!value) return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const numeric = Number(trimmed.replace(/[^0-9.]/g, ''));
+    const numericOnly = /^[0-9.,]+$/.test(trimmed);
+    if (!Number.isNaN(numeric) && numericOnly) {
+      return `${numeric.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })} /m²`;
+    }
+    return /m2|m²|\/m/i.test(trimmed) ? trimmed : `${trimmed} /m²`;
+  };
+
   // Clamp the corner radius whenever the width slider reduces the available space.
   useEffect(() => {
     if (config.shape !== 'rounded-rect') return;
@@ -811,6 +829,7 @@ const ConfiguratorPage: React.FC = () => {
   const minThickness = thicknessChoices[0];
   const maxThickness = thicknessChoices[thicknessChoices.length - 1];
   const activeThicknessLabel = activeThicknessDimensions?.thickness?.trim();
+  const activeSquareMeterPriceLabel = formatSquareMeterPrice(activeThicknessDimensions?.squareMeterPrice);
   const catalogueMaxLengthLabel =
     activeThicknessDimensions?.maxLength || selectedCatalogueMaterial?.maxLength;
   const catalogueMaxWidthLabel =
@@ -1343,7 +1362,7 @@ const ConfiguratorPage: React.FC = () => {
                         />
                       )}
                     </div>
-                    <div className="grid gap-3 text-slate-200 sm:grid-cols-3">
+                    <div className="grid gap-3 text-slate-200 sm:grid-cols-3 md:grid-cols-4">
                       <div>
                         <p className="text-[0.6rem] uppercase tracking-wide text-slate-400">Max blank length</p>
                         <p className="text-sm">{catalogueMaxLengthLabel || `${effectiveLengthLimit}mm`}</p>
@@ -1355,6 +1374,12 @@ const ConfiguratorPage: React.FC = () => {
                       <div>
                         <p className="text-[0.6rem] uppercase tracking-wide text-slate-400">Thicknesses stocked</p>
                         <p className="text-sm">{`${thicknessChoices.join(', ')} mm`}</p>
+                      </div>
+                      <div>
+                        <p className="text-[0.6rem] uppercase tracking-wide text-slate-400">Square metre price</p>
+                        <p className="text-sm">
+                          {activeSquareMeterPriceLabel || '—'}
+                        </p>
                       </div>
                     </div>
                     {activeThicknessLabel && (
