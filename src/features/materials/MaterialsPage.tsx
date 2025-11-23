@@ -21,6 +21,7 @@ interface ThicknessDimension {
   maxLength: string;
   maxWidth: string;
   squareMeterPrice: string;
+  supplierSku: string;
 }
 
 interface MaterialInput {
@@ -29,11 +30,11 @@ interface MaterialInput {
   materialType: string;
   finish: string;
   hexCode: string;
-  supplierSku: string;
   isPopular: boolean;
   thicknessDimensions: ThicknessDimension[];
   imageUrl: string;
   notes: string;
+  supplierSku: string;
 }
 
 interface MaterialRecord extends MaterialInput {
@@ -87,14 +88,14 @@ const buildSearchKeywords = (material: MaterialInput): string[] => {
     material.materialType,
     material.finish,
     material.hexCode,
-    material.supplierSku,
     material.thicknessDimensions
       .map(
         dimension =>
-          `${dimension.thickness} ${dimension.maxLength} ${dimension.maxWidth} ${dimension.squareMeterPrice}`
+          `${dimension.thickness} ${dimension.maxLength} ${dimension.maxWidth} ${dimension.squareMeterPrice} ${dimension.supplierSku}`
       )
       .join(' '),
     material.notes,
+    material.supplierSku,
     material.isPopular ? 'popular favourite top-pick' : ''
   ];
   const words = combinedValues
@@ -138,7 +139,8 @@ const MaterialsPage: React.FC = () => {
               thickness: dimension.thickness || '',
               maxLength: dimension.maxLength || '',
               maxWidth: dimension.maxWidth || '',
-              squareMeterPrice: dimension.squareMeterPrice || ''
+              squareMeterPrice: dimension.squareMeterPrice || '',
+              supplierSku: dimension.supplierSku || data.supplierSku || ''
             }));
           }
 
@@ -147,7 +149,8 @@ const MaterialsPage: React.FC = () => {
               thickness: thicknessValue || '',
               maxLength: data.maxLength || '',
               maxWidth: data.maxWidth || '',
-              squareMeterPrice: ''
+              squareMeterPrice: '',
+              supplierSku: data.supplierSku || ''
             }));
           }
 
@@ -157,7 +160,8 @@ const MaterialsPage: React.FC = () => {
                 thickness: '',
                 maxLength: data.maxLength || '',
                 maxWidth: data.maxWidth || '',
-                squareMeterPrice: ''
+                squareMeterPrice: '',
+                supplierSku: data.supplierSku || ''
               }
             ];
           }
@@ -168,6 +172,7 @@ const MaterialsPage: React.FC = () => {
           id: docSnap.id,
           ...emptyMaterial,
           ...data,
+          supplierSku: normalizedDimensions[0]?.supplierSku || data.supplierSku || '',
           isPopular: Boolean(data.isPopular),
           thicknessDimensions: normalizedDimensions,
           imageUrl: data.imageUrl || ''
@@ -191,7 +196,8 @@ const MaterialsPage: React.FC = () => {
           thickness: dimension.thickness,
           maxLength: dimension.maxLength,
           maxWidth: dimension.maxWidth,
-          squareMeterPrice: dimension.squareMeterPrice || ''
+          squareMeterPrice: dimension.squareMeterPrice || '',
+          supplierSku: dimension.supplierSku || ''
         }))
       });
       setImagePreview(match.imageUrl || '');
@@ -241,6 +247,10 @@ const MaterialsPage: React.FC = () => {
           case 'widthDetails':
             return material.thicknessDimensions.some(dimension =>
               `${dimension.thickness} ${dimension.maxWidth}`.toLowerCase().includes(filterValue)
+            );
+          case 'supplierSku':
+            return material.thicknessDimensions.some(dimension =>
+              dimension.supplierSku.toLowerCase().includes(filterValue)
             );
           default: {
             const rawValue = material[key as keyof MaterialRecord];
@@ -297,7 +307,7 @@ const MaterialsPage: React.FC = () => {
   const addThicknessDimension = () => {
     handleFormChange('thicknessDimensions', [
       ...formState.thicknessDimensions,
-      { thickness: '', maxLength: '', maxWidth: '', squareMeterPrice: '' }
+      { thickness: '', maxLength: '', maxWidth: '', squareMeterPrice: '', supplierSku: '' }
     ]);
   };
 
@@ -387,26 +397,31 @@ const MaterialsPage: React.FC = () => {
         : `#${formState.hexCode}`;
       const sanitizedSupplierName = formState.supplierName.trim();
       const trimmedNotes = formState.notes.trim();
-      const sanitizedSupplierSku = formState.supplierSku.trim();
       const sanitizedDimensions = formState.thicknessDimensions
         .map(dimension => ({
           thickness: dimension.thickness.trim(),
           maxLength: dimension.maxLength.trim(),
           maxWidth: dimension.maxWidth.trim(),
-          squareMeterPrice: dimension.squareMeterPrice.trim()
+          squareMeterPrice: dimension.squareMeterPrice.trim(),
+          supplierSku: dimension.supplierSku.trim()
         }))
         .filter(
           dimension =>
-            dimension.thickness || dimension.maxLength || dimension.maxWidth || dimension.squareMeterPrice
+            dimension.thickness ||
+            dimension.maxLength ||
+            dimension.maxWidth ||
+            dimension.squareMeterPrice ||
+            dimension.supplierSku
         );
+      const derivedSupplierSku = sanitizedDimensions[0]?.supplierSku || formState.supplierSku.trim();
       const baseMaterial: MaterialInput = {
         ...formState,
         hexCode: sanitizedHex.toUpperCase(),
         supplierName: sanitizedSupplierName,
-        supplierSku: sanitizedSupplierSku,
         thicknessDimensions: sanitizedDimensions,
         imageUrl,
-        notes: trimmedNotes
+        notes: trimmedNotes,
+        supplierSku: derivedSupplierSku
       };
       const payload = {
         ...baseMaterial,
@@ -494,7 +509,7 @@ const MaterialsPage: React.FC = () => {
       key: 'supplierSku',
       label: 'Supplier SKU',
       placeholder: 'SKU, code…',
-      helper: 'Search by catalogue or supplier code when ordering replacements.'
+      helper: 'Search by thickness-specific catalogue or supplier code when ordering replacements.'
     },
     {
       key: 'lengthDetails',
@@ -556,6 +571,9 @@ const MaterialsPage: React.FC = () => {
                     <div className="font-semibold text-slate-100">
                       {dimension.thickness ? `${dimension.thickness} mm` : 'Unspecified thickness'}
                     </div>
+                    {dimension.supplierSku && (
+                      <p className="text-[0.7rem] text-slate-400">SKU: {dimension.supplierSku}</p>
+                    )}
                     {dimension.squareMeterPrice && (
                       <p className="text-slate-400">{formatSquareMeterPrice(dimension.squareMeterPrice)}</p>
                     )}
@@ -858,25 +876,6 @@ const MaterialsPage: React.FC = () => {
                 </p>
               </div>
 
-              <div>
-                <label className="text-sm font-semibold text-slate-100" htmlFor="material-sku">
-                  Supplier SKU
-                </label>
-                <input
-                  id="material-sku"
-                  type="text"
-                  className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
-                  value={formState.supplierSku}
-                  onChange={event => handleFormChange('supplierSku', event.target.value)}
-                  placeholder="e.g. MELA-12345"
-                  aria-describedby="material-sku-help"
-                />
-                <p id="material-sku-help" className="mt-1 text-xs text-slate-400">
-                  Add the supplier code exactly as it appears on the order sheet so procurement can search and cross
-                  check fast.
-                </p>
-              </div>
-
               <div className="flex items-start gap-3 rounded-lg border border-slate-800/60 bg-slate-950/50 p-3">
                 <input
                   id="material-popular"
@@ -919,6 +918,7 @@ const MaterialsPage: React.FC = () => {
                   {formState.thicknessDimensions.length ? (
                     formState.thicknessDimensions.map((dimension, index) => {
                       const thicknessId = `thickness-${index}`;
+                      const skuId = `sku-${index}`;
                       const lengthId = `length-${index}`;
                       const widthId = `width-${index}`;
                       const priceId = `price-${index}`;
@@ -927,7 +927,7 @@ const MaterialsPage: React.FC = () => {
                           key={`${thicknessId}-${lengthId}-${widthId}`}
                           className="rounded-xl border border-slate-800 bg-slate-950/40 p-4"
                         >
-                          <div className="flex flex-col gap-4 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end sm:gap-3">
+                          <div className="flex flex-col gap-4 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end sm:gap-3">
                             <div>
                               <label className="text-sm font-semibold text-slate-100" htmlFor={thicknessId}>
                                 Thickness (mm)
@@ -944,6 +944,23 @@ const MaterialsPage: React.FC = () => {
                               />
                               <p id={`${thicknessId}-help`} className="mt-1 text-[0.7rem] text-slate-400">
                                 Type the stocked thickness so estimators know which board size applies.
+                              </p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-semibold text-slate-100" htmlFor={skuId}>
+                                Supplier SKU
+                              </label>
+                              <input
+                                id={skuId}
+                                type="text"
+                                className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                                value={dimension.supplierSku}
+                                onChange={event => updateThicknessDimension(index, 'supplierSku', event.target.value)}
+                                placeholder="e.g. MELA-16-123"
+                                aria-describedby={`${skuId}-help`}
+                              />
+                              <p id={`${skuId}-help`} className="mt-1 text-[0.7rem] text-slate-400">
+                                Store the ordering code for this exact thickness so procurement can move fast.
                               </p>
                             </div>
                             <div>

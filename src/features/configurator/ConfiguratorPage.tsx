@@ -77,6 +77,7 @@ interface ThicknessDimension {
   maxLength: string;
   maxWidth: string;
   squareMeterPrice: string;
+  supplierSku: string;
 }
 
 interface CatalogueMaterial {
@@ -598,14 +599,16 @@ const ConfiguratorPage: React.FC = () => {
                   thickness: dimension.thickness ?? '',
                   maxLength: dimension.maxLength ?? '',
                   maxWidth: dimension.maxWidth ?? '',
-                  squareMeterPrice: dimension.squareMeterPrice ?? ''
+                  squareMeterPrice: dimension.squareMeterPrice ?? '',
+                  supplierSku: dimension.supplierSku ?? data.supplierSku ?? ''
                 }))
                 .filter(
                   dimension =>
                     dimension.thickness ||
                     dimension.maxLength ||
                     dimension.maxWidth ||
-                    dimension.squareMeterPrice
+                    dimension.squareMeterPrice ||
+                    dimension.supplierSku
                 )
             : [];
           const derivedThicknesses = normalizedDimensions
@@ -616,7 +619,7 @@ const ConfiguratorPage: React.FC = () => {
             name: data.name ?? 'Untitled colour',
             materialType: data.materialType ?? '',
             finish: data.finish ?? '',
-            supplierSku: data.supplierSku ?? '',
+            supplierSku: normalizedDimensions[0]?.supplierSku ?? data.supplierSku ?? '',
             hexCode: data.hexCode,
             imageUrl: data.imageUrl,
             isPopular: Boolean(data.isPopular),
@@ -647,30 +650,6 @@ const ConfiguratorPage: React.FC = () => {
     );
   }, [catalogueMaterials, selectedCatalogueMaterialId]);
 
-  const selectedColourSnapshot = useMemo<ColourSnapshot>(() => {
-    if (!selectedCatalogueMaterial) return null;
-
-    const parsedMaxLength = parseMeasurementToMm(selectedCatalogueMaterial.maxLength);
-    const parsedMaxWidth = parseMeasurementToMm(selectedCatalogueMaterial.maxWidth);
-
-    const parsedThicknesses = selectedCatalogueMaterial.availableThicknesses
-      ?.map(value => parseThicknessToNumber(value))
-      .filter((value): value is number => value !== null);
-
-    return {
-      id: selectedCatalogueMaterial.id,
-      name: selectedCatalogueMaterial.name,
-      materialType: selectedCatalogueMaterial.materialType,
-      finish: selectedCatalogueMaterial.finish,
-      supplierSku: selectedCatalogueMaterial.supplierSku,
-      hexCode: selectedCatalogueMaterial.hexCode ?? null,
-      imageUrl: selectedCatalogueMaterial.imageUrl ?? null,
-      maxLength: parsedMaxLength,
-      maxWidth: parsedMaxWidth,
-      availableThicknesses: parsedThicknesses ?? null
-    };
-  }, [selectedCatalogueMaterial]);
-
   const filteredCatalogueMaterials = useMemo(() => {
     const searchValue = catalogueSearch.trim().toLowerCase();
     if (!searchValue) {
@@ -685,6 +664,7 @@ const ConfiguratorPage: React.FC = () => {
           material.materialType,
           material.finish,
           material.supplierSku,
+          material.thicknessDimensions?.map(dimension => dimension.supplierSku).join(' '),
           material.isPopular ? 'popular favourite top pick' : ''
         ]
           .join(' ')
@@ -729,6 +709,30 @@ const ConfiguratorPage: React.FC = () => {
     const fallback = enrichedDimensions.find(dimension => dimension.numericThickness != null);
     return fallback ?? enrichedDimensions[0];
   }, [config.thicknessMm, selectedCatalogueMaterial]);
+
+  const selectedColourSnapshot = useMemo<ColourSnapshot>(() => {
+    if (!selectedCatalogueMaterial) return null;
+
+    const parsedMaxLength = parseMeasurementToMm(selectedCatalogueMaterial.maxLength);
+    const parsedMaxWidth = parseMeasurementToMm(selectedCatalogueMaterial.maxWidth);
+
+    const parsedThicknesses = selectedCatalogueMaterial.availableThicknesses
+      ?.map(value => parseThicknessToNumber(value))
+      .filter((value): value is number => value !== null);
+
+    return {
+      id: selectedCatalogueMaterial.id,
+      name: selectedCatalogueMaterial.name,
+      materialType: selectedCatalogueMaterial.materialType,
+      finish: selectedCatalogueMaterial.finish,
+      supplierSku: activeThicknessDimensions?.supplierSku || selectedCatalogueMaterial.supplierSku,
+      hexCode: selectedCatalogueMaterial.hexCode ?? null,
+      imageUrl: selectedCatalogueMaterial.imageUrl ?? null,
+      maxLength: parsedMaxLength,
+      maxWidth: parsedMaxWidth,
+      availableThicknesses: parsedThicknesses ?? null
+    };
+  }, [activeThicknessDimensions?.supplierSku, selectedCatalogueMaterial]);
 
   const snapToNearestThickness = useCallback(
     (value: number) =>
@@ -1088,17 +1092,19 @@ const ConfiguratorPage: React.FC = () => {
   const cartSurfaceLabel =
     selectedCatalogueMaterial?.name || selectedCatalogueMaterial?.materialType || 'Surface';
   const cartItemLabel = `${cartSurfaceLabel} ${config.shape} ${config.lengthMm}x${config.widthMm}mm top`;
+  const activeSupplierSku =
+    activeThicknessDimensions?.supplierSku || selectedCatalogueMaterial?.supplierSku || '';
   const extraSurfaceKeywords = useMemo(() => {
     if (!selectedCatalogueMaterial) return [] as string[];
     return [
       selectedCatalogueMaterial.name,
       selectedCatalogueMaterial.materialType,
       selectedCatalogueMaterial.finish,
-      selectedCatalogueMaterial.supplierSku
+      activeSupplierSku
     ]
       .filter((term): term is string => Boolean(term))
       .map(term => term.toString());
-  }, [selectedCatalogueMaterial]);
+  }, [activeSupplierSku, selectedCatalogueMaterial]);
 
   useEffect(() => {
     if (dimensionLocked) return;
@@ -1146,11 +1152,11 @@ const ConfiguratorPage: React.FC = () => {
         name: selectedCatalogueMaterial.name,
         materialType: selectedCatalogueMaterial.materialType,
         finish: selectedCatalogueMaterial.finish,
-        supplierSku: selectedCatalogueMaterial.supplierSku,
+        supplierSku: activeSupplierSku,
         hexCode: selectedCatalogueMaterial.hexCode ?? null,
         imageUrl: selectedCatalogueMaterial.imageUrl ?? null,
-        maxLength: selectedCatalogueMaterial.maxLength,
-        maxWidth: selectedCatalogueMaterial.maxWidth,
+        maxLength: activeThicknessDimensions?.maxLength ?? selectedCatalogueMaterial.maxLength,
+        maxWidth: activeThicknessDimensions?.maxWidth ?? selectedCatalogueMaterial.maxWidth,
         availableThicknesses: selectedCatalogueMaterial.availableThicknesses
       };
       const modalColourSnapshot: ColourSnapshot = {
@@ -1158,11 +1164,15 @@ const ConfiguratorPage: React.FC = () => {
         name: selectedCatalogueMaterial.name,
         materialType: selectedCatalogueMaterial.materialType,
         finish: selectedCatalogueMaterial.finish,
-        supplierSku: selectedCatalogueMaterial.supplierSku,
+        supplierSku: activeSupplierSku,
         hexCode: selectedCatalogueMaterial.hexCode ?? null,
         imageUrl: selectedCatalogueMaterial.imageUrl ?? null,
-        maxLength: parseMeasurementToMm(selectedCatalogueMaterial.maxLength),
-        maxWidth: parseMeasurementToMm(selectedCatalogueMaterial.maxWidth),
+        maxLength: parseMeasurementToMm(
+          activeThicknessDimensions?.maxLength ?? selectedCatalogueMaterial.maxLength
+        ),
+        maxWidth: parseMeasurementToMm(
+          activeThicknessDimensions?.maxWidth ?? selectedCatalogueMaterial.maxWidth
+        ),
         availableThicknesses: selectedCatalogueMaterial.availableThicknesses
           ?.map(value => Number(value))
           .filter(value => Number.isFinite(value)) ?? null
@@ -1552,6 +1562,8 @@ const ConfiguratorPage: React.FC = () => {
                   <ul className="space-y-2" role="listbox" aria-label="Colour search results">
                     {filteredCatalogueMaterials.map(material => {
                       const isActive = material.id === selectedCatalogueMaterialId;
+                      const displaySupplierSku =
+                        material.thicknessDimensions?.[0]?.supplierSku || material.supplierSku;
                       return (
                         <li key={material.id}>
                           <button
@@ -1576,8 +1588,8 @@ const ConfiguratorPage: React.FC = () => {
                             <span className="text-[0.7rem] text-slate-400">
                               {(material.materialType || 'Material type TBD') + ' • ' + (material.finish || 'Finish TBD')}
                             </span>
-                            {material.supplierSku && (
-                              <span className="text-[0.65rem] text-slate-500">Supplier SKU: {material.supplierSku}</span>
+                            {displaySupplierSku && (
+                              <span className="text-[0.65rem] text-slate-500">Supplier SKU: {displaySupplierSku}</span>
                             )}
                           </button>
                         </li>
@@ -1606,8 +1618,10 @@ const ConfiguratorPage: React.FC = () => {
                         <p className="text-slate-300">
                           {(selectedCatalogueMaterial.materialType || 'Material type TBD') + ' • ' + (selectedCatalogueMaterial.finish || 'Finish TBD')}
                         </p>
-                        {selectedCatalogueMaterial.supplierSku && (
-                          <p className="text-[0.65rem] text-slate-400">Supplier SKU: {selectedCatalogueMaterial.supplierSku}</p>
+                        {activeSupplierSku && (
+                          <p className="text-[0.65rem] text-slate-400">
+                            Supplier SKU{activeThicknessLabel ? ` (${activeThicknessLabel}mm)` : ''}: {activeSupplierSku}
+                          </p>
                         )}
                       </div>
                       {selectedCatalogueMaterial.hexCode && (
