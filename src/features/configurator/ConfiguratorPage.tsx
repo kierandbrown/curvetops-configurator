@@ -295,23 +295,10 @@ const shapeOptions: { shape: TableShape; label: string; icon: JSX.Element }[] = 
         stroke="currentColor"
         strokeWidth={4}
       >
-        {/* Rounded workstation outline with softened corners. */}
+        {/* Rounded workstation outline with center cable notch and curved front. */}
         <path
-          d="M26 22 H154 Q166 22 166 34 V80 Q166 92 154 92 H110 Q100 92 100 102 Q100 92 90 92 H26 Q14 92 14 80 V34 Q14 22 26 22 Z"
+          d="M26 26 H84 Q92 26 92 34 C92 46 108 46 108 34 Q108 26 116 26 H154 Q166 26 166 38 V86 C166 104 146 108 122 112 C102 115 78 115 58 112 C34 108 14 104 14 86 V38 Q14 26 26 26 Z"
           className="fill-emerald-400/20 stroke-emerald-300"
-        />
-        {/* Cable contour notch. */}
-        <path
-          d="M86 62 Q90 55 90 50 V38 Q90 32 96 32 H120"
-          className="stroke-emerald-200"
-          strokeWidth={3}
-          strokeLinecap="round"
-        />
-        <path
-          d="M94 60 Q90 67 90 74 Q90 82 100 82 H124"
-          className="stroke-emerald-200"
-          strokeWidth={3}
-          strokeLinecap="round"
         />
       </svg>
     )
