@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import { buildCorsProxiedUrl } from '@/utils/corsProxy';
 import { TabletopConfig } from '../configurator/Configurator3D';
 
 type PreviewSize = 'compact' | 'roomy';
@@ -258,7 +259,7 @@ const CartTopPreview = ({ config, label, selectedColour, size = 'compact' }: Car
               <pattern id={swatchPatternId} width="40" height="40" patternUnits="userSpaceOnUse">
                 {/* Use the supplier swatch image so the preview colour matches the cart selection. */}
                 <image
-                  href={selectedColour.imageUrl}
+                  href={buildCorsProxiedUrl(selectedColour.imageUrl) ?? undefined}
                   x="0"
                   y="0"
                   width="40"

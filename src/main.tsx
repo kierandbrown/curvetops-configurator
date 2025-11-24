@@ -1,16 +1,22 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { AuthProvider } from '@auth/AuthContext';
-import App from './App';
+import { routes } from './routes';
 import './index.css';
+
+const router = createBrowserRouter(routes, {
+  // Cast needed while @types lag behind the runtime feature flags exposed in v6.28.
+  future: {
+    v7_startTransition: true,
+    v7_relativeSplatPath: true
+  } as any
+});
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
-    </BrowserRouter>
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>
   </React.StrictMode>
 );

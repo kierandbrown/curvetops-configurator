@@ -9,6 +9,7 @@ import exportModelIcon from './assets/export-model-icon.svg';
 
 import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { ParsedCustomOutline, OutlinePoint } from './customShapeTypes';
+import { buildCorsProxiedUrl } from '@/utils/corsProxy';
 
 
 export type TableShape =
@@ -449,7 +450,7 @@ const TabletopMesh: React.FC<TabletopGeometryOptions> = ({ config, customOutline
   // Apply a supplier swatch image to the tabletop whenever one exists. The trimmed check avoids
   // trying to load accidental whitespace values from Firestore that would silently fail.
   useEffect(() => {
-    const swatchImageUrl = swatch?.imageUrl?.trim();
+    const swatchImageUrl = buildCorsProxiedUrl(swatch?.imageUrl);
     if (!swatchImageUrl) {
       setSwatchTexture(null);
       return;
