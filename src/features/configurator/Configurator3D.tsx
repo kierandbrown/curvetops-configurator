@@ -18,6 +18,7 @@ export type TableShape =
   | 'round'
   | 'ellipse'
   | 'super-ellipse'
+  | 'workstation'
   | 'custom';
 
 export type EdgeProfile = 'edged' | 'painted-sharknose';
@@ -29,6 +30,9 @@ export interface TabletopConfig {
   thicknessMm: number;
   edgeRadiusMm: number;
   superEllipseExponent: number;
+  roundFrontCorners: boolean;
+  includeCableContour: boolean;
+  workstationFrontRadiusMm: number;
   material: 'laminate' | 'timber' | 'linoleum';
   finish: 'matte' | 'satin';
   edgeProfile: EdgeProfile;
@@ -182,7 +186,18 @@ const buildCustomGeometry = (
 };
 
 const createTabletopGeometry = ({ config, customOutline }: TabletopGeometryOptions) => {
-  const { shape, lengthMm, widthMm, thicknessMm, edgeRadiusMm, superEllipseExponent, edgeProfile } = config;
+  const {
+    shape,
+    lengthMm,
+    widthMm,
+    thicknessMm,
+    edgeRadiusMm,
+    superEllipseExponent,
+    roundFrontCorners,
+    includeCableContour,
+    workstationFrontRadiusMm,
+    edgeProfile
+  } = config;
 
   if (shape === 'custom' && customOutline?.paths.length && customOutline.bounds) {
     const customGeometry = buildCustomGeometry(customOutline, thicknessMm, edgeProfile);
@@ -257,6 +272,58 @@ const createTabletopGeometry = ({ config, customOutline }: TabletopGeometryOptio
     const radius = diameter / 2;
     shape2d.moveTo(radius, 0);
     shape2d.absarc(0, 0, radius, 0, Math.PI * 2, false);
+  } else if (shape === 'workstation') {
+    const hw = width / 2;
+    const hl = length / 2;
+    const frontRadius = roundFrontCorners
+      ? Math.min(workstationFrontRadiusMm * MM_TO_M, hw, hl)
+      : 0;
+    const x = -hl;
+    const frontY = -hw;
+    const backY = hw;
+
+    // Size the optional cable contour so it remains within the blank even on narrow desktops.
+    const contourHalfWidth = includeCableContour
+      ? Math.min(length * 0.25, Math.max(0.05, Math.min(0.1, hl - frontRadius - 0.05)))
+      : 0;
+    const contourDepth = includeCableContour ? Math.min(width * 0.18, 0.08, hw - 0.05) : 0;
+    const contourRadius = includeCableContour ? Math.min(contourDepth / 2, contourHalfWidth, 0.03) : 0;
+
+    shape2d.moveTo(x + frontRadius, frontY);
+    shape2d.lineTo(hl - frontRadius, frontY);
+    if (frontRadius > 0) {
+      shape2d.quadraticCurveTo(hl, frontY, hl, frontY + frontRadius);
+    }
+    shape2d.lineTo(hl, backY);
+
+    if (includeCableContour && contourHalfWidth > 0 && contourDepth > 0) {
+      shape2d.lineTo(contourHalfWidth, backY);
+      shape2d.lineTo(contourHalfWidth, backY - contourDepth + contourRadius);
+      if (contourRadius > 0) {
+        shape2d.quadraticCurveTo(
+          contourHalfWidth,
+          backY - contourDepth,
+          contourHalfWidth - contourRadius,
+          backY - contourDepth
+        );
+      }
+      shape2d.lineTo(-contourHalfWidth + contourRadius, backY - contourDepth);
+      if (contourRadius > 0) {
+        shape2d.quadraticCurveTo(
+          -contourHalfWidth,
+          backY - contourDepth,
+          -contourHalfWidth,
+          backY - contourDepth + contourRadius
+        );
+      }
+      shape2d.lineTo(-contourHalfWidth, backY);
+    }
+
+    shape2d.lineTo(x, backY);
+    shape2d.lineTo(x, frontY + frontRadius);
+    if (frontRadius > 0) {
+      shape2d.quadraticCurveTo(x, frontY, x + frontRadius, frontY);
+    }
   } else {
     const hw = width / 2;
     const hl = length / 2;
