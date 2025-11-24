@@ -89,18 +89,6 @@ const Layout: React.FC = () => {
                 Admin
               </NavLink>
             )}
-            {user && (
-              <NavLink
-                to="/account"
-                className={({ isActive }) =>
-                  `rounded px-3 py-1.5 transition hover:bg-slate-800 ${
-                    isActive ? 'bg-slate-800 font-medium' : 'bg-slate-900/40'
-                  }`
-                }
-              >
-                Account
-              </NavLink>
-            )}
           </div>
         </nav>
       </div>
