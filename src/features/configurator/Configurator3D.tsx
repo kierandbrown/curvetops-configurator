@@ -357,25 +357,50 @@ const createTabletopGeometry = ({ config, customOutline }: TabletopGeometryOptio
 
     if (includeCableContour && contourHalfWidth > 0 && contourDepth > 0) {
       const contourBottomY = backY - contourDepth;
-      const contourControlX = contourHalfWidth * 0.6;
-      const contourControlY = contourDepth * 0.85;
+      const externalRadius = 0.05;
+      const internalRadius = 0.05;
+      const radiusScale = Math.min(1, contourDepth / (externalRadius + internalRadius));
+      const scaledExternalRadius = externalRadius * radiusScale;
+      const scaledInternalRadius = internalRadius * radiusScale;
+      const internalTopY = contourBottomY + scaledInternalRadius;
+      const bottomFlatHalfWidth = Math.max(contourHalfWidth - scaledInternalRadius, 0);
+      const bezierKappa = 0.5522847498;
 
-      shape2d.lineTo(contourHalfWidth, backY);
+      shape2d.lineTo(contourHalfWidth + scaledExternalRadius, backY);
+      shape2d.absarc(
+        contourHalfWidth + scaledExternalRadius,
+        backY - scaledExternalRadius,
+        scaledExternalRadius,
+        Math.PI / 2,
+        Math.PI,
+        false
+      );
+      shape2d.lineTo(contourHalfWidth, internalTopY);
       shape2d.bezierCurveTo(
-        contourHalfWidth - contourControlX * 0.25,
-        backY,
-        contourHalfWidth - contourControlX,
-        backY - contourControlY,
-        0,
+        contourHalfWidth,
+        internalTopY - scaledInternalRadius * bezierKappa,
+        bottomFlatHalfWidth + scaledInternalRadius * bezierKappa,
+        contourBottomY,
+        bottomFlatHalfWidth,
         contourBottomY
       );
+      shape2d.lineTo(-bottomFlatHalfWidth, contourBottomY);
       shape2d.bezierCurveTo(
-        -contourHalfWidth + contourControlX,
-        backY - contourControlY,
-        -contourHalfWidth + contourControlX * 0.25,
-        backY,
+        -bottomFlatHalfWidth - scaledInternalRadius * bezierKappa,
+        contourBottomY,
         -contourHalfWidth,
-        backY
+        internalTopY - scaledInternalRadius * bezierKappa,
+        -contourHalfWidth,
+        internalTopY
+      );
+      shape2d.lineTo(-(contourHalfWidth + scaledExternalRadius), backY - scaledExternalRadius);
+      shape2d.absarc(
+        -(contourHalfWidth + scaledExternalRadius),
+        backY - scaledExternalRadius,
+        scaledExternalRadius,
+        0,
+        Math.PI / 2,
+        false
       );
     }
 
