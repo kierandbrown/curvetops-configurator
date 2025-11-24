@@ -20,6 +20,8 @@ const statusOptions = [
   { value: 'draft', label: 'Draft' },
   { value: 'awaiting-approval', label: 'Awaiting approval' },
   { value: 'in-production', label: 'In production' },
+  { value: 'shipped', label: 'Shipped' },
+  { value: 'delivered', label: 'Delivered' },
   { value: 'ready-to-ship', label: 'Ready to ship' },
   { value: 'completed', label: 'Completed' },
   { value: 'cancelled', label: 'Cancelled' }
@@ -276,6 +278,27 @@ const OrdersPage = () => {
     }
   };
 
+  const updateOrderStatus = async (orderId: string, status: OrderStatus) => {
+    const targetOrder = orders.find(order => order.id === orderId);
+    if (!isAdmin || !targetOrder) return;
+
+    setOrders(prev =>
+      prev.map(order => (order.id === orderId ? { ...order, status } : order))
+    );
+
+    await updateDoc(doc(db, 'orders', orderId), {
+      status,
+      updatedAt: serverTimestamp(),
+      searchKeywords: buildSearchKeywords({
+        projectName: targetOrder.projectName,
+        customerName: targetOrder.customerName,
+        contactEmail: targetOrder.contactEmail,
+        status,
+        notes: targetOrder.notes
+      })
+    });
+  };
+
   // Quickly duplicate an order so estimators can re-use pricing frameworks.
   const cloneOrder = async (order: OrderRecord) => {
     if (!showOrderForm) return;
@@ -443,9 +466,26 @@ const OrdersPage = () => {
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <span className="inline-flex items-center rounded-full bg-slate-800/80 px-2 py-0.5 text-xs font-medium text-slate-200">
-                            {statusOptions.find(option => option.value === order.status)?.label || order.status}
-                          </span>
+                          {isAdmin ? (
+                            <select
+                              className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs font-medium text-slate-100 focus:border-emerald-400 focus:outline-none"
+                              value={order.status}
+                              onChange={event =>
+                                updateOrderStatus(order.id, event.target.value as OrderStatus)
+                              }
+                              aria-label="Update order status"
+                            >
+                              {statusOptions.map(option => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full bg-slate-800/80 px-2 py-0.5 text-xs font-medium text-slate-200">
+                              {statusOptions.find(option => option.value === order.status)?.label || order.status}
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <p className="font-medium text-slate-100">{order.customerName || 'Unnamed contact'}</p>
