@@ -60,6 +60,7 @@ export interface CartItemRecord {
   customShape: CartCustomShapeMeta | null;
   estimatedPrice: number | null;
   costing: CartCostingSnapshot | null;
+  orderId?: string | null;
   createdAt?: Timestamp | null;
   updatedAt?: Timestamp | null;
 }
