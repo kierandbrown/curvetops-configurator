@@ -65,18 +65,6 @@ const Layout: React.FC = () => {
                 My Orders
               </NavLink>
             )}
-            {user && (
-              <NavLink
-                to="/specifications"
-                className={({ isActive }) =>
-                  `rounded px-3 py-1.5 transition hover:bg-slate-800 ${
-                    isActive ? 'bg-slate-800 font-medium' : 'bg-slate-900/40'
-                  }`
-                }
-              >
-                Specifications
-              </NavLink>
-            )}
             {isAdmin && (
               <NavLink
                 to="/admin"

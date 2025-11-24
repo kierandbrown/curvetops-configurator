@@ -37,6 +37,7 @@ interface OrderRecord {
   totalValue: number;
   customerId: string;
   createdAt?: Timestamp | null;
+  isSpecificationOrder?: boolean;
 }
 
 interface OrderFormState {
@@ -127,7 +128,8 @@ const OrdersPage = () => {
           notes: data.notes || '',
           totalValue: typeof data.totalValue === 'number' ? data.totalValue : 0,
           customerId: data.customerId || '',
-          createdAt: data.createdAt || null
+          createdAt: data.createdAt || null,
+          isSpecificationOrder: data.isSpecificationOrder || false
         };
       });
       setOrders(nextOrders);
@@ -246,6 +248,7 @@ const OrdersPage = () => {
         notes,
         totalValue,
         customerId,
+        isSpecificationOrder: activeOrder?.isSpecificationOrder ?? false,
         searchKeywords: buildSearchKeywords({
           projectName,
           customerName,
@@ -426,11 +429,18 @@ const OrdersPage = () => {
                           >
                             {order.projectName || 'Untitled order'}
                           </button>
-                          <p className="text-xs text-slate-400">
-                            {showOrderForm
-                              ? 'Tap a name to open the order form.'
-                              : 'Order records are view-only here so you can reference past work.'}
-                          </p>
+                          <div className="mt-1 flex flex-wrap items-center gap-2">
+                            {order.isSpecificationOrder && (
+                              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[0.7rem] font-semibold uppercase tracking-wide text-emerald-300">
+                                Specification order
+                              </span>
+                            )}
+                            <p className="text-xs text-slate-400">
+                              {showOrderForm
+                                ? 'Tap a name to open the order form.'
+                                : 'Order records are view-only here so you can reference past work.'}
+                            </p>
+                          </div>
                         </td>
                         <td className="px-4 py-3">
                           <span className="inline-flex items-center rounded-full bg-slate-800/80 px-2 py-0.5 text-xs font-medium text-slate-200">

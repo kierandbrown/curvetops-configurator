@@ -20,7 +20,6 @@ import { defaultTabletopConfig } from '../configurator/defaultConfig';
 import CartTopPreview from './CartTopPreview';
 import { buildCartSearchKeywords } from './cartUtils';
 import { CartCostingSnapshot, CartItemRecord, CartLabourCost } from './types';
-import { DEFAULT_COMMISSION_RATE } from '../specifications/specificationTypes';
 
 interface CartFilters {
   label: string;
@@ -511,7 +510,7 @@ const CartPage = () => {
     if (!profile) return;
 
     if (itemsForSpecification.length === 0) {
-      setSpecificationError('Add at least one tabletop to save a specification.');
+      setSpecificationError('Add at least one tabletop to save a specification order.');
       return;
     }
 
@@ -537,33 +536,64 @@ const CartPage = () => {
         profile.email;
       const specifierCompany = specificationForm.specifierCompany.trim() || profile.companyName;
 
-      const payload = {
-        userId: profile.id,
+      const specificationNotes = specificationForm.notes.trim();
+      const normalizedBuyerName = specificationForm.buyerName.trim();
+      const normalizedBuyerCompany = specificationForm.buyerCompany.trim();
+
+      const summaryLines = [
+        specificationForm.jobAddress.trim() && `Job address: ${specificationForm.jobAddress.trim()}`,
+        normalizedBuyerName && `Buyer: ${normalizedBuyerName}${
+          normalizedBuyerCompany ? ` (${normalizedBuyerCompany})` : ''
+        }`,
+        `Specifier: ${specifierName}${specifierCompany ? ` (${specifierCompany})` : ''}`,
+        specificationNotes,
+        `Included tops: ${items.length}`,
+        `Estimated value: ${
+          specificationEstimatedValue > 0
+            ? specificationEstimatedValue.toLocaleString('en-AU', {
+                style: 'currency',
+                currency: 'AUD'
+              })
+            : 'Awaiting pricing'
+        }`
+      ]
+        .filter(Boolean)
+        .join('\n');
+
+      const searchTokens = [
         jobName,
-        jobAddress: specificationForm.jobAddress.trim(),
-        buyerName: specificationForm.buyerName.trim(),
-        buyerCompany: specificationForm.buyerCompany.trim(),
+        normalizedBuyerName,
+        normalizedBuyerCompany,
         specifierName,
         specifierCompany,
-        notes: specificationForm.notes.trim(),
-        items,
-        cartItemCount: items.length,
-        totalEstimatedValue: specificationEstimatedValue,
+        profile.email || ''
+      ]
+        .join(' ')
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .map(token => token.trim())
+        .filter(Boolean);
+
+      const payload = {
+        projectName: jobName,
         status: 'draft' as const,
-        linkedOrderId: null,
-        convertedOrderValue: null,
-        commissionRate: DEFAULT_COMMISSION_RATE,
-        commissionDue: null,
+        customerName: normalizedBuyerName || specifierName,
+        contactEmail: profile.email || '',
+        notes: summaryLines,
+        totalValue: specificationEstimatedValue,
+        customerId: profile.id,
+        isSpecificationOrder: true,
+        searchKeywords: Array.from(new Set(searchTokens)),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
 
-      const docRef = await addDoc(collection(db, 'specifications'), payload);
+      const docRef = await addDoc(collection(db, 'orders'), payload);
       setSpecificationSavedId(docRef.id);
       setIsSpecificationModalOpen(false);
     } catch (error) {
       console.error('Failed to save specification', error);
-      setSpecificationError('Unable to save specification. Please try again.');
+      setSpecificationError('Unable to save the specification order. Please try again.');
     } finally {
       setSavingSpecification(false);
     }
@@ -946,7 +976,7 @@ const CartPage = () => {
                     disabled={!hasCartItems}
                     className="w-full rounded-lg border border-emerald-300/70 bg-slate-900 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:border-emerald-200 disabled:cursor-not-allowed disabled:border-slate-800 disabled:text-slate-500 sm:w-auto"
                   >
-                    Save specification
+                    Save specification order
                   </button>
                   <p className="text-[0.65rem] text-slate-500">
                     {selectedItemIds.length > 0
@@ -955,9 +985,9 @@ const CartPage = () => {
                   </p>
                   {specificationSavedId && (
                     <p className="text-xs text-emerald-300">
-                      Specification saved.{' '}
-                      <Link to="/specifications" className="underline hover:text-emerald-200">
-                        View all specs
+                      Specification order saved.{' '}
+                      <Link to="/orders" className="underline hover:text-emerald-200">
+                        View it in Orders
                       </Link>
                     </p>
                   )}
@@ -988,7 +1018,7 @@ const CartPage = () => {
           <div className="relative z-10 w-full max-w-2xl space-y-4 rounded-2xl border border-emerald-400/40 bg-slate-950 p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs uppercase tracking-[0.25em] text-emerald-300">Save specification</p>
+                <p className="text-xs uppercase tracking-[0.25em] text-emerald-300">Save specification order</p>
                 <h3 className="text-lg font-semibold text-slate-50">Capture this cart for a job</h3>
                 <p className="text-sm text-slate-400">
                   Save {itemsForSpecification.length} item{itemsForSpecification.length === 1 ? '' : 's'} with job details so
@@ -1084,7 +1114,7 @@ const CartPage = () => {
                   Estimated value {specificationEstimatedValue > 0
                     ? specificationEstimatedValue.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })
                     : 'Awaiting pricing'}
-                  . Commission is calculated at {(DEFAULT_COMMISSION_RATE * 100).toFixed(1)}% once converted to an order.
+                  . This will be saved as a draft specification order in your Orders list.
                 </p>
               </div>
 
@@ -1105,7 +1135,7 @@ const CartPage = () => {
                   disabled={savingSpecification}
                   className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700"
                 >
-                  {savingSpecification ? 'Saving…' : 'Save specification'}
+                  {savingSpecification ? 'Saving…' : 'Save specification order'}
                 </button>
               </div>
             </form>
