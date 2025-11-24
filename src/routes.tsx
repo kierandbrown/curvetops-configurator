@@ -11,6 +11,7 @@ import AccountPage from './pages/AccountPage';
 import { ProtectedRoute } from '@auth/ProtectedRoute';
 import CartPage from './features/cart/CartPage';
 import CheckoutPage from './features/cart/CheckoutPage';
+import SpecificationsPage from './features/specifications/SpecificationsPage';
 
 export const routes: RouteObject[] = [
   {
@@ -31,6 +32,14 @@ export const routes: RouteObject[] = [
         element: (
           <ProtectedRoute>
             <OrdersPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'specifications',
+        element: (
+          <ProtectedRoute>
+            <SpecificationsPage />
           </ProtectedRoute>
         )
       },

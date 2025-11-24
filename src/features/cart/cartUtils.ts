@@ -1,9 +1,5 @@
 import { TabletopConfig } from '../configurator/Configurator3D';
-
-export interface CartCustomShapeMeta {
-  fileName?: string | null;
-  notes?: string | null;
-}
+import { CartCustomShapeMeta } from './types';
 
 export const buildCartSearchKeywords = (
   config: TabletopConfig,

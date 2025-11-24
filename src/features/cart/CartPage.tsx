@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import {
-  Timestamp,
+  addDoc,
   collection,
   deleteDoc,
   doc,
@@ -19,62 +19,8 @@ import { TabletopConfig } from '../configurator/Configurator3D';
 import { defaultTabletopConfig } from '../configurator/defaultConfig';
 import CartTopPreview from './CartTopPreview';
 import { buildCartSearchKeywords } from './cartUtils';
-
-interface CartLabourCost {
-  id?: string;
-  label?: string;
-  basis?: string;
-  appliesToEdgeProfile?: string;
-  units?: number;
-  rate?: number;
-  cost?: number;
-}
-
-interface CartCostingSnapshot {
-  areaM2?: number;
-  edgeLengthM?: number;
-  squareMeterRate?: number;
-  sheetAreaM2?: number;
-  piecesPerSheet?: number;
-  sheetsRequired?: number;
-  sheetUnitCost?: number;
-  materialCost?: number;
-  labourItems?: CartLabourCost[];
-  labourTotal?: number;
-  baseCost?: number;
-  profit?: number;
-  profitPercentage?: number;
-  totalCost?: number;
-  recordedAt?: string;
-}
-
-interface CartItemRecord {
-  id: string;
-  label: string;
-  config: TabletopConfig;
-  selectedColour:
-    | {
-        id?: string;
-        name?: string;
-        materialType?: string;
-        finish?: string;
-        supplierSku?: string;
-        hexCode?: string | null;
-        imageUrl?: string | null;
-        maxLength?: number | null;
-        maxWidth?: number | null;
-        availableThicknesses?: number[] | null;
-      }
-    | null;
-  customShape: {
-    fileName?: string | null;
-    notes?: string | null;
-  } | null;
-  estimatedPrice: number | null;
-  costing: CartCostingSnapshot | null;
-  createdAt?: Timestamp | null;
-  updatedAt?: Timestamp | null;
-}
+import { CartCostingSnapshot, CartItemRecord, CartLabourCost } from './types';
+import { DEFAULT_COMMISSION_RATE } from '../specifications/specificationTypes';
 
 interface CartFilters {
   label: string;
@@ -84,6 +30,16 @@ interface CartFilters {
   dimensions: string;
   price: string;
   fileName: string;
+}
+
+interface SpecificationFormState {
+  jobName: string;
+  jobAddress: string;
+  buyerName: string;
+  buyerCompany: string;
+  specifierName: string;
+  specifierCompany: string;
+  notes: string;
 }
 
 const MATERIAL_LABELS: Record<TabletopConfig['material'], string> = {
@@ -144,6 +100,19 @@ const CartPage = () => {
   const [filters, setFilters] = useState<CartFilters>(emptyFilters);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  const [isSpecificationModalOpen, setIsSpecificationModalOpen] = useState(false);
+  const [savingSpecification, setSavingSpecification] = useState(false);
+  const [specificationError, setSpecificationError] = useState<string | null>(null);
+  const [specificationSavedId, setSpecificationSavedId] = useState<string | null>(null);
+  const [specificationForm, setSpecificationForm] = useState<SpecificationFormState>({
+    jobName: '',
+    jobAddress: '',
+    buyerName: '',
+    buyerCompany: '',
+    specifierName: '',
+    specifierCompany: '',
+    notes: ''
+  });
   // Keep a simple flag for showing action buttons in the UI instead of
   // recalculating lengths inline for every render.
   const hasCartItems = cartItems.length > 0;
@@ -305,6 +274,19 @@ const CartPage = () => {
     return () => document.removeEventListener('click', closeMenu);
   }, []);
 
+  useEffect(() => {
+    if (!profile) return;
+    setSpecificationForm(prev => ({
+      ...prev,
+      specifierName:
+        prev.specifierName ||
+        profile.displayName ||
+        `${profile.firstName} ${profile.lastName}`.trim() ||
+        profile.email,
+      specifierCompany: prev.specifierCompany || profile.companyName
+    }));
+  }, [profile]);
+
   const filteredItems = useMemo(() => {
     // Preserve the original add order even after quantity tweaks or label updates.
     const sorted = [...cartItems].sort((a, b) => {
@@ -344,6 +326,17 @@ const CartPage = () => {
     const total = pricedItems.reduce((sum, item) => sum + (item.estimatedPrice ?? 0), 0);
     return { pricedCount: pricedItems.length, totalEstimatedValue: total };
   }, [filteredItems]);
+
+  const itemsForSpecification = useMemo(() => {
+    if (selectedItemIds.length === 0) return cartItems;
+    const selectedIds = new Set(selectedItemIds);
+    return cartItems.filter(item => selectedIds.has(item.id));
+  }, [cartItems, selectedItemIds]);
+
+  const specificationEstimatedValue = useMemo(
+    () => itemsForSpecification.reduce((sum, item) => sum + (item.estimatedPrice ?? 0), 0),
+    [itemsForSpecification]
+  );
 
   const handleFilterChange = (field: keyof CartFilters, value: string) => {
     setFilters(prev => ({ ...prev, [field]: value }));
@@ -482,6 +475,83 @@ const CartPage = () => {
     // selection there. Passing the cartId lets the downstream page load context
     // without letting people create brand new items inside the cart itself.
     navigate(`/configurator?cartId=${itemId}`, { state: { cartItemId: itemId } });
+  };
+
+  const handleSpecificationFieldChange = (field: keyof SpecificationFormState, value: string) => {
+    setSpecificationForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveSpecification = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!profile) return;
+
+    if (itemsForSpecification.length === 0) {
+      setSpecificationError('Add at least one tabletop to save a specification.');
+      return;
+    }
+
+    setSavingSpecification(true);
+    setSpecificationError(null);
+
+    try {
+      const items = itemsForSpecification.map(item => ({
+        cartItemId: item.id,
+        label: item.label,
+        config: item.config,
+        selectedColour: item.selectedColour,
+        customShape: item.customShape,
+        estimatedPrice: item.estimatedPrice ?? null,
+        costing: item.costing ?? null
+      }));
+
+      const jobName = specificationForm.jobName.trim() || 'Untitled job';
+      const specifierName =
+        specificationForm.specifierName.trim() ||
+        profile.displayName ||
+        `${profile.firstName} ${profile.lastName}`.trim() ||
+        profile.email;
+      const specifierCompany = specificationForm.specifierCompany.trim() || profile.companyName;
+
+      const payload = {
+        userId: profile.id,
+        jobName,
+        jobAddress: specificationForm.jobAddress.trim(),
+        buyerName: specificationForm.buyerName.trim(),
+        buyerCompany: specificationForm.buyerCompany.trim(),
+        specifierName,
+        specifierCompany,
+        notes: specificationForm.notes.trim(),
+        items,
+        cartItemCount: items.length,
+        totalEstimatedValue: specificationEstimatedValue,
+        status: 'draft' as const,
+        linkedOrderId: null,
+        convertedOrderValue: null,
+        commissionRate: DEFAULT_COMMISSION_RATE,
+        commissionDue: null,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      const docRef = await addDoc(collection(db, 'specifications'), payload);
+      setSpecificationSavedId(docRef.id);
+      setIsSpecificationModalOpen(false);
+    } catch (error) {
+      console.error('Failed to save specification', error);
+      setSpecificationError('Unable to save specification. Please try again.');
+    } finally {
+      setSavingSpecification(false);
+    }
+  };
+
+  const handleOpenSpecificationModal = () => {
+    setSpecificationError(null);
+    setSpecificationSavedId(null);
+    setIsSpecificationModalOpen(true);
+  };
+
+  const handleCloseSpecificationModal = () => {
+    setIsSpecificationModalOpen(false);
   };
 
   if (!profile) {
@@ -843,24 +913,180 @@ const CartPage = () => {
                 </p>
                 <p className="text-xs text-slate-500">Only items with an estimated price are counted.</p>
               </div>
-              <div className="flex w-full flex-col items-end gap-1 sm:w-auto">
-                {/* Placing the action near the summary keeps checkout context close to pricing. */}
-                <button
-                  type="button"
-                  onClick={handlePlaceOrder}
-                  disabled={!hasCartItems}
-                  className="w-full rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400 sm:w-auto"
-                >
-                  Place order
-                </button>
-                <p className="text-[0.65rem] text-slate-500">
-                  Jump to orders to submit the saved tops when you are ready.
-                </p>
+              <div className="flex w-full flex-col items-end gap-3 sm:w-auto">
+                <div className="flex w-full flex-col items-end gap-1 sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={handleOpenSpecificationModal}
+                    disabled={!hasCartItems}
+                    className="w-full rounded-lg border border-emerald-300/70 bg-slate-900 px-3 py-2 text-xs font-semibold text-emerald-200 transition hover:border-emerald-200 disabled:cursor-not-allowed disabled:border-slate-800 disabled:text-slate-500 sm:w-auto"
+                  >
+                    Save specification
+                  </button>
+                  <p className="text-[0.65rem] text-slate-500">
+                    {selectedItemIds.length > 0
+                      ? `Capturing ${itemsForSpecification.length} selected item${itemsForSpecification.length === 1 ? '' : 's'}.`
+                      : 'Captures the entire cart.'}
+                  </p>
+                  {specificationSavedId && (
+                    <p className="text-xs text-emerald-300">
+                      Specification saved.{' '}
+                      <Link to="/specifications" className="underline hover:text-emerald-200">
+                        View all specs
+                      </Link>
+                    </p>
+                  )}
+                </div>
+                <div className="flex w-full flex-col items-end gap-1 sm:w-auto">
+                  {/* Placing the action near the summary keeps checkout context close to pricing. */}
+                  <button
+                    type="button"
+                    onClick={handlePlaceOrder}
+                    disabled={!hasCartItems}
+                    className="w-full rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400 sm:w-auto"
+                  >
+                    Place order
+                  </button>
+                  <p className="text-[0.65rem] text-slate-500">
+                    Jump to orders to submit the saved tops when you are ready.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
+
+      {isSpecificationModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+          <div className="absolute inset-0" onClick={handleCloseSpecificationModal} />
+          <div className="relative z-10 w-full max-w-2xl space-y-4 rounded-2xl border border-emerald-400/40 bg-slate-950 p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.25em] text-emerald-300">Save specification</p>
+                <h3 className="text-lg font-semibold text-slate-50">Capture this cart for a job</h3>
+                <p className="text-sm text-slate-400">
+                  Save {itemsForSpecification.length} item{itemsForSpecification.length === 1 ? '' : 's'} with job details so
+                  architects or specifiers can share a full brief.
+                </p>
+              </div>
+              <button
+                type="button"
+                aria-label="Close specification modal"
+                onClick={handleCloseSpecificationModal}
+                className="rounded-full border border-slate-800 p-2 text-slate-300 transition hover:border-emerald-300 hover:text-emerald-200"
+              >
+                ×
+              </button>
+            </div>
+
+            <form className="grid gap-3 md:grid-cols-2" onSubmit={handleSaveSpecification}>
+              <label className="flex flex-col text-sm text-slate-200 md:col-span-2">
+                <span className="mb-1 text-xs uppercase tracking-wider text-slate-500">Job name</span>
+                <input
+                  type="text"
+                  value={specificationForm.jobName}
+                  onChange={event => handleSpecificationFieldChange('jobName', event.target.value)}
+                  placeholder="e.g. Acme HQ fitout"
+                  className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                />
+              </label>
+              <label className="flex flex-col text-sm text-slate-200 md:col-span-2">
+                <span className="mb-1 text-xs uppercase tracking-wider text-slate-500">Job address</span>
+                <input
+                  type="text"
+                  value={specificationForm.jobAddress}
+                  onChange={event => handleSpecificationFieldChange('jobAddress', event.target.value)}
+                  placeholder="Street, suburb, state"
+                  className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                />
+              </label>
+              <label className="flex flex-col text-sm text-slate-200">
+                <span className="mb-1 text-xs uppercase tracking-wider text-slate-500">Buyer contact</span>
+                <input
+                  type="text"
+                  value={specificationForm.buyerName}
+                  onChange={event => handleSpecificationFieldChange('buyerName', event.target.value)}
+                  placeholder="Client name or team"
+                  className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                />
+              </label>
+              <label className="flex flex-col text-sm text-slate-200">
+                <span className="mb-1 text-xs uppercase tracking-wider text-slate-500">Buyer organisation</span>
+                <input
+                  type="text"
+                  value={specificationForm.buyerCompany}
+                  onChange={event => handleSpecificationFieldChange('buyerCompany', event.target.value)}
+                  placeholder="Company name"
+                  className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                />
+              </label>
+              <label className="flex flex-col text-sm text-slate-200">
+                <span className="mb-1 text-xs uppercase tracking-wider text-slate-500">Specifier name</span>
+                <input
+                  type="text"
+                  value={specificationForm.specifierName}
+                  onChange={event => handleSpecificationFieldChange('specifierName', event.target.value)}
+                  placeholder="Architect or specifier"
+                  className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                />
+              </label>
+              <label className="flex flex-col text-sm text-slate-200">
+                <span className="mb-1 text-xs uppercase tracking-wider text-slate-500">Specifier company</span>
+                <input
+                  type="text"
+                  value={specificationForm.specifierCompany}
+                  onChange={event => handleSpecificationFieldChange('specifierCompany', event.target.value)}
+                  placeholder="Design studio or firm"
+                  className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                />
+              </label>
+              <label className="flex flex-col text-sm text-slate-200 md:col-span-2">
+                <span className="mb-1 text-xs uppercase tracking-wider text-slate-500">Notes</span>
+                <textarea
+                  value={specificationForm.notes}
+                  onChange={event => handleSpecificationFieldChange('notes', event.target.value)}
+                  rows={3}
+                  placeholder="Installation dates, delivery instructions or commercial notes"
+                  className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                />
+              </label>
+
+              <div className="md:col-span-2 flex flex-col gap-2 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-200">
+                <p className="text-xs text-slate-500">Included tops</p>
+                <p className="font-semibold text-slate-50">{itemsForSpecification.length} item{itemsForSpecification.length === 1 ? '' : 's'}</p>
+                <p className="text-xs text-slate-400">
+                  Estimated value {specificationEstimatedValue > 0
+                    ? specificationEstimatedValue.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })
+                    : 'Awaiting pricing'}
+                  . Commission is calculated at {(DEFAULT_COMMISSION_RATE * 100).toFixed(1)}% once converted to an order.
+                </p>
+              </div>
+
+              {specificationError && (
+                <p className="md:col-span-2 text-sm text-red-300">{specificationError}</p>
+              )}
+
+              <div className="md:col-span-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={handleCloseSpecificationModal}
+                  className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-slate-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingSpecification}
+                  className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700"
+                >
+                  {savingSpecification ? 'Saving…' : 'Save specification'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
