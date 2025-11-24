@@ -348,10 +348,6 @@ const createTabletopGeometry = ({ config, customOutline }: TabletopGeometryOptio
     const contourDepth = includeCableContour
       ? THREE.MathUtils.clamp(requestedContourDepth, 0.02, Math.max(0.02, hw - 0.05))
       : 0;
-    const contourRadius = includeCableContour
-      ? Math.min(contourDepth / 2, contourHalfWidth, 0.03)
-      : 0;
-
     shape2d.moveTo(x + frontRadius, frontY);
     shape2d.lineTo(hl - frontRadius, frontY);
     if (frontRadius > 0) {
@@ -360,42 +356,27 @@ const createTabletopGeometry = ({ config, customOutline }: TabletopGeometryOptio
     shape2d.lineTo(hl, backY);
 
     if (includeCableContour && contourHalfWidth > 0 && contourDepth > 0) {
-      shape2d.lineTo(contourHalfWidth - contourRadius, backY);
-      if (contourRadius > 0) {
-        shape2d.quadraticCurveTo(
-          contourHalfWidth - contourRadius,
-          backY - contourRadius,
-          contourHalfWidth,
-          backY - contourRadius
-        );
-      }
-      shape2d.lineTo(contourHalfWidth, backY - contourDepth + contourRadius);
-      if (contourRadius > 0) {
-        shape2d.quadraticCurveTo(
-          contourHalfWidth - contourRadius,
-          backY - contourDepth + contourRadius,
-          contourHalfWidth - contourRadius,
-          backY - contourDepth
-        );
-      }
-      shape2d.lineTo(-contourHalfWidth + contourRadius, backY - contourDepth);
-      if (contourRadius > 0) {
-        shape2d.quadraticCurveTo(
-          -contourHalfWidth + contourRadius,
-          backY - contourDepth + contourRadius,
-          -contourHalfWidth,
-          backY - contourDepth + contourRadius
-        );
-      }
-      shape2d.lineTo(-contourHalfWidth, backY - contourRadius);
-      if (contourRadius > 0) {
-        shape2d.quadraticCurveTo(
-          -contourHalfWidth + contourRadius,
-          backY - contourRadius,
-          -contourHalfWidth + contourRadius,
-          backY
-        );
-      }
+      const contourBottomY = backY - contourDepth;
+      const contourControlX = contourHalfWidth * 0.6;
+      const contourControlY = contourDepth * 0.85;
+
+      shape2d.lineTo(contourHalfWidth, backY);
+      shape2d.bezierCurveTo(
+        contourHalfWidth - contourControlX * 0.25,
+        backY,
+        contourHalfWidth - contourControlX,
+        backY - contourControlY,
+        0,
+        contourBottomY
+      );
+      shape2d.bezierCurveTo(
+        -contourHalfWidth + contourControlX,
+        backY - contourControlY,
+        -contourHalfWidth + contourControlX * 0.25,
+        backY,
+        -contourHalfWidth,
+        backY
+      );
     }
 
     shape2d.lineTo(x, backY);
