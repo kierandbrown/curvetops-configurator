@@ -108,6 +108,8 @@ const OrdersPage = () => {
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [previewOrderId, setPreviewOrderId] = useState<string | null>(null);
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
 
   // Subscribe to the appropriate slice of the orders collection so customers only see their own documents.
   useEffect(() => {
@@ -222,6 +224,20 @@ const OrdersPage = () => {
   }, [orders, filters]);
 
   const activeOrder = activeOrderId ? orders.find(order => order.id === activeOrderId) : null;
+  const previewOrder = previewOrderId ? orders.find(order => order.id === previewOrderId) : null;
+
+  const handleOrderClick = (orderId: string) => {
+    setActiveOrderId(orderId);
+    if (!showOrderForm) {
+      setPreviewOrderId(orderId);
+      setIsViewerOpen(true);
+    }
+  };
+
+  const closeViewer = () => {
+    setIsViewerOpen(false);
+    setPreviewOrderId(null);
+  };
 
   // Handle both create and update flows with a single submit handler.
   const persistOrder = async (event: FormEvent) => {
@@ -417,14 +433,17 @@ const OrdersPage = () => {
                   </thead>
                   <tbody>
                     {filteredOrders.map(order => (
-                      <tr key={order.id} className="border-t border-slate-800/70 hover:bg-slate-900/40">
+                      <tr
+                        key={order.id}
+                        className="cursor-pointer border-t border-slate-800/70 hover:bg-slate-900/40"
+                        onClick={() => handleOrderClick(order.id)}
+                      >
                         <td className="px-4 py-3">
                           <button
                             className="text-left font-semibold text-emerald-300 hover:underline"
                             onClick={event => {
                               event.stopPropagation();
-                              if (!showOrderForm) return;
-                              setActiveOrderId(order.id);
+                              handleOrderClick(order.id);
                             }}
                           >
                             {order.projectName || 'Untitled order'}
@@ -504,6 +523,63 @@ const OrdersPage = () => {
             )}
           </div>
         </section>
+
+        {!showOrderForm && isViewerOpen && previewOrder && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+            <div className="absolute inset-0" onClick={closeViewer} />
+            <div className="relative z-10 w-full max-w-3xl space-y-5 rounded-2xl border border-emerald-400/30 bg-slate-950 p-6 shadow-2xl">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="space-y-2">
+                  <p className="text-xs uppercase tracking-[0.25em] text-emerald-300">Order overview</p>
+                  <h3 className="text-xl font-semibold text-slate-50">
+                    {previewOrder.projectName || 'Untitled order'}
+                  </h3>
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-slate-300">
+                    <span className="inline-flex items-center rounded-full bg-slate-800/80 px-2 py-0.5 text-xs font-medium text-slate-200">
+                      {statusOptions.find(option => option.value === previewOrder.status)?.label || previewOrder.status}
+                    </span>
+                    {previewOrder.isSpecificationOrder && (
+                      <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[0.7rem] font-semibold uppercase tracking-wide text-emerald-300">
+                        Specification order
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Close order overview"
+                  onClick={closeViewer}
+                  className="rounded-full border border-slate-800 p-2 text-slate-300 transition hover:border-emerald-300 hover:text-emerald-200"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-1 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Customer</p>
+                  <p className="text-sm font-semibold text-slate-100">{previewOrder.customerName || 'Unnamed contact'}</p>
+                  <p className="text-xs text-slate-400">{previewOrder.contactEmail || 'No email provided'}</p>
+                </div>
+                <div className="space-y-1 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Estimated value</p>
+                  <p className="text-sm font-semibold text-slate-100">
+                    {previewOrder.totalValue ? currencyFormatter.format(previewOrder.totalValue) : 'Not provided'}
+                  </p>
+                </div>
+                <div className="md:col-span-2 space-y-2 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs uppercase tracking-wide text-slate-500">Notes</p>
+                    <span className="text-[0.65rem] uppercase tracking-[0.15em] text-slate-500">Read only</span>
+                  </div>
+                  <p className="whitespace-pre-wrap text-sm text-slate-200">
+                    {previewOrder.notes ? previewOrder.notes : 'No notes added yet.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {showOrderForm && (
           <section className="rounded-2xl border border-slate-800 bg-slate-950/30 p-4">
