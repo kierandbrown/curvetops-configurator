@@ -1,12 +1,15 @@
 import { onCall } from 'firebase-functions/v2/https';
 
 interface TabletopConfig {
-  shape: 'rect' | 'rounded-rect' | 'round-top' | 'round' | 'ellipse' | 'super-ellipse' | 'custom';
+  shape: 'rect' | 'rounded-rect' | 'round-top' | 'round' | 'ellipse' | 'super-ellipse' | 'workstation' | 'custom';
   lengthMm: number;
   widthMm: number;
   thicknessMm: number;
   edgeRadiusMm: number;
   superEllipseExponent: number;
+  roundFrontCorners: boolean;
+  includeCableContour: boolean;
+  workstationFrontRadiusMm: number;
   material: 'laminate' | 'timber' | 'linoleum';
   finish: 'matte' | 'satin';
   edgeProfile: 'edged' | 'painted-sharknose';

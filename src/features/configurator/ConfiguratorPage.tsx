@@ -245,6 +245,27 @@ const shapeOptions: { shape: TableShape; label: string; icon: JSX.Element }[] = 
     )
   },
   {
+    shape: 'workstation',
+    label: 'Workstation top',
+    icon: (
+      <svg
+        aria-hidden
+        viewBox="0 0 160 100"
+        className="h-12 w-16 text-emerald-300"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={4}
+      >
+        <path
+          d="M30 20 Q30 40 50 40 H110 V60 Q95 60 95 80 H65 Q65 60 50 60 H30 Z"
+          className="fill-emerald-400/20 stroke-emerald-300"
+        />
+        <path d="M95 70 Q80 70 80 80" className="stroke-emerald-300" />
+        <path d="M80 80 Q80 70 65 70" className="stroke-emerald-300" />
+      </svg>
+    )
+  },
+  {
     shape: 'round-top',
     label: 'D End Top',
     icon: (
@@ -331,6 +352,7 @@ type NumericConfigField =
   | 'lengthMm'
   | 'widthMm'
   | 'edgeRadiusMm'
+  | 'workstationFrontRadiusMm'
   | 'superEllipseExponent'
   | 'thicknessMm';
 
@@ -440,6 +462,7 @@ const ConfiguratorPage: React.FC = () => {
     lengthMm: defaultTabletopConfig.lengthMm.toString(),
     widthMm: defaultTabletopConfig.widthMm.toString(),
     edgeRadiusMm: defaultTabletopConfig.edgeRadiusMm.toString(),
+    workstationFrontRadiusMm: defaultTabletopConfig.workstationFrontRadiusMm.toString(),
     superEllipseExponent: defaultTabletopConfig.superEllipseExponent.toString(),
     thicknessMm: defaultTabletopConfig.thicknessMm.toString()
   });
@@ -497,6 +520,10 @@ const ConfiguratorPage: React.FC = () => {
   useEffect(() => {
     setManualInputs(prev => ({ ...prev, edgeRadiusMm: config.edgeRadiusMm.toString() }));
   }, [config.edgeRadiusMm]);
+
+  useEffect(() => {
+    setManualInputs(prev => ({ ...prev, workstationFrontRadiusMm: config.workstationFrontRadiusMm.toString() }));
+  }, [config.workstationFrontRadiusMm]);
 
   useEffect(() => {
     setManualInputs(prev => ({ ...prev, superEllipseExponent: config.superEllipseExponent.toString() }));
@@ -807,7 +834,7 @@ const ConfiguratorPage: React.FC = () => {
     [thicknessChoices]
   );
 
-  const updateField = (field: keyof TabletopConfig, value: number | string) => {
+  const updateField = (field: keyof TabletopConfig, value: number | string | boolean) => {
     setConfig(prev => {
       // Keep circular tops perfectly round by mirroring the length/width values.
       if (prev.shape === 'round' && (field === 'lengthMm' || field === 'widthMm')) {
@@ -1005,6 +1032,17 @@ const ConfiguratorPage: React.FC = () => {
       }));
     }
   }, [config.shape, config.widthMm, config.edgeRadiusMm]);
+
+  useEffect(() => {
+    if (config.shape !== 'workstation' || !config.roundFrontCorners) return;
+    const maxCornerRadius = Math.floor(config.widthMm / 2);
+    if (config.workstationFrontRadiusMm > maxCornerRadius) {
+      setConfig(prev => ({
+        ...prev,
+        workstationFrontRadiusMm: Math.max(30, maxCornerRadius)
+      }));
+    }
+  }, [config.shape, config.widthMm, config.workstationFrontRadiusMm, config.roundFrontCorners]);
 
   const materialMaxLength = useMemo(
     () =>
@@ -1891,17 +1929,95 @@ const ConfiguratorPage: React.FC = () => {
               {selectedCatalogueMaterial.name} sheets max out at {catalogueMaxWidthLabel || `${effectiveWidthLimit} mm`}.
             </p>
           )}
-          {dimensionLocked && (
-            <p className="text-[0.7rem] text-amber-300">
-              Width is locked to your DXF outline so the preview and pricing stay accurate.
-            </p>
-          )}
-          {config.shape === 'round' && (
-            <p className="text-[0.7rem] text-emerald-300">
-              Adjust either slider to set the diameter—both measurements update together to keep a circle.
-            </p>
-          )}
-        </label>
+        {dimensionLocked && (
+          <p className="text-[0.7rem] text-amber-300">
+            Width is locked to your DXF outline so the preview and pricing stay accurate.
+          </p>
+        )}
+        {config.shape === 'round' && (
+          <p className="text-[0.7rem] text-emerald-300">
+            Adjust either slider to set the diameter—both measurements update together to keep a circle.
+          </p>
+        )}
+      </label>
+
+        {config.shape === 'workstation' && (
+          <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-slate-100">Front corner treatment</p>
+                <p className="text-[0.7rem] text-slate-400">
+                  Smooth just the user-facing corners while keeping the rear edge square for wall or privacy screens.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => updateField('roundFrontCorners', !config.roundFrontCorners)}
+                className={`rounded-lg border px-3 py-1 text-[0.75rem] font-semibold transition ${
+                  config.roundFrontCorners
+                    ? 'border-emerald-300/70 bg-emerald-500/10 text-emerald-200'
+                    : 'border-slate-700 bg-slate-900 text-slate-100 hover:border-emerald-300'
+                }`}
+              >
+                {config.roundFrontCorners ? 'Rounded front corners' : 'Square front corners'}
+              </button>
+            </div>
+
+            {config.roundFrontCorners && (
+              <label className="flex flex-col gap-1">
+                <div className="flex items-start justify-between gap-3 text-[0.75rem] font-medium">
+                  <span>Front corner radius (mm)</span>
+                  <div className="flex flex-col items-end text-right">
+                    <input
+                      type="number"
+                      min={30}
+                      max={maxCornerRadius}
+                      step={5}
+                      value={manualInputs.workstationFrontRadiusMm}
+                      onChange={handleManualNumberChange('workstationFrontRadiusMm', 30, maxCornerRadius)}
+                      onBlur={handleManualNumberBlur('workstationFrontRadiusMm', 30, maxCornerRadius)}
+                      className="w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-right text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                    />
+                    <p className="text-[0.6rem] font-normal text-slate-500">
+                      Keep the radius between 30&nbsp;mm and {maxCornerRadius}&nbsp;mm so the cut stays inside the blank.
+                    </p>
+                  </div>
+                </div>
+                <input
+                  type="range"
+                  min={30}
+                  max={maxCornerRadius}
+                  step={5}
+                  value={config.workstationFrontRadiusMm}
+                  onChange={e => updateField('workstationFrontRadiusMm', Number(e.target.value))}
+                  className="accent-emerald-400"
+                />
+              </label>
+            )}
+
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-slate-100">Cable contour</p>
+                <p className="text-[0.7rem] text-slate-400">
+                  Add a shallow scoop along the rear edge for cable passthroughs without moving the desk off the wall.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => updateField('includeCableContour', !config.includeCableContour)}
+                className={`rounded-lg border px-3 py-1 text-[0.75rem] font-semibold transition ${
+                  config.includeCableContour
+                    ? 'border-emerald-300/70 bg-emerald-500/10 text-emerald-200'
+                    : 'border-slate-700 bg-slate-900 text-slate-100 hover:border-emerald-300'
+                }`}
+              >
+                {config.includeCableContour ? 'Cable contour on' : 'Cable contour off'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {config.shape === 'rounded-rect' && (
           <label className="flex flex-col gap-1">

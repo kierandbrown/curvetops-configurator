@@ -7,6 +7,9 @@ export const defaultTabletopConfig: TabletopConfig = {
   thicknessMm: 25,
   edgeRadiusMm: 150,
   superEllipseExponent: 2.5,
+  roundFrontCorners: true,
+  includeCableContour: false,
+  workstationFrontRadiusMm: 120,
   material: 'laminate',
   finish: 'matte',
   // Default to the edged profile so pricing + renders match the majority of jobs.

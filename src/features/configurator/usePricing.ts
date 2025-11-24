@@ -44,29 +44,37 @@ export const usePricing = (config: TabletopConfig) => {
 
   // Memoise the payload so we only re-trigger the effect when a meaningful
   // change occurs (avoids extra calls caused by new object references).
-  const normalizedPayload = useMemo(() => ({
-    shape: config.shape,
-    lengthMm: Number(config.lengthMm),
-    widthMm: Number(config.widthMm),
-    thicknessMm: Number(config.thicknessMm),
-    edgeRadiusMm: Number(config.edgeRadiusMm),
-    superEllipseExponent: Number(config.superEllipseExponent),
-    material: config.material,
-    finish: config.finish,
-    edgeProfile: config.edgeProfile,
-    quantity: Number(config.quantity)
-  }), [
-    config.shape,
-    config.lengthMm,
-    config.widthMm,
-    config.thicknessMm,
-    config.edgeRadiusMm,
-    config.superEllipseExponent,
-    config.material,
-    config.finish,
-    config.edgeProfile,
-    config.quantity
-  ]);
+  const normalizedPayload = useMemo(
+    () => ({
+      shape: config.shape,
+      lengthMm: Number(config.lengthMm),
+      widthMm: Number(config.widthMm),
+      thicknessMm: Number(config.thicknessMm),
+      edgeRadiusMm: Number(config.edgeRadiusMm),
+      superEllipseExponent: Number(config.superEllipseExponent),
+      roundFrontCorners: config.roundFrontCorners,
+      includeCableContour: config.includeCableContour,
+      workstationFrontRadiusMm: Number(config.workstationFrontRadiusMm),
+      material: config.material,
+      finish: config.finish,
+      edgeProfile: config.edgeProfile,
+      quantity: Number(config.quantity)
+    }), [
+      config.shape,
+      config.lengthMm,
+      config.widthMm,
+      config.thicknessMm,
+      config.edgeRadiusMm,
+      config.superEllipseExponent,
+      config.roundFrontCorners,
+      config.includeCableContour,
+      config.workstationFrontRadiusMm,
+      config.material,
+      config.finish,
+      config.edgeProfile,
+      config.quantity
+    ]
+  );
 
   useEffect(() => {
     let cancelled = false;
