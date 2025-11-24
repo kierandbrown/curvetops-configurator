@@ -289,18 +289,30 @@ const shapeOptions: { shape: TableShape; label: string; icon: JSX.Element }[] = 
     icon: (
       <svg
         aria-hidden
-        viewBox="0 0 160 100"
+        viewBox="0 0 180 110"
         className="h-12 w-16 text-emerald-300"
         fill="none"
         stroke="currentColor"
         strokeWidth={4}
       >
+        {/* Rounded workstation outline with softened corners. */}
         <path
-          d="M30 20 Q30 40 50 40 H110 V60 Q95 60 95 80 H65 Q65 60 50 60 H30 Z"
+          d="M26 22 H154 Q166 22 166 34 V80 Q166 92 154 92 H110 Q100 92 100 102 Q100 92 90 92 H26 Q14 92 14 80 V34 Q14 22 26 22 Z"
           className="fill-emerald-400/20 stroke-emerald-300"
         />
-        <path d="M95 70 Q80 70 80 80" className="stroke-emerald-300" />
-        <path d="M80 80 Q80 70 65 70" className="stroke-emerald-300" />
+        {/* Cable contour notch. */}
+        <path
+          d="M86 62 Q90 55 90 50 V38 Q90 32 96 32 H120"
+          className="stroke-emerald-200"
+          strokeWidth={3}
+          strokeLinecap="round"
+        />
+        <path
+          d="M94 60 Q90 67 90 74 Q90 82 100 82 H124"
+          className="stroke-emerald-200"
+          strokeWidth={3}
+          strokeLinecap="round"
+        />
       </svg>
     )
   },
