@@ -8,6 +8,11 @@ export const storageProxy = functions.https.onRequest((req, res) => {
     // Explicitly vary on Origin so CDN/proxy caches don't leak responses between tenants.
     res.set('Vary', 'Origin');
 
+    const origin = req.headers.origin ?? '*';
+    res.set('Access-Control-Allow-Origin', origin);
+    res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+
     if (req.method === 'OPTIONS') {
       res.status(204).send('');
       return;
