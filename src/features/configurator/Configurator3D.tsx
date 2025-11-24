@@ -32,6 +32,8 @@ export interface TabletopConfig {
   superEllipseExponent: number;
   roundFrontCorners: boolean;
   includeCableContour: boolean;
+  cableContourLengthMm: number;
+  cableContourDepthMm: number;
   workstationFrontRadiusMm: number;
   material: 'laminate' | 'timber' | 'linoleum';
   finish: 'matte' | 'satin';
@@ -195,6 +197,8 @@ const createTabletopGeometry = ({ config, customOutline }: TabletopGeometryOptio
     superEllipseExponent,
     roundFrontCorners,
     includeCableContour,
+    cableContourLengthMm,
+    cableContourDepthMm,
     workstationFrontRadiusMm,
     edgeProfile
   } = config;
@@ -282,12 +286,18 @@ const createTabletopGeometry = ({ config, customOutline }: TabletopGeometryOptio
     const frontY = -hw;
     const backY = hw;
 
-    // Size the optional cable contour so it remains within the blank even on narrow desktops.
+    const contourSideClearance = 0.05;
+    const requestedHalfContour = (cableContourLengthMm / 2) * MM_TO_M;
     const contourHalfWidth = includeCableContour
-      ? Math.min(length * 0.25, Math.max(0.05, Math.min(0.1, hl - frontRadius - 0.05)))
+      ? THREE.MathUtils.clamp(requestedHalfContour, 0.05, Math.max(0, hl - contourSideClearance))
       : 0;
-    const contourDepth = includeCableContour ? Math.min(width * 0.18, 0.08, hw - 0.05) : 0;
-    const contourRadius = includeCableContour ? Math.min(contourDepth / 2, contourHalfWidth, 0.03) : 0;
+    const requestedContourDepth = cableContourDepthMm * MM_TO_M;
+    const contourDepth = includeCableContour
+      ? THREE.MathUtils.clamp(requestedContourDepth, 0.02, Math.max(0.02, hw - 0.05))
+      : 0;
+    const contourRadius = includeCableContour
+      ? Math.min(contourDepth / 2, contourHalfWidth, 0.03)
+      : 0;
 
     shape2d.moveTo(x + frontRadius, frontY);
     shape2d.lineTo(hl - frontRadius, frontY);
@@ -297,7 +307,10 @@ const createTabletopGeometry = ({ config, customOutline }: TabletopGeometryOptio
     shape2d.lineTo(hl, backY);
 
     if (includeCableContour && contourHalfWidth > 0 && contourDepth > 0) {
-      shape2d.lineTo(contourHalfWidth, backY);
+      shape2d.lineTo(contourHalfWidth - contourRadius, backY);
+      if (contourRadius > 0) {
+        shape2d.quadraticCurveTo(contourHalfWidth, backY, contourHalfWidth, backY - contourRadius);
+      }
       shape2d.lineTo(contourHalfWidth, backY - contourDepth + contourRadius);
       if (contourRadius > 0) {
         shape2d.quadraticCurveTo(
@@ -316,7 +329,10 @@ const createTabletopGeometry = ({ config, customOutline }: TabletopGeometryOptio
           backY - contourDepth + contourRadius
         );
       }
-      shape2d.lineTo(-contourHalfWidth, backY);
+      shape2d.lineTo(-contourHalfWidth, backY - contourRadius);
+      if (contourRadius > 0) {
+        shape2d.quadraticCurveTo(-contourHalfWidth, backY, -contourHalfWidth + contourRadius, backY);
+      }
     }
 
     shape2d.lineTo(x, backY);

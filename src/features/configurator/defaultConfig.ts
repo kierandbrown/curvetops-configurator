@@ -9,6 +9,8 @@ export const defaultTabletopConfig: TabletopConfig = {
   superEllipseExponent: 2.5,
   roundFrontCorners: true,
   includeCableContour: false,
+  cableContourLengthMm: 400,
+  cableContourDepthMm: 60,
   workstationFrontRadiusMm: 120,
   material: 'laminate',
   finish: 'matte',

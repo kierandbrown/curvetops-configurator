@@ -23,6 +23,11 @@ import ViewportMouseGuide from './ViewportMouseGuide';
 import CartTopPreview from '../cart/CartTopPreview';
 
 const ROUND_DIAMETER_LIMIT_MM = 1800;
+const WORKSTATION_CONTOUR_MAX_LENGTH_MM = 2400;
+const WORKSTATION_CONTOUR_MAX_WIDTH_MM = 800;
+const MIN_CONTOUR_LENGTH_MM = 150;
+const MIN_CONTOUR_DEPTH_MM = 20;
+const CONTOUR_EDGE_CLEARANCE_MM = 50;
 
 // Supported board thickness increments for the slider.
 const DEFAULT_THICKNESS_OPTIONS = [12, 16, 18, 25, 33];
@@ -353,6 +358,8 @@ type NumericConfigField =
   | 'widthMm'
   | 'edgeRadiusMm'
   | 'workstationFrontRadiusMm'
+  | 'cableContourLengthMm'
+  | 'cableContourDepthMm'
   | 'superEllipseExponent'
   | 'thicknessMm';
 
@@ -463,6 +470,8 @@ const ConfiguratorPage: React.FC = () => {
     widthMm: defaultTabletopConfig.widthMm.toString(),
     edgeRadiusMm: defaultTabletopConfig.edgeRadiusMm.toString(),
     workstationFrontRadiusMm: defaultTabletopConfig.workstationFrontRadiusMm.toString(),
+    cableContourLengthMm: defaultTabletopConfig.cableContourLengthMm.toString(),
+    cableContourDepthMm: defaultTabletopConfig.cableContourDepthMm.toString(),
     superEllipseExponent: defaultTabletopConfig.superEllipseExponent.toString(),
     thicknessMm: defaultTabletopConfig.thicknessMm.toString()
   });
@@ -524,6 +533,14 @@ const ConfiguratorPage: React.FC = () => {
   useEffect(() => {
     setManualInputs(prev => ({ ...prev, workstationFrontRadiusMm: config.workstationFrontRadiusMm.toString() }));
   }, [config.workstationFrontRadiusMm]);
+
+  useEffect(() => {
+    setManualInputs(prev => ({ ...prev, cableContourLengthMm: config.cableContourLengthMm.toString() }));
+  }, [config.cableContourLengthMm]);
+
+  useEffect(() => {
+    setManualInputs(prev => ({ ...prev, cableContourDepthMm: config.cableContourDepthMm.toString() }));
+  }, [config.cableContourDepthMm]);
 
   useEffect(() => {
     setManualInputs(prev => ({ ...prev, superEllipseExponent: config.superEllipseExponent.toString() }));
@@ -1044,6 +1061,7 @@ const ConfiguratorPage: React.FC = () => {
     }
   }, [config.shape, config.widthMm, config.workstationFrontRadiusMm, config.roundFrontCorners]);
 
+
   const materialMaxLength = useMemo(
     () =>
       parseMeasurementToMm(
@@ -1059,21 +1077,57 @@ const ConfiguratorPage: React.FC = () => {
     [activeThicknessDimensions, selectedCatalogueMaterial]
   );
   const baseLengthLimit = config.shape === 'round' ? ROUND_DIAMETER_LIMIT_MM : 3600;
-  const rawLengthLimit = materialMaxLength ? Math.min(baseLengthLimit, materialMaxLength) : baseLengthLimit;
+  const workstationLengthLimit =
+    config.shape === 'workstation' && config.includeCableContour
+      ? Math.min(baseLengthLimit, WORKSTATION_CONTOUR_MAX_LENGTH_MM)
+      : baseLengthLimit;
+  const rawLengthLimit = materialMaxLength
+    ? Math.min(workstationLengthLimit, materialMaxLength)
+    : workstationLengthLimit;
   const effectiveLengthLimit = Math.max(500, rawLengthLimit);
-  const rawWidthLimit =
+  const unconstrainedWidthLimit =
     config.shape === 'round'
       ? rawLengthLimit
       : materialMaxWidth
       ? Math.min(1800, materialMaxWidth)
       : 1800;
-  const effectiveWidthLimit = Math.max(300, rawWidthLimit);
+  const workstationWidthLimit =
+    config.shape === 'workstation' && config.includeCableContour
+      ? Math.min(unconstrainedWidthLimit, WORKSTATION_CONTOUR_MAX_WIDTH_MM)
+      : unconstrainedWidthLimit;
+  const effectiveWidthLimit = Math.max(300, workstationWidthLimit);
   const maxCornerRadius = useMemo(() => Math.floor(config.widthMm / 2), [config.widthMm]);
   // Translate the saved thickness back to the slider position.
   const thicknessIndex = useMemo(
     () => Math.max(thicknessChoices.indexOf(config.thicknessMm), 0),
     [config.thicknessMm, thicknessChoices]
   );
+  const maxCableContourLength = useMemo(() => {
+    const usableLength = config.lengthMm - CONTOUR_EDGE_CLEARANCE_MM * 2;
+    return Math.max(
+      MIN_CONTOUR_LENGTH_MM,
+      Math.min(usableLength, WORKSTATION_CONTOUR_MAX_LENGTH_MM)
+    );
+  }, [config.lengthMm]);
+  const maxCableContourDepth = useMemo(() => {
+    const halfWidthAllowance = config.widthMm / 2 - CONTOUR_EDGE_CLEARANCE_MM;
+    const scaledLimit = Math.floor(config.widthMm * 0.35);
+    const safeDepth = Math.max(halfWidthAllowance, MIN_CONTOUR_DEPTH_MM);
+    return Math.max(MIN_CONTOUR_DEPTH_MM, Math.min(safeDepth, scaledLimit));
+  }, [config.widthMm]);
+
+  useEffect(() => {
+    if (config.shape !== 'workstation') return;
+
+    setConfig(prev => {
+      const nextLength = clampNumber(prev.cableContourLengthMm, MIN_CONTOUR_LENGTH_MM, maxCableContourLength);
+      const nextDepth = clampNumber(prev.cableContourDepthMm, MIN_CONTOUR_DEPTH_MM, maxCableContourDepth);
+
+      if (nextLength === prev.cableContourLengthMm && nextDepth === prev.cableContourDepthMm) return prev;
+
+      return { ...prev, cableContourLengthMm: nextLength, cableContourDepthMm: nextDepth };
+    });
+  }, [config.shape, maxCableContourDepth, maxCableContourLength]);
   const minThickness = thicknessChoices[0];
   const maxThickness = thicknessChoices[thicknessChoices.length - 1];
   const activeThicknessLabel = activeThicknessDimensions?.thickness?.trim();
@@ -2003,6 +2057,9 @@ const ConfiguratorPage: React.FC = () => {
                 <p className="text-[0.7rem] text-slate-400">
                   Add a shallow scoop along the rear edge for cable passthroughs without moving the desk off the wall.
                 </p>
+                <p className="text-[0.7rem] text-emerald-300">
+                  Workstation tops with cable contours max out at 2400&nbsp;mm long and 800&nbsp;mm wide.
+                </p>
               </div>
               <button
                 type="button"
@@ -2016,6 +2073,90 @@ const ConfiguratorPage: React.FC = () => {
                 {config.includeCableContour ? 'Cable contour on' : 'Cable contour off'}
               </button>
             </div>
+
+            {config.includeCableContour && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="flex flex-col gap-1">
+                  <div className="flex items-start justify-between gap-3 text-[0.75rem] font-medium">
+                    <span>Contour length (mm)</span>
+                    <div className="flex flex-col items-end text-right">
+                      <input
+                        type="number"
+                        min={MIN_CONTOUR_LENGTH_MM}
+                        max={maxCableContourLength}
+                        step={10}
+                        value={manualInputs.cableContourLengthMm}
+                        onChange={handleManualNumberChange(
+                          'cableContourLengthMm',
+                          MIN_CONTOUR_LENGTH_MM,
+                          maxCableContourLength
+                        )}
+                        onBlur={handleManualNumberBlur(
+                          'cableContourLengthMm',
+                          MIN_CONTOUR_LENGTH_MM,
+                          maxCableContourLength
+                        )}
+                        className="w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-right text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                      />
+                      <p className="text-[0.6rem] font-normal text-slate-500">
+                        Keep the contour span between {MIN_CONTOUR_LENGTH_MM}&nbsp;mm and {Math.round(maxCableContourLength)}&nbsp;mm across the rear edge.
+                      </p>
+                    </div>
+                  </div>
+                  <input
+                    type="range"
+                    min={MIN_CONTOUR_LENGTH_MM}
+                    max={maxCableContourLength}
+                    step={10}
+                    value={config.cableContourLengthMm}
+                    onChange={e => updateField('cableContourLengthMm', Number(e.target.value))}
+                    className="accent-emerald-400"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-1">
+                  <div className="flex items-start justify-between gap-3 text-[0.75rem] font-medium">
+                    <span>Contour depth (mm)</span>
+                    <div className="flex flex-col items-end text-right">
+                      <input
+                        type="number"
+                        min={MIN_CONTOUR_DEPTH_MM}
+                        max={maxCableContourDepth}
+                        step={5}
+                        value={manualInputs.cableContourDepthMm}
+                        onChange={handleManualNumberChange(
+                          'cableContourDepthMm',
+                          MIN_CONTOUR_DEPTH_MM,
+                          maxCableContourDepth
+                        )}
+                        onBlur={handleManualNumberBlur(
+                          'cableContourDepthMm',
+                          MIN_CONTOUR_DEPTH_MM,
+                          maxCableContourDepth
+                        )}
+                        className="w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-right text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                      />
+                      <p className="text-[0.6rem] font-normal text-slate-500">
+                        Adjust the scoop depth between {MIN_CONTOUR_DEPTH_MM}&nbsp;mm and {Math.round(maxCableContourDepth)}&nbsp;mm to suit your cable bundle.
+                      </p>
+                    </div>
+                  </div>
+                  <input
+                    type="range"
+                    min={MIN_CONTOUR_DEPTH_MM}
+                    max={maxCableContourDepth}
+                    step={5}
+                    value={config.cableContourDepthMm}
+                    onChange={e => updateField('cableContourDepthMm', Number(e.target.value))}
+                    className="accent-emerald-400"
+                  />
+                </label>
+              </div>
+            )}
           </div>
         )}
 
