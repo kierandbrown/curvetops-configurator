@@ -272,6 +272,7 @@ const CartPage = () => {
           customShape: data.customShape || null,
           estimatedPrice: typeof data.estimatedPrice === 'number' ? data.estimatedPrice : null,
           costing: data.costing || null,
+          orderId: data.orderId || null,
           createdAt: data.createdAt || null,
           updatedAt: data.updatedAt || null
         };

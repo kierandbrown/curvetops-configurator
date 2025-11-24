@@ -1,10 +1,12 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Timestamp,
   addDoc,
   collection,
   deleteDoc,
   doc,
+  getDocs,
   onSnapshot,
   query,
   serverTimestamp,
@@ -14,6 +16,8 @@ import {
 import { db } from '@auth/firebase';
 import { useAuth } from '@auth/AuthContext';
 import Loader from '@/components/ui/Loader';
+import { TabletopConfig } from '../configurator/Configurator3D';
+import { defaultTabletopConfig } from '../configurator/defaultConfig';
 
 // Supported workflow steps for an order. These stay in one spot so both the form and table share the same labels.
 const statusOptions = [
@@ -41,6 +45,7 @@ interface OrderRecord {
   createdAt?: Timestamp | null;
   updatedAt?: Timestamp | null;
   isSpecificationOrder?: boolean;
+  tables?: OrderTable[];
 }
 
 interface OrderFormState {
@@ -58,6 +63,16 @@ type OrderFilters = {
   customerName: string;
   totalValue: string;
 };
+
+interface OrderTable {
+  id: string;
+  label: string;
+  cartItemId?: string | null;
+  material?: string | null;
+  shape?: string | null;
+  dimensions?: string | null;
+  quantity?: number | null;
+}
 
 type TableColumnKey = Exclude<keyof OrderFilters, 'totalValue'>;
 
@@ -103,6 +118,60 @@ const formatTimestamp = (timestamp?: Timestamp | null) => {
   }
 };
 
+const normaliseTableConfig = (config?: Partial<TabletopConfig>) => ({
+  ...defaultTabletopConfig,
+  ...config
+});
+
+const formatDimensionValue = (value?: number | null) => {
+  if (value == null) return '—';
+  const rounded = Math.round(value);
+  return Number.isFinite(rounded) ? `${rounded}mm` : '—';
+};
+
+const formatTableDimensions = (config?: Partial<TabletopConfig>) => {
+  if (!config) return 'Size not provided';
+  const { shape, lengthMm, widthMm, leftReturnMm, rightReturnMm, internalRadiusMm } = config;
+
+  if (shape === 'round' || shape === 'round-top') {
+    const diameter = Math.max(lengthMm ?? 0, widthMm ?? 0);
+    return diameter ? `${formatDimensionValue(diameter)} diameter` : 'Size not provided';
+  }
+
+  if (shape === 'ninety-degree') {
+    return `${formatDimensionValue(lengthMm)} x ${formatDimensionValue(widthMm)} with ${formatDimensionValue(
+      leftReturnMm
+    )} & ${formatDimensionValue(rightReturnMm)} returns (internal radius ${formatDimensionValue(internalRadiusMm)})`;
+  }
+
+  if (shape === 'ellipse' || shape === 'super-ellipse') {
+    return `${formatDimensionValue(lengthMm)} x ${formatDimensionValue(widthMm)} (ellipse)`;
+  }
+
+  return `${formatDimensionValue(lengthMm)} x ${formatDimensionValue(widthMm)}`;
+};
+
+const mapOrderTables = (tables: unknown, orderId: string): OrderTable[] => {
+  if (!Array.isArray(tables)) return [];
+
+  return tables
+    .map((table, index) => {
+      const entry = table as Partial<OrderTable> & { config?: Partial<TabletopConfig> };
+      const config = entry.config ? normaliseTableConfig(entry.config) : null;
+
+      return {
+        id: entry.id || `${orderId}-table-${index}`,
+        label: entry.label || 'Table top',
+        cartItemId: entry.cartItemId ?? null,
+        material: entry.material ?? config?.material ?? null,
+        shape: entry.shape ?? config?.shape ?? null,
+        dimensions: entry.dimensions || (config ? formatTableDimensions(config) : null),
+        quantity: entry.quantity ?? config?.quantity ?? null
+      } satisfies OrderTable;
+    })
+    .filter(Boolean);
+};
+
 const OrdersPage = () => {
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
@@ -123,6 +192,8 @@ const OrdersPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [previewOrderId, setPreviewOrderId] = useState<string | null>(null);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
+  const [orderTables, setOrderTables] = useState<Record<string, OrderTable[]>>({});
+  const [tablesLoadingId, setTablesLoadingId] = useState<string | null>(null);
 
   // Subscribe to the appropriate slice of the orders collection so customers only see their own documents.
   useEffect(() => {
@@ -145,7 +216,8 @@ const OrdersPage = () => {
           customerId: data.customerId || '',
           createdAt: data.createdAt || null,
           updatedAt: data.updatedAt || null,
-          isSpecificationOrder: data.isSpecificationOrder || false
+          isSpecificationOrder: data.isSpecificationOrder || false,
+          tables: mapOrderTables((data as Record<string, unknown>).tables, docSnap.id)
         };
       });
       setOrders(nextOrders);
@@ -200,6 +272,50 @@ const OrdersPage = () => {
     setFormState(prev => ({ ...prev, [field]: value }));
   };
 
+  const fetchOrderTables = useCallback(
+    async (orderId: string) => {
+      setTablesLoadingId(orderId);
+      try {
+        const cartItemsRef = collection(db, 'cartItems');
+        const cartItemsQuery = query(cartItemsRef, where('orderId', '==', orderId));
+        const snapshot = await getDocs(cartItemsQuery);
+
+        const tables: OrderTable[] = snapshot.docs.map(docSnap => {
+          const data = docSnap.data() as Partial<OrderTable> & { config?: Partial<TabletopConfig> };
+          const config = normaliseTableConfig(data.config);
+
+          return {
+            id: docSnap.id,
+            label: data.label || 'Untitled top',
+            cartItemId: docSnap.id,
+            material: (data as Record<string, unknown>).material?.toString() || data.material || config.material,
+            shape: data.shape || config.shape || null,
+            dimensions: formatTableDimensions(config),
+            quantity: typeof config.quantity === 'number' ? config.quantity : null
+          };
+        });
+
+        setOrderTables(prev => ({ ...prev, [orderId]: tables }));
+      } catch (error) {
+        console.error('Failed to load order tables', error);
+      } finally {
+        setTablesLoadingId(null);
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!previewOrderId) return;
+
+    const selectedOrder = orders.find(order => order.id === previewOrderId);
+    const hasTablesInDoc = selectedOrder?.tables && selectedOrder.tables.length > 0;
+    const hasTablesLoaded = orderTables[previewOrderId]?.length;
+
+    if (hasTablesInDoc || hasTablesLoaded) return;
+    fetchOrderTables(previewOrderId);
+  }, [fetchOrderTables, orderTables, orders, previewOrderId]);
+
   const startCreateFlow = () => {
     if (!showOrderForm) return;
     setActiveOrderId(null);
@@ -213,6 +329,12 @@ const OrdersPage = () => {
       contactEmail: defaultEmail,
       status: 'draft'
     });
+  };
+
+  const getTablesForOrder = (order: OrderRecord | null) => {
+    if (!order) return [] as OrderTable[];
+    if (order.tables?.length) return order.tables;
+    return orderTables[order.id] || [];
   };
 
   // Keep the newest orders at the top and then layer the column filters over the data set.
@@ -239,13 +361,15 @@ const OrdersPage = () => {
 
   const activeOrder = activeOrderId ? orders.find(order => order.id === activeOrderId) : null;
   const previewOrder = previewOrderId ? orders.find(order => order.id === previewOrderId) : null;
+  const previewTables = previewOrder ? getTablesForOrder(previewOrder) : [];
+  const isLoadingTables = previewOrder ? tablesLoadingId === previewOrder.id : false;
 
   const handleOrderClick = (orderId: string) => {
-    setActiveOrderId(orderId);
-    if (!showOrderForm) {
-      setPreviewOrderId(orderId);
-      setIsViewerOpen(true);
+    if (showOrderForm) {
+      setActiveOrderId(orderId);
     }
+    setPreviewOrderId(orderId);
+    setIsViewerOpen(true);
   };
 
   const closeViewer = () => {
@@ -501,6 +625,7 @@ const OrdersPage = () => {
                             <select
                               className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs font-medium text-slate-100 focus:border-emerald-400 focus:outline-none"
                               value={order.status}
+                              onClick={event => event.stopPropagation()}
                               onChange={event =>
                                 updateOrderStatus(order.id, event.target.value as OrderStatus)
                               }
@@ -576,7 +701,7 @@ const OrdersPage = () => {
           </div>
         </section>
 
-        {!showOrderForm && isViewerOpen && previewOrder && (
+        {isViewerOpen && previewOrder && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
             <div className="absolute inset-0" onClick={closeViewer} />
             <div className="relative z-10 w-full max-w-3xl space-y-5 overflow-y-auto rounded-2xl border border-emerald-400/30 bg-slate-950 p-6 shadow-2xl max-h-[calc(100vh-3rem)]">
@@ -607,6 +732,19 @@ const OrdersPage = () => {
                 </button>
               </div>
 
+              {showOrderForm && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveOrderId(previewOrder.id);
+                    closeViewer();
+                  }}
+                  className="inline-flex items-center justify-center rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-200 transition hover:border-emerald-400 hover:bg-emerald-500/20"
+                >
+                  Edit this order
+                </button>
+              )}
+
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2 rounded-xl border border-slate-800 bg-slate-900/50 p-4 md:col-span-2">
                   <p className="text-xs uppercase tracking-wide text-slate-500">Order details</p>
@@ -635,6 +773,45 @@ const OrdersPage = () => {
                   <p className="text-sm font-semibold text-slate-100">
                     {previewOrder.totalValue ? currencyFormatter.format(previewOrder.totalValue) : 'Not provided'}
                   </p>
+                </div>
+                <div className="md:col-span-2 space-y-3 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs uppercase tracking-wide text-slate-500">Tables</p>
+                    {isLoadingTables && <Loader />}
+                  </div>
+                  {previewTables.length ? (
+                    <ul className="divide-y divide-slate-800">
+                      {previewTables.map(table => (
+                        <li key={table.id} className="py-3">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                              <p className="text-sm font-semibold text-slate-100">{table.label || 'Table top'}</p>
+                              <p className="text-xs text-slate-400">
+                                {[table.dimensions || 'Size not provided', table.material || 'Material not set']
+                                  .filter(Boolean)
+                                  .join(' • ')}
+                                {typeof table.quantity === 'number' && table.quantity > 1
+                                  ? ` • Qty ${table.quantity}`
+                                  : ''}
+                              </p>
+                            </div>
+                            {table.cartItemId ? (
+                              <Link
+                                to={`/configurator?cartId=${table.cartItemId}`}
+                                className="inline-flex items-center justify-center rounded-md border border-emerald-500/40 px-3 py-1.5 text-xs font-semibold text-emerald-200 transition hover:border-emerald-300 hover:text-emerald-100"
+                              >
+                                Open in configurator
+                              </Link>
+                            ) : (
+                              <span className="text-xs text-slate-500">Configurator link unavailable</span>
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-slate-400">No tables are linked to this order yet.</p>
+                  )}
                 </div>
                 <div className="md:col-span-2 space-y-2 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
                   <div className="flex items-center justify-between">
