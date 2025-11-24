@@ -32,6 +32,40 @@ const CONTOUR_EDGE_CLEARANCE_MM = 50;
 // Supported board thickness increments for the slider.
 const DEFAULT_THICKNESS_OPTIONS = [12, 16, 18, 25, 33];
 
+type TabletopStyleSlug = 'cafe' | 'boardroom' | 'meeting-room' | 'workstation';
+
+const tabletopStylePresets: Record<TabletopStyleSlug, TabletopConfig> = {
+  cafe: {
+    ...defaultTabletopConfig,
+    shape: 'round',
+    lengthMm: 900,
+    widthMm: 900,
+    edgeRadiusMm: 120
+  },
+  boardroom: {
+    ...defaultTabletopConfig,
+    shape: 'rounded-rect',
+    lengthMm: 3200,
+    widthMm: 1200,
+    edgeRadiusMm: 120
+  },
+  'meeting-room': {
+    ...defaultTabletopConfig,
+    shape: 'super-ellipse',
+    lengthMm: 2400,
+    widthMm: 1100,
+    superEllipseExponent: 2.8
+  },
+  workstation: {
+    ...defaultTabletopConfig,
+    shape: 'workstation',
+    lengthMm: 1800,
+    widthMm: 750,
+    workstationFrontRadiusMm: 150,
+    includeCableContour: true
+  }
+};
+
 const PreviewCard = ({
   title,
   subtitle,
@@ -515,6 +549,20 @@ const ConfiguratorPage: React.FC = () => {
   );
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get('cartId')) return;
+
+    const styleParam = searchParams.get('style');
+    if (!styleParam) return;
+
+    const normalizedStyle = styleParam.toLowerCase() as TabletopStyleSlug;
+    const preset = tabletopStylePresets[normalizedStyle];
+    if (!preset) return;
+
+    setCustomShape(null);
+    setConfig(prev => ({ ...prev, ...preset }));
+  }, [searchParams]);
 
   // Keep the manual string inputs aligned whenever a slider or preset updates
   // the underlying config so the two controls never drift apart.
