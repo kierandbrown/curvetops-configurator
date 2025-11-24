@@ -253,7 +253,9 @@ const CartPage = () => {
     if (!profile) return;
     const cartRef = collection(db, 'cartItems');
     // Order cart rows by when they were first created so edits do not reshuffle the list.
-    const cartQuery = query(cartRef, where('userId', '==', profile.id), orderBy('createdAt', 'asc'));
+    // Sorting happens client-side to avoid the Firestore composite index requirement
+    // for (userId, createdAt) while preserving stable ordering.
+    const cartQuery = query(cartRef, where('userId', '==', profile.id));
 
     const unsubscribe = onSnapshot(cartQuery, snapshot => {
       const nextItems: CartItemRecord[] = snapshot.docs.map(docSnap => {
