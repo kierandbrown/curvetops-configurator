@@ -34,8 +34,6 @@ interface CartFilters {
 interface SpecificationFormState {
   jobName: string;
   jobAddress: string;
-  buyerName: string;
-  buyerCompany: string;
   specifierName: string;
   specifierCompany: string;
   notes: string;
@@ -131,8 +129,6 @@ const CartPage = () => {
   const [specificationForm, setSpecificationForm] = useState<SpecificationFormState>({
     jobName: '',
     jobAddress: '',
-    buyerName: '',
-    buyerCompany: '',
     specifierName: '',
     specifierCompany: '',
     notes: ''
@@ -537,14 +533,9 @@ const CartPage = () => {
       const specifierCompany = specificationForm.specifierCompany.trim() || profile.companyName;
 
       const specificationNotes = specificationForm.notes.trim();
-      const normalizedBuyerName = specificationForm.buyerName.trim();
-      const normalizedBuyerCompany = specificationForm.buyerCompany.trim();
 
       const summaryLines = [
         specificationForm.jobAddress.trim() && `Job address: ${specificationForm.jobAddress.trim()}`,
-        normalizedBuyerName && `Buyer: ${normalizedBuyerName}${
-          normalizedBuyerCompany ? ` (${normalizedBuyerCompany})` : ''
-        }`,
         `Specifier: ${specifierName}${specifierCompany ? ` (${specifierCompany})` : ''}`,
         specificationNotes,
         `Included tops: ${items.length}`,
@@ -562,8 +553,6 @@ const CartPage = () => {
 
       const searchTokens = [
         jobName,
-        normalizedBuyerName,
-        normalizedBuyerCompany,
         specifierName,
         specifierCompany,
         profile.email || ''
@@ -577,7 +566,7 @@ const CartPage = () => {
       const payload = {
         projectName: jobName,
         status: 'draft' as const,
-        customerName: normalizedBuyerName || specifierName,
+        customerName: specifierName,
         contactEmail: profile.email || '',
         notes: summaryLines,
         totalValue: specificationEstimatedValue,
@@ -1021,8 +1010,7 @@ const CartPage = () => {
                 <p className="text-xs uppercase tracking-[0.25em] text-emerald-300">Save specification order</p>
                 <h3 className="text-lg font-semibold text-slate-50">Capture this cart for a job</h3>
                 <p className="text-sm text-slate-400">
-                  Save {itemsForSpecification.length} item{itemsForSpecification.length === 1 ? '' : 's'} with job details so
-                  architects or specifiers can share a full brief.
+                  Save {itemsForSpecification.length} item{itemsForSpecification.length === 1 ? '' : 's'} with job details.
                 </p>
               </div>
               <button
@@ -1053,26 +1041,6 @@ const CartPage = () => {
                   value={specificationForm.jobAddress}
                   onChange={event => handleSpecificationFieldChange('jobAddress', event.target.value)}
                   placeholder="Street, suburb, state"
-                  className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
-                />
-              </label>
-              <label className="flex flex-col text-sm text-slate-200">
-                <span className="mb-1 text-xs uppercase tracking-wider text-slate-500">Buyer contact</span>
-                <input
-                  type="text"
-                  value={specificationForm.buyerName}
-                  onChange={event => handleSpecificationFieldChange('buyerName', event.target.value)}
-                  placeholder="Client name or team"
-                  className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
-                />
-              </label>
-              <label className="flex flex-col text-sm text-slate-200">
-                <span className="mb-1 text-xs uppercase tracking-wider text-slate-500">Buyer organisation</span>
-                <input
-                  type="text"
-                  value={specificationForm.buyerCompany}
-                  onChange={event => handleSpecificationFieldChange('buyerCompany', event.target.value)}
-                  placeholder="Company name"
                   className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
                 />
               </label>
