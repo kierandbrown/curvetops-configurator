@@ -2512,13 +2512,13 @@ const ConfiguratorPage: React.FC = () => {
                                 aria-hidden
                               >
                                 {/* Overlay a thickness dimension so production teams see what was saved with the edge. */}
-                                <line x1="138" y1="22" x2="138" y2="68" stroke="#fcd34d" strokeWidth={2} />
-                                <line x1="128" y1="22" x2="138" y2="22" stroke="#94a3b8" strokeWidth={1.5} />
-                                <line x1="128" y1="68" x2="138" y2="68" stroke="#94a3b8" strokeWidth={1.5} />
+                                <line x1="146" y1="22" x2="146" y2="68" stroke="#fcd34d" strokeWidth={2} />
+                                <line x1="136" y1="22" x2="146" y2="22" stroke="#94a3b8" strokeWidth={1.5} />
+                                <line x1="136" y1="68" x2="146" y2="68" stroke="#94a3b8" strokeWidth={1.5} />
                                 <rect
-                                  x="110"
+                                  x="120"
                                   y="38"
-                                  width="44"
+                                  width="40"
                                   height="16"
                                   rx="4"
                                   ry="4"
@@ -2527,7 +2527,7 @@ const ConfiguratorPage: React.FC = () => {
                                   strokeWidth="1"
                                 />
                                 <text
-                                  x="132"
+                                  x="140"
                                   y="50"
                                   textAnchor="middle"
                                   fontSize="11"
