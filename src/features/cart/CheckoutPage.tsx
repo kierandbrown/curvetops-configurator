@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DEFAULT_COUNTRY, useAuth } from '@auth/AuthContext';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '@auth/firebase';
 
 interface AddressForm {
   contactName: string;
@@ -152,6 +154,7 @@ const CheckoutPage = () => {
     saveForLater: true
   });
   const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
+  const [creatingCheckoutSession, setCreatingCheckoutSession] = useState(false);
 
   useEffect(() => {
     if (!profile) return;
@@ -207,7 +210,7 @@ const CheckoutPage = () => {
     }
   };
 
-  const handleConfirmPayment = (event: FormEvent) => {
+  const handleConfirmPayment = async (event: FormEvent) => {
     event.preventDefault();
 
     if (!freightQuote) {
@@ -215,7 +218,41 @@ const CheckoutPage = () => {
       return;
     }
 
-    setPaymentStatus('Payment details captured. (Demo flow — connect a gateway to charge cards).');
+    const { total } = freightQuote;
+
+    setCreatingCheckoutSession(true);
+    setPaymentStatus('Contacting Stripe to start a secure checkout...');
+
+    try {
+      const createSession = httpsCallable<any, { url?: string }>(
+        functions,
+        'createCheckoutSession'
+      );
+
+      const response = await createSession({
+        amount: total,
+        currency: 'aud',
+        returnUrl: `${window.location.origin}/orders`
+      });
+
+      const checkoutUrl = response.data?.url;
+
+      if (!checkoutUrl) {
+        setPaymentStatus('Stripe did not return a checkout URL. Please try again.');
+        return;
+      }
+
+      setPaymentStatus('Redirecting to Stripe Checkout...');
+      window.location.assign(checkoutUrl);
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Unable to start Stripe Checkout. Please try again.';
+      setPaymentStatus(message);
+    } finally {
+      setCreatingCheckoutSession(false);
+    }
   };
 
   const handleGooglePay = () => {
@@ -506,9 +543,10 @@ const CheckoutPage = () => {
               </button>
               <button
                 type="submit"
+                disabled={creatingCheckoutSession}
                 className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400"
               >
-                Confirm payment
+                {creatingCheckoutSession ? 'Starting Stripe checkout...' : 'Confirm payment'}
               </button>
             </div>
           </div>
