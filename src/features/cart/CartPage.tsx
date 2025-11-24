@@ -374,6 +374,20 @@ const CartPage = () => {
     }
   };
 
+  const clearCartItems = async () => {
+    if (cartItems.length === 0) return;
+    const idsToDelete = cartItems.map(item => item.id);
+
+    setCartItems([]);
+    setSelectedItemIds([]);
+
+    try {
+      await Promise.all(idsToDelete.map(id => deleteDoc(doc(db, 'cartItems', id))));
+    } catch (error) {
+      console.error('Failed to clear cart after saving specification', error);
+    }
+  };
+
   // Build extra search keywords from the stored colour metadata so quantity updates
   // keep the global search bar in sync with the latest item details.
   const buildColourSearchKeywords = (
@@ -579,6 +593,7 @@ const CartPage = () => {
       };
 
       const docRef = await addDoc(collection(db, 'orders'), payload);
+      await clearCartItems();
       setSpecificationSavedId(docRef.id);
       setIsSpecificationModalOpen(false);
     } catch (error) {
