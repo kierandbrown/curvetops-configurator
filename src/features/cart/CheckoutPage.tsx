@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { DEFAULT_COUNTRY, useAuth } from '@auth/AuthContext';
 
 interface AddressForm {
+  contactName: string;
+  companyName: string;
   streetAddress: string;
   city: string;
   stateProvince: string;
@@ -42,6 +44,8 @@ const stateAdjustments: Record<string, number> = {
 
 const FORKLIFT_SURCHARGE = 85;
 const BASE_LINEHAUL = 120;
+const ORIGIN_CITY = 'Queanbeyan';
+const ORIGIN_STATE = 'NSW';
 
 const normaliseState = (value: string) => value.trim().toUpperCase();
 
@@ -90,6 +94,8 @@ const buildFreightQuote = (address: AddressForm): FreightQuote => {
   const total = BASE_LINEHAUL + stateAdjustment + FORKLIFT_SURCHARGE + remoteSurcharge;
 
   const notes = [
+    `Deliver to: ${address.contactName || 'Add a contact'} — ${address.companyName || 'Add a company name'}`,
+    `Sending from ${ORIGIN_CITY}, ${ORIGIN_STATE} (calculated ex-warehouse)`,
     `Base linehaul: ${BASE_LINEHAUL.toLocaleString('en-AU', { style: 'currency', currency: 'AUD' })}`,
     `State adjustment (${stateCode || 'unknown'}): ${stateAdjustment.toLocaleString('en-AU', {
       style: 'currency',
@@ -126,6 +132,8 @@ const CheckoutPage = () => {
   const navigate = useNavigate();
 
   const [addressForm, setAddressForm] = useState<AddressForm>({
+    contactName: '',
+    companyName: '',
     streetAddress: '',
     city: '',
     stateProvince: '',
@@ -150,6 +158,8 @@ const CheckoutPage = () => {
 
     setAddressForm(prev => ({
       ...prev,
+      contactName: `${profile.firstName} ${profile.lastName}`.trim(),
+      companyName: profile.companyName,
       streetAddress: profile.streetAddress,
       city: profile.city,
       stateProvince: profile.stateProvince,
@@ -254,6 +264,32 @@ const CheckoutPage = () => {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
+            <label className="text-sm font-medium text-slate-200" htmlFor="checkout-contact">
+              Delivery contact name
+              <input
+                id="checkout-contact"
+                value={addressForm.contactName}
+                onChange={e => handleAddressChange('contactName', e.target.value)}
+                autoComplete="name"
+                className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
+                placeholder="Person receiving the order"
+                required
+              />
+            </label>
+
+            <label className="text-sm font-medium text-slate-200" htmlFor="checkout-company">
+              Company name
+              <input
+                id="checkout-company"
+                value={addressForm.companyName}
+                onChange={e => handleAddressChange('companyName', e.target.value)}
+                autoComplete="organization"
+                className="mt-1 w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
+                placeholder="Business receiving delivery"
+                required
+              />
+            </label>
+
             <label className="md:col-span-2 text-sm font-medium text-slate-200" htmlFor="checkout-street">
               Street address
               <input
@@ -320,6 +356,7 @@ const CheckoutPage = () => {
             <ul className="list-disc space-y-1 pl-5">
               <li>All items are oversized and loaded with a forklift.</li>
               <li>Delivery is available only within Australia.</li>
+              <li>Quotes are calculated from Queanbeyan, NSW to your destination.</li>
               <li>Remote postcodes attract additional uplift on top of the state adjustment.</li>
             </ul>
           </div>
