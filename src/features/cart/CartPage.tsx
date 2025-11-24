@@ -102,6 +102,40 @@ const emptyFilters: CartFilters = {
   fileName: ''
 };
 
+const calculateAreaM2 = (config: TabletopConfig) => {
+  const { shape, lengthMm, widthMm } = config;
+  if (shape === 'round' || shape === 'round-top') {
+    const radiusMm = Math.max(lengthMm, widthMm) / 2;
+    return (Math.PI * radiusMm * radiusMm) / 1_000_000;
+  }
+
+  if (shape === 'ellipse' || shape === 'super-ellipse') {
+    const a = lengthMm / 2;
+    const b = widthMm / 2;
+    return (Math.PI * a * b) / 1_000_000;
+  }
+
+  return (lengthMm * widthMm) / 1_000_000;
+};
+
+const calculateEdgeLengthMeters = (config: TabletopConfig) => {
+  const { shape, lengthMm, widthMm } = config;
+
+  if (shape === 'round' || shape === 'round-top') {
+    const diameterMm = Math.max(lengthMm, widthMm);
+    return (Math.PI * diameterMm) / 1000;
+  }
+
+  if (shape === 'ellipse' || shape === 'super-ellipse') {
+    const a = lengthMm / 2;
+    const b = widthMm / 2;
+    const perimeter = Math.PI * (3 * (a + b) - Math.sqrt((3 * a + b) * (a + 3 * b)));
+    return perimeter / 1000;
+  }
+
+  return (2 * (lengthMm + widthMm)) / 1000;
+};
+
 const CartPage = () => {
   const { profile } = useAuth();
   const navigate = useNavigate();
@@ -124,41 +158,98 @@ const CartPage = () => {
     return clampQuantity(parsed);
   };
 
-  const scaleCostValue = (value: number | undefined, ratio: number) => {
-    return Number.isFinite(value) ? (value as number) * ratio : value;
-  };
-
-  const scaleCostingForQuantity = (
-    costing: CartCostingSnapshot | null,
-    currentQuantity: number,
+  const calculateCostingForQuantity = (
+    item: CartItemRecord,
     nextQuantity: number
   ): CartCostingSnapshot | null => {
-    if (!costing) return null;
+    const costingSnapshot = item.costing;
+    if (!costingSnapshot) return null;
 
-    const current = Number(currentQuantity);
-    const next = Number(nextQuantity);
-    if (!Number.isFinite(current) || current <= 0 || !Number.isFinite(next) || next <= 0) {
-      return costing;
-    }
+    const areaM2 = calculateAreaM2({ ...item.config, quantity: nextQuantity });
+    const edgeLengthM = calculateEdgeLengthMeters({ ...item.config, quantity: nextQuantity });
 
-    const ratio = next / current;
+    const materialMaxLength = item.selectedColour?.maxLength ?? null;
+    const materialMaxWidth = item.selectedColour?.maxWidth ?? null;
+
+    const sheetAreaM2 = materialMaxLength && materialMaxWidth
+      ? (materialMaxLength * materialMaxWidth) / 1_000_000
+      : null;
+
+    const piecesPerSheet = materialMaxLength && materialMaxWidth
+      ? Math.max(
+          Math.floor(materialMaxLength / Math.max(item.config.lengthMm, 1)) *
+            Math.floor(materialMaxWidth / Math.max(item.config.widthMm, 1)),
+          1
+        )
+      : 1;
+
+    const sheetsRequired = Math.max(1, Math.ceil(nextQuantity / piecesPerSheet));
+
+    const squareMeterRate = Number.isFinite(costingSnapshot.squareMeterRate)
+      ? costingSnapshot.squareMeterRate
+      : null;
+
+    const sheetUnitCost = squareMeterRate != null && sheetAreaM2 != null ? squareMeterRate * sheetAreaM2 : null;
+    const materialCost = sheetUnitCost != null ? sheetUnitCost * sheetsRequired : null;
+
+    const labourItems = (costingSnapshot.labourItems ?? []).map(labourItem => {
+      const appliesToEdgeProfile = labourItem.appliesToEdgeProfile ?? 'any';
+      if (appliesToEdgeProfile !== 'any' && appliesToEdgeProfile !== item.config.edgeProfile) {
+        return null;
+      }
+
+      const rate = Number.isFinite(labourItem.rate) ? (labourItem.rate as number) : 0;
+      const units = (() => {
+        switch (labourItem.basis) {
+          case 'edge-m':
+            return edgeLengthM * nextQuantity;
+          case 'area-m2':
+            return areaM2 * nextQuantity;
+          case 'per-table':
+            return nextQuantity;
+          case 'per-order':
+            return 1;
+          default:
+            return 0;
+        }
+      })();
+
+      const cost = units * rate;
+
+      return {
+        ...labourItem,
+        units,
+        rate,
+        cost
+      } satisfies CartLabourCost;
+    }).filter((entry): entry is CartLabourCost => Boolean(entry));
+
+    const labourTotal = labourItems.reduce((sum, labourItem) => sum + (labourItem.cost ?? 0), 0);
+    const baseCost = (materialCost ?? 0) + labourTotal;
+
+    const profitPercentage = Number.isFinite(costingSnapshot.profitPercentage)
+      ? costingSnapshot.profitPercentage
+      : 0;
+
+    const profit = baseCost * (profitPercentage / 100);
+    const totalCost = baseCost + profit;
 
     return {
-      ...costing,
-      areaM2: scaleCostValue(costing.areaM2, ratio),
-      edgeLengthM: scaleCostValue(costing.edgeLengthM, ratio),
-      sheetsRequired: scaleCostValue(costing.sheetsRequired, ratio),
-      materialCost: scaleCostValue(costing.materialCost, ratio),
-      labourTotal: scaleCostValue(costing.labourTotal, ratio),
-      baseCost: scaleCostValue(costing.baseCost, ratio),
-      profit: scaleCostValue(costing.profit, ratio),
-      totalCost: scaleCostValue(costing.totalCost, ratio),
-      labourItems:
-        costing.labourItems?.map(item => ({
-          ...item,
-          units: scaleCostValue(item.units, ratio),
-          cost: scaleCostValue(item.cost, ratio)
-        })) ?? costing.labourItems
+      ...costingSnapshot,
+      areaM2,
+      edgeLengthM,
+      piecesPerSheet,
+      sheetAreaM2,
+      sheetsRequired,
+      sheetUnitCost,
+      materialCost,
+      labourItems,
+      labourTotal,
+      baseCost,
+      profit,
+      profitPercentage,
+      totalCost,
+      recordedAt: new Date().toISOString()
     };
   };
 
@@ -283,12 +374,12 @@ const CartPage = () => {
     const clampedQuantity = normaliseQuantity(nextQuantity);
     const currentQuantity = normaliseQuantity(item.config.quantity);
     const nextConfig = { ...item.config, quantity: clampedQuantity };
-    const scaledCosting = scaleCostingForQuantity(item.costing, currentQuantity, clampedQuantity);
-    const nextEstimatedPrice =
-      scaledCosting?.totalCost ??
-      (item.estimatedPrice != null && currentQuantity > 0
+    const recalculatedCosting = calculateCostingForQuantity(item, clampedQuantity);
+    const fallbackEstimatedPrice =
+      item.estimatedPrice != null && currentQuantity > 0
         ? (item.estimatedPrice * clampedQuantity) / currentQuantity
-        : item.estimatedPrice);
+        : item.estimatedPrice;
+    const nextEstimatedPrice = recalculatedCosting?.totalCost ?? fallbackEstimatedPrice;
 
     // Optimistically update the UI so the quantity and totals change immediately
     // while Firestore writes complete.
@@ -299,7 +390,7 @@ const CartPage = () => {
               ...cartItem,
               config: { ...cartItem.config, quantity: clampedQuantity },
               estimatedPrice: nextEstimatedPrice,
-              costing: scaledCosting ?? cartItem.costing ?? null
+              costing: recalculatedCosting ?? cartItem.costing ?? null
             }
           : cartItem
       )
@@ -317,7 +408,7 @@ const CartPage = () => {
       await updateDoc(doc(db, 'cartItems', item.id), {
         'config.quantity': clampedQuantity,
         estimatedPrice: nextEstimatedPrice ?? null,
-        costing: scaledCosting ?? item.costing ?? null,
+        costing: recalculatedCosting ?? item.costing ?? null,
         searchKeywords,
         updatedAt: serverTimestamp()
       });
