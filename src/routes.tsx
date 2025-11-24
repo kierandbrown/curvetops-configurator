@@ -10,6 +10,7 @@ import MaterialsPage from './features/materials/MaterialsPage';
 import AccountPage from './pages/AccountPage';
 import { ProtectedRoute } from '@auth/ProtectedRoute';
 import CartPage from './features/cart/CartPage';
+import CheckoutPage from './features/cart/CheckoutPage';
 
 export const routes: RouteObject[] = [
   {
@@ -38,6 +39,14 @@ export const routes: RouteObject[] = [
         element: (
           <ProtectedRoute>
             <CartPage />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: 'checkout',
+        element: (
+          <ProtectedRoute>
+            <CheckoutPage />
           </ProtectedRoute>
         )
       },

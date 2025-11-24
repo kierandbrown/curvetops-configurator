@@ -173,7 +173,7 @@ const CartPage = () => {
 
     const sheetAreaM2 = materialMaxLength && materialMaxWidth
       ? (materialMaxLength * materialMaxWidth) / 1_000_000
-      : null;
+      : undefined;
 
     const piecesPerSheet = materialMaxLength && materialMaxWidth
       ? Math.max(
@@ -189,10 +189,10 @@ const CartPage = () => {
       ? costingSnapshot.squareMeterRate
       : null;
 
-    const sheetUnitCost = squareMeterRate != null && sheetAreaM2 != null ? squareMeterRate * sheetAreaM2 : null;
-    const materialCost = sheetUnitCost != null ? sheetUnitCost * sheetsRequired : null;
+    const sheetUnitCost = squareMeterRate != null && sheetAreaM2 != null ? squareMeterRate * sheetAreaM2 : undefined;
+    const materialCost = sheetUnitCost != null ? sheetUnitCost * sheetsRequired : undefined;
 
-    const labourItems = (costingSnapshot.labourItems ?? []).map(labourItem => {
+    const labourItems = (costingSnapshot.labourItems ?? []).map<CartLabourCost | null>(labourItem => {
       const appliesToEdgeProfile = labourItem.appliesToEdgeProfile ?? 'any';
       if (appliesToEdgeProfile !== 'any' && appliesToEdgeProfile !== item.config.edgeProfile) {
         return null;
@@ -216,19 +216,24 @@ const CartPage = () => {
 
       const cost = units * rate;
 
-      return {
-        ...labourItem,
+      const normalisedLabourItem: CartLabourCost = {
+        id: labourItem.id,
+        label: labourItem.label,
+        basis: labourItem.basis,
+        appliesToEdgeProfile: labourItem.appliesToEdgeProfile,
         units,
         rate,
         cost
-      } satisfies CartLabourCost;
-    }).filter((entry): entry is CartLabourCost => Boolean(entry));
+      };
+
+      return normalisedLabourItem;
+    }).filter((entry): entry is CartLabourCost => entry !== null);
 
     const labourTotal = labourItems.reduce((sum, labourItem) => sum + (labourItem.cost ?? 0), 0);
     const baseCost = (materialCost ?? 0) + labourTotal;
 
     const profitPercentage = Number.isFinite(costingSnapshot.profitPercentage)
-      ? costingSnapshot.profitPercentage
+      ? (costingSnapshot.profitPercentage as number)
       : 0;
 
     const profit = baseCost * (profitPercentage / 100);
@@ -469,7 +474,7 @@ const CartPage = () => {
   // Send customers to the orders view so they can confirm their purchase
   // details and follow the approval workflow with the saved tops.
   const handlePlaceOrder = () => {
-    navigate('/orders');
+    navigate('/checkout');
   };
 
   const handleNameClick = (itemId: string) => {
