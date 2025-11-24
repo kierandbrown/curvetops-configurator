@@ -6,9 +6,8 @@ import { routes } from './routes';
 import './index.css';
 
 const router = createBrowserRouter(routes, {
-  // Cast needed while @types lag behind the runtime feature flags exposed in v6.28.
   future: {
-    v7_startTransition: true,
+    // Cast needed while @types lag behind the runtime feature flags exposed in v6.28.
     v7_relativeSplatPath: true
   } as any
 });
@@ -16,7 +15,13 @@ const router = createBrowserRouter(routes, {
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <AuthProvider>
-      <RouterProvider router={router} />
+      <RouterProvider
+        router={router}
+        future={{
+          // Opt in early to v7's transition-wrapped state updates to silence upgrade warnings.
+          v7_startTransition: true
+        }}
+      />
     </AuthProvider>
   </React.StrictMode>
 );
