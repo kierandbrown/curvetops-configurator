@@ -37,6 +37,7 @@ interface OrderRecord {
   totalValue: number;
   customerId: string;
   createdAt?: Timestamp | null;
+  updatedAt?: Timestamp | null;
   isSpecificationOrder?: boolean;
 }
 
@@ -90,6 +91,16 @@ const buildSearchKeywords = (order: SearchableOrderFields) => {
   return Array.from(new Set(tokens));
 };
 
+const formatTimestamp = (timestamp?: Timestamp | null) => {
+  if (!timestamp) return 'Not available';
+  try {
+    return timestamp.toDate().toLocaleString();
+  } catch (error) {
+    console.error('Unable to format timestamp', error);
+    return 'Not available';
+  }
+};
+
 const OrdersPage = () => {
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
@@ -131,6 +142,7 @@ const OrdersPage = () => {
           totalValue: typeof data.totalValue === 'number' ? data.totalValue : 0,
           customerId: data.customerId || '',
           createdAt: data.createdAt || null,
+          updatedAt: data.updatedAt || null,
           isSpecificationOrder: data.isSpecificationOrder || false
         };
       });
@@ -527,7 +539,7 @@ const OrdersPage = () => {
         {!showOrderForm && isViewerOpen && previewOrder && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
             <div className="absolute inset-0" onClick={closeViewer} />
-            <div className="relative z-10 w-full max-w-3xl space-y-5 rounded-2xl border border-emerald-400/30 bg-slate-950 p-6 shadow-2xl">
+            <div className="relative z-10 w-full max-w-3xl space-y-5 overflow-y-auto rounded-2xl border border-emerald-400/30 bg-slate-950 p-6 shadow-2xl max-h-[calc(100vh-3rem)]">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="space-y-2">
                   <p className="text-xs uppercase tracking-[0.25em] text-emerald-300">Order overview</p>
@@ -556,6 +568,23 @@ const OrdersPage = () => {
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2 rounded-xl border border-slate-800 bg-slate-900/50 p-4 md:col-span-2">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Order details</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <p className="text-[0.75rem] uppercase tracking-wide text-slate-500">Order ID</p>
+                      <p className="text-sm font-semibold text-slate-100">{previewOrder.id}</p>
+                    </div>
+                    <div>
+                      <p className="text-[0.75rem] uppercase tracking-wide text-slate-500">Created</p>
+                      <p className="text-sm font-semibold text-slate-100">{formatTimestamp(previewOrder.createdAt)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[0.75rem] uppercase tracking-wide text-slate-500">Last updated</p>
+                      <p className="text-sm font-semibold text-slate-100">{formatTimestamp(previewOrder.updatedAt)}</p>
+                    </div>
+                  </div>
+                </div>
                 <div className="space-y-1 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
                   <p className="text-xs uppercase tracking-wide text-slate-500">Customer</p>
                   <p className="text-sm font-semibold text-slate-100">{previewOrder.customerName || 'Unnamed contact'}</p>
