@@ -955,7 +955,6 @@ const CartPage = () => {
                       })
                     : 'Awaiting prices'}
                 </p>
-                <p className="text-xs text-slate-500">Only items with an estimated price are counted.</p>
               </div>
               <div className="flex w-full flex-col items-end gap-3 sm:w-auto">
                 <div className="flex w-full flex-col items-end gap-1 sm:w-auto">
