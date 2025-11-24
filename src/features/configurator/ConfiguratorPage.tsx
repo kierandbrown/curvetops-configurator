@@ -23,8 +23,8 @@ import ViewportMouseGuide from './ViewportMouseGuide';
 import CartTopPreview from '../cart/CartTopPreview';
 
 const ROUND_DIAMETER_LIMIT_MM = 1800;
-const WORKSTATION_CONTOUR_MAX_LENGTH_MM = 2400;
-const WORKSTATION_CONTOUR_MAX_WIDTH_MM = 800;
+const WORKSTATION_MAX_LENGTH_MM = 2400;
+const WORKSTATION_MAX_WIDTH_MM = 800;
 const MIN_CONTOUR_LENGTH_MM = 150;
 const MIN_CONTOUR_DEPTH_MM = 20;
 const CONTOUR_EDGE_CLEARANCE_MM = 50;
@@ -1225,8 +1225,8 @@ const ConfiguratorPage: React.FC = () => {
   );
   const baseLengthLimit = config.shape === 'round' ? ROUND_DIAMETER_LIMIT_MM : 3600;
   const workstationLengthLimit =
-    config.shape === 'workstation' && config.includeCableContour
-      ? Math.min(baseLengthLimit, WORKSTATION_CONTOUR_MAX_LENGTH_MM)
+    config.shape === 'workstation'
+      ? Math.min(baseLengthLimit, WORKSTATION_MAX_LENGTH_MM)
       : baseLengthLimit;
   const rawLengthLimit = materialMaxLength
     ? Math.min(workstationLengthLimit, materialMaxLength)
@@ -1239,8 +1239,8 @@ const ConfiguratorPage: React.FC = () => {
       ? Math.min(1800, materialMaxWidth)
       : 1800;
   const workstationWidthLimit =
-    config.shape === 'workstation' && config.includeCableContour
-      ? Math.min(unconstrainedWidthLimit, WORKSTATION_CONTOUR_MAX_WIDTH_MM)
+    config.shape === 'workstation'
+      ? Math.min(unconstrainedWidthLimit, WORKSTATION_MAX_WIDTH_MM)
       : unconstrainedWidthLimit;
   const effectiveWidthLimit = Math.max(300, workstationWidthLimit);
   const maxCornerRadius = useMemo(() => Math.floor(config.widthMm / 2), [config.widthMm]);
@@ -1253,7 +1253,7 @@ const ConfiguratorPage: React.FC = () => {
     const usableLength = config.lengthMm - CONTOUR_EDGE_CLEARANCE_MM * 2;
     return Math.max(
       MIN_CONTOUR_LENGTH_MM,
-      Math.min(usableLength, WORKSTATION_CONTOUR_MAX_LENGTH_MM)
+      Math.min(usableLength, WORKSTATION_MAX_LENGTH_MM)
     );
   }, [config.lengthMm]);
   const maxCableContourDepth = useMemo(() => {

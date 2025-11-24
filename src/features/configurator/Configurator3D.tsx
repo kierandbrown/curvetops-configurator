@@ -362,13 +362,18 @@ const createTabletopGeometry = ({ config, customOutline }: TabletopGeometryOptio
     if (includeCableContour && contourHalfWidth > 0 && contourDepth > 0) {
       shape2d.lineTo(contourHalfWidth - contourRadius, backY);
       if (contourRadius > 0) {
-        shape2d.quadraticCurveTo(contourHalfWidth, backY, contourHalfWidth, backY - contourRadius);
+        shape2d.quadraticCurveTo(
+          contourHalfWidth - contourRadius,
+          backY - contourRadius,
+          contourHalfWidth,
+          backY - contourRadius
+        );
       }
       shape2d.lineTo(contourHalfWidth, backY - contourDepth + contourRadius);
       if (contourRadius > 0) {
         shape2d.quadraticCurveTo(
-          contourHalfWidth,
-          backY - contourDepth,
+          contourHalfWidth - contourRadius,
+          backY - contourDepth + contourRadius,
           contourHalfWidth - contourRadius,
           backY - contourDepth
         );
@@ -376,15 +381,20 @@ const createTabletopGeometry = ({ config, customOutline }: TabletopGeometryOptio
       shape2d.lineTo(-contourHalfWidth + contourRadius, backY - contourDepth);
       if (contourRadius > 0) {
         shape2d.quadraticCurveTo(
-          -contourHalfWidth,
-          backY - contourDepth,
+          -contourHalfWidth + contourRadius,
+          backY - contourDepth + contourRadius,
           -contourHalfWidth,
           backY - contourDepth + contourRadius
         );
       }
       shape2d.lineTo(-contourHalfWidth, backY - contourRadius);
       if (contourRadius > 0) {
-        shape2d.quadraticCurveTo(-contourHalfWidth, backY, -contourHalfWidth + contourRadius, backY);
+        shape2d.quadraticCurveTo(
+          -contourHalfWidth + contourRadius,
+          backY - contourRadius,
+          -contourHalfWidth + contourRadius,
+          backY
+        );
       }
     }
 
