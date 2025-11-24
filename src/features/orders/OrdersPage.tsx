@@ -348,12 +348,6 @@ const OrdersPage = () => {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm uppercase tracking-wide text-emerald-300">Order management</p>
-          <h1 className="text-3xl font-semibold">Orders overview</h1>
-          <p className="text-sm text-slate-300">
-            {isAdmin
-              ? 'Admins can review every submitted order and keep status updates in sync.'
-              : 'Track the orders you have placed and monitor their status updates in real time.'}
-          </p>
         </div>
         {showOrderForm ? (
           <button
@@ -362,15 +356,7 @@ const OrdersPage = () => {
           >
             Create order
           </button>
-        ) : (
-          <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4 text-sm text-slate-300">
-            <p className="font-semibold text-slate-100">Viewing past orders</p>
-            <p className="mt-1 text-xs text-slate-400">
-              This page lists the orders you have placed. Reach out through the configurator when you are ready to submit a new
-              request.
-            </p>
-          </div>
-        )}
+        ) : null}
       </div>
 
       <div
@@ -379,10 +365,6 @@ const OrdersPage = () => {
         }`}
       >
         <section className="flex min-h-full flex-1 flex-col rounded-2xl border border-slate-800 bg-slate-950/40">
-          <header className="border-b border-slate-800 px-4 py-3">
-            <p className="text-sm font-semibold">Saved orders</p>
-            <p className="text-xs text-slate-400">The table stays locked to the viewport height so it is easy to scan long lists of orders.</p>
-          </header>
           <div className="flex-1 overflow-hidden">
             {loading ? (
               <div className="flex h-full items-center justify-center">
@@ -406,7 +388,6 @@ const OrdersPage = () => {
                                 className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-100 focus:border-emerald-400 focus:outline-none"
                                 aria-label={column.label}
                               />
-                              <p className="mt-1 text-[0.65rem] text-slate-400">{column.helper}</p>
                             </div>
                           </div>
                         </th>
@@ -423,7 +404,6 @@ const OrdersPage = () => {
                               className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-100 focus:border-emerald-400 focus:outline-none"
                               aria-label="Estimated value"
                             />
-                            <p className="mt-1 text-[0.65rem] text-slate-400">Match parts of an amount (e.g. 15 or 15000) to locate similar deals.</p>
                           </div>
                         </div>
                       </th>
