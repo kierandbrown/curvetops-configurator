@@ -59,10 +59,18 @@ const emptyFilters: CartFilters = {
 };
 
 const calculateAreaM2 = (config: TabletopConfig) => {
-  const { shape, lengthMm, widthMm } = config;
+  const { shape, lengthMm, widthMm, leftReturnMm, rightReturnMm, internalRadiusMm } = config;
   if (shape === 'round' || shape === 'round-top') {
     const radiusMm = Math.max(lengthMm, widthMm) / 2;
     return (Math.PI * radiusMm * radiusMm) / 1_000_000;
+  }
+
+  if (shape === 'ninety-degree') {
+    const baseArea = (lengthMm * widthMm) / 1_000_000;
+    const cutoutArea = (leftReturnMm * rightReturnMm) / 1_000_000;
+    const innerRadius = Math.min(internalRadiusMm, leftReturnMm, rightReturnMm);
+    const radiusAdjustment = (Math.PI / 4) * Math.pow(innerRadius, 2) / 1_000_000;
+    return Math.max(baseArea - cutoutArea + radiusAdjustment, 0);
   }
 
   if (shape === 'ellipse' || shape === 'super-ellipse') {
@@ -75,11 +83,28 @@ const calculateAreaM2 = (config: TabletopConfig) => {
 };
 
 const calculateEdgeLengthMeters = (config: TabletopConfig) => {
-  const { shape, lengthMm, widthMm } = config;
+  const { shape, lengthMm, widthMm, leftReturnMm, rightReturnMm, internalRadiusMm, externalRadiusMm } = config;
 
   if (shape === 'round' || shape === 'round-top') {
     const diameterMm = Math.max(lengthMm, widthMm);
     return (Math.PI * diameterMm) / 1000;
+  }
+
+  if (shape === 'ninety-degree') {
+    const innerRadius = Math.min(internalRadiusMm, leftReturnMm, rightReturnMm);
+    const outerRadius = Math.min(externalRadiusMm, leftReturnMm, rightReturnMm);
+    const perimeterPieces =
+      (lengthMm - leftReturnMm) +
+      widthMm +
+      lengthMm +
+      Math.max(widthMm - rightReturnMm - innerRadius, 0) +
+      Math.max(leftReturnMm - outerRadius - innerRadius, 0) +
+      Math.max(rightReturnMm - outerRadius, 0);
+
+    const concaveArc = (Math.PI / 2) * innerRadius;
+    const outerArc = (Math.PI / 2) * outerRadius;
+
+    return (perimeterPieces + concaveArc + outerArc) / 1000;
   }
 
   if (shape === 'ellipse' || shape === 'super-ellipse') {

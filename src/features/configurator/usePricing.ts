@@ -49,6 +49,10 @@ export const usePricing = (config: TabletopConfig) => {
       shape: config.shape,
       lengthMm: Number(config.lengthMm),
       widthMm: Number(config.widthMm),
+      leftReturnMm: Number(config.leftReturnMm),
+      rightReturnMm: Number(config.rightReturnMm),
+      internalRadiusMm: Number(config.internalRadiusMm),
+      externalRadiusMm: Number(config.externalRadiusMm),
       thicknessMm: Number(config.thicknessMm),
       edgeRadiusMm: Number(config.edgeRadiusMm),
       superEllipseExponent: Number(config.superEllipseExponent),
@@ -59,10 +63,15 @@ export const usePricing = (config: TabletopConfig) => {
       finish: config.finish,
       edgeProfile: config.edgeProfile,
       quantity: Number(config.quantity)
-    }), [
+    }),
+    [
       config.shape,
       config.lengthMm,
       config.widthMm,
+      config.leftReturnMm,
+      config.rightReturnMm,
+      config.internalRadiusMm,
+      config.externalRadiusMm,
       config.thicknessMm,
       config.edgeRadiusMm,
       config.superEllipseExponent,

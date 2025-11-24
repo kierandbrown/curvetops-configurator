@@ -266,6 +266,27 @@ const shapeOptions: { shape: TableShape; label: string; icon: JSX.Element }[] = 
     )
   },
   {
+    shape: 'ninety-degree',
+    label: '90° top',
+    icon: (
+      <svg
+        aria-hidden
+        viewBox="0 0 160 100"
+        className="h-12 w-16 text-emerald-300"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={4}
+      >
+        <path
+          d="M60 10 H150 V90 H10 V40 H60 Z"
+          className="fill-emerald-400/20 stroke-emerald-300"
+        />
+        <path d="M60 40 Q90 40 90 10" className="stroke-emerald-300" />
+        <path d="M60 40 Q60 70 30 70" className="stroke-emerald-300" />
+      </svg>
+    )
+  },
+  {
     shape: 'round-top',
     label: 'D End Top',
     icon: (
@@ -351,6 +372,10 @@ const shapeOptions: { shape: TableShape; label: string; icon: JSX.Element }[] = 
 type NumericConfigField =
   | 'lengthMm'
   | 'widthMm'
+  | 'leftReturnMm'
+  | 'rightReturnMm'
+  | 'internalRadiusMm'
+  | 'externalRadiusMm'
   | 'edgeRadiusMm'
   | 'workstationFrontRadiusMm'
   | 'superEllipseExponent'
@@ -403,10 +428,18 @@ const DEFAULT_LABOUR_ITEMS: LabourItem[] = [
 const generateId = () => `labour-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
 const calculateAreaM2 = (config: TabletopConfig) => {
-  const { shape, lengthMm, widthMm } = config;
+  const { shape, lengthMm, widthMm, leftReturnMm, rightReturnMm, internalRadiusMm } = config;
   if (shape === 'round' || shape === 'round-top') {
     const radiusMm = Math.max(lengthMm, widthMm) / 2;
     return (Math.PI * radiusMm * radiusMm) / 1_000_000;
+  }
+
+  if (shape === 'ninety-degree') {
+    const baseArea = (lengthMm * widthMm) / 1_000_000;
+    const cutoutArea = (leftReturnMm * rightReturnMm) / 1_000_000;
+    const innerRadius = Math.min(internalRadiusMm, leftReturnMm, rightReturnMm);
+    const radiusAdjustment = (Math.PI / 4) * Math.pow(innerRadius, 2) / 1_000_000;
+    return Math.max(baseArea - cutoutArea + radiusAdjustment, 0);
   }
 
   if (shape === 'ellipse' || shape === 'super-ellipse') {
@@ -419,11 +452,28 @@ const calculateAreaM2 = (config: TabletopConfig) => {
 };
 
 const calculateEdgeLengthMeters = (config: TabletopConfig) => {
-  const { shape, lengthMm, widthMm } = config;
+  const { shape, lengthMm, widthMm, leftReturnMm, rightReturnMm, internalRadiusMm, externalRadiusMm } = config;
 
   if (shape === 'round' || shape === 'round-top') {
     const diameterMm = Math.max(lengthMm, widthMm);
     return (Math.PI * diameterMm) / 1000;
+  }
+
+  if (shape === 'ninety-degree') {
+    const innerRadius = Math.min(internalRadiusMm, leftReturnMm, rightReturnMm);
+    const outerRadius = Math.min(externalRadiusMm, leftReturnMm, rightReturnMm);
+    const perimeterPieces =
+      (lengthMm - leftReturnMm) +
+      widthMm +
+      lengthMm +
+      Math.max(widthMm - rightReturnMm - innerRadius, 0) +
+      Math.max(leftReturnMm - outerRadius - innerRadius, 0) +
+      Math.max(rightReturnMm - outerRadius, 0);
+
+    const concaveArc = (Math.PI / 2) * innerRadius;
+    const outerArc = (Math.PI / 2) * outerRadius;
+
+    return (perimeterPieces + concaveArc + outerArc) / 1000;
   }
 
   if (shape === 'ellipse' || shape === 'super-ellipse') {
@@ -461,6 +511,10 @@ const ConfiguratorPage: React.FC = () => {
   const [manualInputs, setManualInputs] = useState<Record<NumericConfigField, string>>({
     lengthMm: defaultTabletopConfig.lengthMm.toString(),
     widthMm: defaultTabletopConfig.widthMm.toString(),
+    leftReturnMm: defaultTabletopConfig.leftReturnMm.toString(),
+    rightReturnMm: defaultTabletopConfig.rightReturnMm.toString(),
+    internalRadiusMm: defaultTabletopConfig.internalRadiusMm.toString(),
+    externalRadiusMm: defaultTabletopConfig.externalRadiusMm.toString(),
     edgeRadiusMm: defaultTabletopConfig.edgeRadiusMm.toString(),
     workstationFrontRadiusMm: defaultTabletopConfig.workstationFrontRadiusMm.toString(),
     superEllipseExponent: defaultTabletopConfig.superEllipseExponent.toString(),
@@ -518,6 +572,22 @@ const ConfiguratorPage: React.FC = () => {
   }, [config.widthMm]);
 
   useEffect(() => {
+    setManualInputs(prev => ({ ...prev, leftReturnMm: config.leftReturnMm.toString() }));
+  }, [config.leftReturnMm]);
+
+  useEffect(() => {
+    setManualInputs(prev => ({ ...prev, rightReturnMm: config.rightReturnMm.toString() }));
+  }, [config.rightReturnMm]);
+
+  useEffect(() => {
+    setManualInputs(prev => ({ ...prev, internalRadiusMm: config.internalRadiusMm.toString() }));
+  }, [config.internalRadiusMm]);
+
+  useEffect(() => {
+    setManualInputs(prev => ({ ...prev, externalRadiusMm: config.externalRadiusMm.toString() }));
+  }, [config.externalRadiusMm]);
+
+  useEffect(() => {
     setManualInputs(prev => ({ ...prev, edgeRadiusMm: config.edgeRadiusMm.toString() }));
   }, [config.edgeRadiusMm]);
 
@@ -532,6 +602,35 @@ const ConfiguratorPage: React.FC = () => {
   useEffect(() => {
     setManualInputs(prev => ({ ...prev, thicknessMm: config.thicknessMm.toString() }));
   }, [config.thicknessMm]);
+
+  useEffect(() => {
+    setConfig(prev => {
+      if (prev.shape !== 'ninety-degree') return prev;
+
+      const clampedLeftReturn = clampNumber(prev.leftReturnMm, 100, prev.lengthMm);
+      const clampedRightReturn = clampNumber(prev.rightReturnMm, 100, prev.widthMm);
+      const maxRadius = Math.max(0, Math.min(clampedLeftReturn, clampedRightReturn));
+      const clampedInternal = clampNumber(prev.internalRadiusMm, 10, maxRadius);
+      const clampedExternal = clampNumber(prev.externalRadiusMm, 10, maxRadius);
+
+      if (
+        clampedLeftReturn === prev.leftReturnMm &&
+        clampedRightReturn === prev.rightReturnMm &&
+        clampedInternal === prev.internalRadiusMm &&
+        clampedExternal === prev.externalRadiusMm
+      ) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        leftReturnMm: clampedLeftReturn,
+        rightReturnMm: clampedRightReturn,
+        internalRadiusMm: clampedInternal,
+        externalRadiusMm: clampedExternal
+      };
+    });
+  }, [config.lengthMm, config.widthMm, config.shape]);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
@@ -1940,6 +2039,103 @@ const ConfiguratorPage: React.FC = () => {
           </p>
         )}
       </label>
+
+        {config.shape === 'ninety-degree' && (
+          <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-3">
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-slate-100">Return sizing</p>
+              <p className="text-[0.7rem] text-slate-400">
+                Control each leg of the 90° top independently, then fine-tune the inside and outside corner radii.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="flex flex-col gap-1 text-[0.75rem] font-medium">
+                <span>Left return (mm)</span>
+                <input
+                  type="number"
+                  min={100}
+                  max={config.lengthMm}
+                  step={10}
+                  value={manualInputs.leftReturnMm}
+                  onChange={handleManualNumberChange('leftReturnMm', 100, config.lengthMm)}
+                  onBlur={handleManualNumberBlur('leftReturnMm', 100, config.lengthMm)}
+                  className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                />
+                <p className="text-[0.65rem] text-slate-500">Keep this leg within the overall length.</p>
+              </label>
+
+              <label className="flex flex-col gap-1 text-[0.75rem] font-medium">
+                <span>Right return (mm)</span>
+                <input
+                  type="number"
+                  min={100}
+                  max={config.widthMm}
+                  step={10}
+                  value={manualInputs.rightReturnMm}
+                  onChange={handleManualNumberChange('rightReturnMm', 100, config.widthMm)}
+                  onBlur={handleManualNumberBlur('rightReturnMm', 100, config.widthMm)}
+                  className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                />
+                <p className="text-[0.65rem] text-slate-500">Limit this leg to the available width.</p>
+              </label>
+
+              <label className="flex flex-col gap-1 text-[0.75rem] font-medium">
+                <span>Internal radius (mm)</span>
+                <input
+                  type="number"
+                  min={10}
+                  max={Math.min(config.leftReturnMm, config.rightReturnMm)}
+                  step={5}
+                  value={manualInputs.internalRadiusMm}
+                  onChange={handleManualNumberChange(
+                    'internalRadiusMm',
+                    10,
+                    Math.max(10, Math.min(config.leftReturnMm, config.rightReturnMm))
+                  )}
+                  onBlur={handleManualNumberBlur(
+                    'internalRadiusMm',
+                    10,
+                    Math.max(10, Math.min(config.leftReturnMm, config.rightReturnMm))
+                  )}
+                  className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                />
+                <p className="text-[0.65rem] text-slate-500">Softens the inner elbow of the corner.</p>
+              </label>
+
+              <label className="flex flex-col gap-1 text-[0.75rem] font-medium">
+                <span>External radius (mm)</span>
+                <input
+                  type="number"
+                  min={10}
+                  max={Math.min(config.leftReturnMm, config.rightReturnMm)}
+                  step={5}
+                  value={manualInputs.externalRadiusMm}
+                  onChange={handleManualNumberChange(
+                    'externalRadiusMm',
+                    10,
+                    Math.max(10, Math.min(config.leftReturnMm, config.rightReturnMm))
+                  )}
+                  onBlur={handleManualNumberBlur(
+                    'externalRadiusMm',
+                    10,
+                    Math.max(10, Math.min(config.leftReturnMm, config.rightReturnMm))
+                  )}
+                  className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                />
+                <p className="text-[0.65rem] text-slate-500">Rounds the outer elbow where the legs meet.</p>
+              </label>
+            </div>
+          </div>
+        )}
 
         {config.shape === 'workstation' && (
           <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-3">

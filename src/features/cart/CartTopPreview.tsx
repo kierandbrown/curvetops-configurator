@@ -168,6 +168,48 @@ const CartTopPreview = ({ config, label, selectedColour, size = 'compact' }: Car
       shapeElement = <path d={path} fill={fill} stroke={stroke} strokeWidth={4} />;
       break;
     }
+    case 'ninety-degree': {
+      const leftReturn = Math.min(config.leftReturnMm, config.lengthMm) * scale;
+      const rightReturn = Math.min(config.rightReturnMm, config.widthMm) * scale;
+      const innerRadius = Math.min(config.internalRadiusMm, config.leftReturnMm, config.rightReturnMm) * scale;
+      const outerRadius = Math.min(config.externalRadiusMm, config.leftReturnMm, config.rightReturnMm) * scale;
+
+      const startX = originX + leftReturn;
+      const baseY = originY + scaledWidth;
+      const innerCornerY = baseY - rightReturn;
+
+      const commands = [`M${startX} ${baseY - outerRadius}`];
+
+      if (outerRadius > 0) {
+        commands.push(`Q${startX} ${baseY} ${startX + outerRadius} ${baseY}`);
+      } else {
+        commands.push(`L${startX} ${baseY}`);
+      }
+
+      commands.push(
+        `L${originX + scaledLength} ${baseY}`,
+        `L${originX + scaledLength} ${originY}`,
+        `L${originX} ${originY}`,
+        `L${originX} ${innerCornerY + innerRadius}`
+      );
+
+      if (innerRadius > 0) {
+        commands.push(`Q${originX} ${innerCornerY} ${startX - innerRadius} ${innerCornerY}`);
+      }
+
+      const elbowStartX = startX - Math.max(innerRadius, 0);
+      if (outerRadius > 0) {
+        commands.push(`L${elbowStartX - Math.max(outerRadius - innerRadius, 0)} ${innerCornerY}`);
+        commands.push(`Q${startX} ${innerCornerY} ${startX} ${innerCornerY - outerRadius}`);
+      } else {
+        commands.push(`L${startX} ${innerCornerY}`);
+      }
+
+      commands.push(`L${startX} ${baseY - outerRadius}`);
+
+      shapeElement = <path d={commands.join(' ')} fill={fill} stroke={stroke} strokeWidth={4} />;
+      break;
+    }
     case 'custom':
     default: {
       shapeElement = (

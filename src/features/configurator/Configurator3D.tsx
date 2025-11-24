@@ -18,6 +18,7 @@ export type TableShape =
   | 'round'
   | 'ellipse'
   | 'super-ellipse'
+  | 'ninety-degree'
   | 'workstation'
   | 'custom';
 
@@ -27,6 +28,10 @@ export interface TabletopConfig {
   shape: TableShape;
   lengthMm: number;
   widthMm: number;
+  leftReturnMm: number;
+  rightReturnMm: number;
+  internalRadiusMm: number;
+  externalRadiusMm: number;
   thicknessMm: number;
   edgeRadiusMm: number;
   superEllipseExponent: number;
@@ -190,6 +195,10 @@ const createTabletopGeometry = ({ config, customOutline }: TabletopGeometryOptio
     shape,
     lengthMm,
     widthMm,
+    leftReturnMm,
+    rightReturnMm,
+    internalRadiusMm,
+    externalRadiusMm,
     thicknessMm,
     edgeRadiusMm,
     superEllipseExponent,
@@ -208,6 +217,10 @@ const createTabletopGeometry = ({ config, customOutline }: TabletopGeometryOptio
 
   const length = lengthMm * MM_TO_M;
   const width = widthMm * MM_TO_M;
+  const leftReturn = Math.min(leftReturnMm, lengthMm) * MM_TO_M;
+  const rightReturn = Math.min(rightReturnMm, widthMm) * MM_TO_M;
+  const internalRadius = Math.min(internalRadiusMm, leftReturnMm, rightReturnMm) * MM_TO_M;
+  const externalRadius = Math.min(externalRadiusMm, leftReturnMm, rightReturnMm) * MM_TO_M;
   const thickness = thicknessMm * MM_TO_M;
 
   const shape2d = new THREE.Shape();
@@ -253,6 +266,46 @@ const createTabletopGeometry = ({ config, customOutline }: TabletopGeometryOptio
     shape2d.quadraticCurveTo(x, y + width, x, y + width - r);
     shape2d.lineTo(x, y + r);
     shape2d.quadraticCurveTo(x, y, x + r, y);
+  } else if (shape === 'ninety-degree') {
+    const hl = length / 2;
+    const hw = width / 2;
+    const innerX = -hl + leftReturn;
+    const innerY = -hw + rightReturn;
+
+    const usableInnerRadius = Math.max(
+      0,
+      Math.min(internalRadius, leftReturn, rightReturn, Math.abs(innerX + hl), Math.abs(innerY + hw))
+    );
+    const usableOuterRadius = Math.max(
+      0,
+      Math.min(externalRadius, leftReturn, rightReturn, rightReturn - usableInnerRadius)
+    );
+
+    // Start near the inner corner so the rounding flows smoothly along the bottom run.
+    shape2d.moveTo(innerX, -hw + usableOuterRadius);
+    if (usableOuterRadius > 0) {
+      shape2d.quadraticCurveTo(innerX, -hw, innerX + usableOuterRadius, -hw);
+    }
+    shape2d.lineTo(hl, -hw);
+    shape2d.lineTo(hl, hw);
+    shape2d.lineTo(-hl, hw);
+
+    // Step down the left leg until the inner corner radius begins.
+    shape2d.lineTo(-hl, innerY + usableInnerRadius);
+    if (usableInnerRadius > 0) {
+      shape2d.quadraticCurveTo(-hl, innerY, innerX - usableInnerRadius, innerY);
+    }
+
+    // Transition around the outer elbow before returning to the start.
+    const elbowStartX = innerX - Math.max(usableInnerRadius, 0);
+    const elbowStartY = innerY;
+    if (usableOuterRadius > 0) {
+      shape2d.lineTo(elbowStartX - (usableOuterRadius - usableInnerRadius), elbowStartY);
+      shape2d.quadraticCurveTo(innerX, innerY, innerX, innerY - usableOuterRadius);
+    } else {
+      shape2d.lineTo(innerX, innerY);
+    }
+    shape2d.lineTo(innerX, -hw + usableOuterRadius);
   } else if (shape === 'round-top') {
     // Model a D-shaped top: one straight side and a fully rounded meeting end.
     const hw = width / 2;
