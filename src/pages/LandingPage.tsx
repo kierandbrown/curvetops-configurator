@@ -74,8 +74,8 @@ const LandingPage: React.FC = () => {
         </div>
         <div className="relative h-64 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-xl shadow-emerald-900/30">
           <img
-            src="https://images.unsplash.com/photo-1545239351-1141bd82e8a6?auto=format&fit=crop&w=1400&q=90"
-            alt="Curved timber table in a modern interior"
+            src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1400&q=90"
+            alt="Cafe tables with yellow chairs in a modern interior"
             className="h-full w-full object-cover opacity-90"
           />
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-900/30 to-transparent" />
